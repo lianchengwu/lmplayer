@@ -667,6 +667,15 @@ func (cs *CacheService) SetEnabled(enabled bool) CacheResponse {
 	log.Printf("🎵 设置OSD歌词状态: %v", enabled)
 
 	if enabled {
+		// 检查是否已经启用
+		if cs.IsEnabled() {
+			log.Printf("✅ OSD歌词程序已在运行，无需重复启动")
+			return CacheResponse{
+				Success: true,
+				Message: "桌面歌词已在运行",
+			}
+		}
+
 		// 启动OSD歌词程序
 		if err := cs.startOSDLyricsProcess(); err != nil {
 			log.Printf("❌ 启动OSD歌词程序失败: %v", err)
@@ -691,11 +700,19 @@ func (cs *CacheService) startOSDLyricsProcess() error {
 	cs.osdProcessMutex.Lock()
 	defer cs.osdProcessMutex.Unlock()
 
-	// 如果进程已经在运行，先停止它
+	// 检查进程是否已经在运行且健康
 	if cs.osdProcess != nil {
-		cs.osdProcess.Process.Kill()
-		cs.osdProcess.Wait()
-		cs.osdProcess = nil
+		// 检查进程状态
+		processState := cs.osdProcess.ProcessState
+		if processState == nil {
+			// 进程还在运行（ProcessState为nil表示进程未退出）
+			log.Printf("✅ OSD歌词程序已在运行，PID: %d", cs.osdProcess.Process.Pid)
+			return nil // 进程健康运行，无需重启
+		} else {
+			// 进程已退出，清理引用
+			log.Printf("🔍 检测到OSD歌词进程已退出（退出码: %d），准备重新启动", processState.ExitCode())
+			cs.osdProcess = nil
+		}
 	}
 	// 获取当前程序所在的目录
 	ex, err := os.Executable()
@@ -804,7 +821,22 @@ func (cs *CacheService) stopOSDLyricsProcess() {
 func (cs *CacheService) IsEnabled() bool {
 	cs.osdProcessMutex.RLock()
 	defer cs.osdProcessMutex.RUnlock()
-	return cs.osdProcess != nil
+
+	if cs.osdProcess == nil {
+		return false
+	}
+
+	// 检查进程是否真的还在运行
+	processState := cs.osdProcess.ProcessState
+	if processState != nil {
+		// 进程已退出
+		log.Printf("🔍 检测到OSD歌词进程已退出，清理引用")
+		// 注意：这里不能直接修改 cs.osdProcess，因为我们持有的是读锁
+		// 实际清理会在下次调用 startOSDLyricsProcess 时进行
+		return false
+	}
+
+	return true // 进程存在且未退出
 }
 
 // broadcastLyricsMessage 向所有连接的客户端广播歌词消息
