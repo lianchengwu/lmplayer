@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dhowden/tag"
@@ -16,6 +17,12 @@ import (
 
 // LocalMusicService 本地音乐服务结构体
 type LocalMusicService struct{}
+
+// ScanResult 扫描结果
+type ScanResult struct {
+	MusicFile *LocalMusicFile
+	Error     error
+}
 
 // LocalMusicFile 本地音乐文件信息
 type LocalMusicFile struct {
@@ -36,12 +43,21 @@ type LocalMusicFile struct {
 	Lyrics       string `json:"lyrics"`        // 歌词内容
 }
 
+// FolderMusicGroup 文件夹音乐分组
+type FolderMusicGroup struct {
+	FolderPath string           `json:"folder_path"` // 文件夹路径
+	FolderName string           `json:"folder_name"` // 文件夹名称
+	MusicFiles []LocalMusicFile `json:"music_files"` // 该文件夹下的音乐文件
+	Stats      LocalMusicStats  `json:"stats"`       // 该文件夹的统计信息
+}
+
 // LocalMusicResponse 本地音乐响应结构
 type LocalMusicResponse struct {
-	Success bool             `json:"success"`
-	Message string           `json:"message"`
-	Data    []LocalMusicFile `json:"data"`
-	Stats   LocalMusicStats  `json:"stats"`
+	Success      bool               `json:"success"`
+	Message      string             `json:"message"`
+	Data         []LocalMusicFile   `json:"data"`          // 保持兼容性，所有音乐文件的平铺列表
+	FolderGroups []FolderMusicGroup `json:"folder_groups"` // 按文件夹分组的音乐文件
+	Stats        LocalMusicStats    `json:"stats"`         // 总体统计信息
 }
 
 // LocalMusicStats 本地音乐统计信息
@@ -107,7 +123,22 @@ func (l *LocalMusicService) ScanMusicFolders(folderPaths []string) LocalMusicRes
 	}
 
 	var allMusicFiles []LocalMusicFile
+	var folderGroups []FolderMusicGroup
 	var failedPaths []string
+
+	// 收集所有文件夹中的音乐文件路径
+	var allFilePaths []string
+	var folderFileMap = make(map[string][]string) // 记录每个文件夹的文件路径
+
+	supportedFormats := map[string]bool{
+		".mp3":  true,
+		".flac": true,
+		".wav":  true,
+		".m4a":  true,
+		".aac":  true,
+		".ogg":  true,
+		".wma":  true,
+	}
 
 	for _, folderPath := range folderPaths {
 		if folderPath == "" {
@@ -121,21 +152,86 @@ func (l *LocalMusicService) ScanMusicFolders(folderPaths []string) LocalMusicRes
 			continue
 		}
 
-		// 扫描单个文件夹
-		response := l.ScanMusicFolder(folderPath)
-		if response.Success {
-			allMusicFiles = append(allMusicFiles, response.Data...)
-			fmt.Printf("成功扫描文件夹 %s: %d 首音乐\n", folderPath, len(response.Data))
-		} else {
+		var folderFiles []string
+		err := filepath.Walk(folderPath, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return nil // 跳过错误文件
+			}
+
+			if info.IsDir() {
+				return nil // 跳过目录
+			}
+
+			// 检查文件扩展名
+			ext := strings.ToLower(filepath.Ext(path))
+			if !supportedFormats[ext] {
+				return nil // 跳过不支持的格式
+			}
+
+			folderFiles = append(folderFiles, path)
+			allFilePaths = append(allFilePaths, path)
+			return nil
+		})
+
+		if err != nil {
 			failedPaths = append(failedPaths, folderPath)
-			fmt.Printf("扫描文件夹失败 %s: %s\n", folderPath, response.Message)
+			fmt.Printf("扫描文件夹失败 %s: %v\n", folderPath, err)
+			continue
+		}
+
+		folderFileMap[folderPath] = folderFiles
+		fmt.Printf("收集文件夹 %s: %d 个音乐文件\n", folderPath, len(folderFiles))
+	}
+
+	if len(allFilePaths) == 0 {
+		message := "没有找到音乐文件"
+		if len(failedPaths) > 0 {
+			message += fmt.Sprintf("，%d 个文件夹扫描失败", len(failedPaths))
+		}
+		return LocalMusicResponse{
+			Success: true,
+			Message: message,
+			Data:    []LocalMusicFile{},
+			Stats:   LocalMusicStats{},
+		}
+	}
+
+	// 使用协程并发扫描所有音乐文件
+	fmt.Printf("🚀 开始并发扫描 %d 个音乐文件\n", len(allFilePaths))
+	allMusicFiles = l.scanMusicFilesConcurrently(allFilePaths)
+
+	// 按文件夹分组音乐文件
+	for folderPath, folderFiles := range folderFileMap {
+		var folderMusicFiles []LocalMusicFile
+
+		// 找到属于这个文件夹的音乐文件
+		for _, musicFile := range allMusicFiles {
+			for _, filePath := range folderFiles {
+				if musicFile.FilePath == filePath {
+					folderMusicFiles = append(folderMusicFiles, musicFile)
+					break
+				}
+			}
+		}
+
+		if len(folderMusicFiles) > 0 {
+			folderName := filepath.Base(folderPath)
+			folderStats := l.calculateStats(folderMusicFiles)
+			folderGroup := FolderMusicGroup{
+				FolderPath: folderPath,
+				FolderName: folderName,
+				MusicFiles: folderMusicFiles,
+				Stats:      folderStats,
+			}
+			folderGroups = append(folderGroups, folderGroup)
+			fmt.Printf("✅ 文件夹 %s: %d 首音乐\n", folderPath, len(folderMusicFiles))
 		}
 	}
 
 	// 去重处理（基于文件hash）
 	uniqueFiles := l.deduplicateMusicFiles(allMusicFiles)
 
-	// 计算统计信息
+	// 计算总体统计信息
 	stats := l.calculateStats(uniqueFiles)
 
 	// 缓存扫描结果
@@ -154,14 +250,15 @@ func (l *LocalMusicService) ScanMusicFolders(folderPaths []string) LocalMusicRes
 	}
 
 	return LocalMusicResponse{
-		Success: true,
-		Message: message,
-		Data:    uniqueFiles,
-		Stats:   stats,
+		Success:      true,
+		Message:      message,
+		Data:         uniqueFiles,
+		FolderGroups: folderGroups,
+		Stats:        stats,
 	}
 }
 
-// ScanMusicFolder 扫描音乐文件夹
+// ScanMusicFolder 扫描音乐文件夹（使用协程并发扫描）
 func (l *LocalMusicService) ScanMusicFolder(folderPath string) LocalMusicResponse {
 	if folderPath == "" {
 		return LocalMusicResponse{
@@ -178,7 +275,8 @@ func (l *LocalMusicService) ScanMusicFolder(folderPath string) LocalMusicRespons
 		}
 	}
 
-	var musicFiles []LocalMusicFile
+	// 收集所有音乐文件路径
+	var filePaths []string
 	supportedFormats := map[string]bool{
 		".mp3":  true,
 		".flac": true,
@@ -189,7 +287,6 @@ func (l *LocalMusicService) ScanMusicFolder(folderPath string) LocalMusicRespons
 		".wma":  true,
 	}
 
-	// 遍历文件夹
 	err := filepath.Walk(folderPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil // 跳过错误文件
@@ -205,14 +302,7 @@ func (l *LocalMusicService) ScanMusicFolder(folderPath string) LocalMusicRespons
 			return nil // 跳过不支持的格式
 		}
 
-		// 解析音乐文件
-		musicFile, err := l.parseMusicFile(path)
-		if err != nil {
-			fmt.Printf("解析音乐文件失败 %s: %v\n", path, err)
-			return nil // 跳过解析失败的文件
-		}
-
-		musicFiles = append(musicFiles, *musicFile)
+		filePaths = append(filePaths, path)
 		return nil
 	})
 
@@ -222,6 +312,18 @@ func (l *LocalMusicService) ScanMusicFolder(folderPath string) LocalMusicRespons
 			Message: fmt.Sprintf("扫描文件夹失败: %v", err),
 		}
 	}
+
+	if len(filePaths) == 0 {
+		return LocalMusicResponse{
+			Success: true,
+			Message: "文件夹中没有找到支持的音乐文件",
+			Data:    []LocalMusicFile{},
+			Stats:   LocalMusicStats{},
+		}
+	}
+
+	// 使用协程并发扫描音乐文件
+	musicFiles := l.scanMusicFilesConcurrently(filePaths)
 
 	// 计算统计信息
 	stats := l.calculateStats(musicFiles)
@@ -236,12 +338,74 @@ func (l *LocalMusicService) ScanMusicFolder(folderPath string) LocalMusicRespons
 		fmt.Printf("生成本地音乐映射失败: %v\n", err)
 	}
 
-	return LocalMusicResponse{
-		Success: true,
-		Message: fmt.Sprintf("成功扫描到 %d 首音乐", len(musicFiles)),
-		Data:    musicFiles,
-		Stats:   stats,
+	// 创建文件夹分组
+	folderName := filepath.Base(folderPath)
+	folderGroup := FolderMusicGroup{
+		FolderPath: folderPath,
+		FolderName: folderName,
+		MusicFiles: musicFiles,
+		Stats:      stats,
 	}
+
+	return LocalMusicResponse{
+		Success:      true,
+		Message:      fmt.Sprintf("成功扫描到 %d 首音乐", len(musicFiles)),
+		Data:         musicFiles,
+		FolderGroups: []FolderMusicGroup{folderGroup},
+		Stats:        stats,
+	}
+}
+
+// scanMusicFilesConcurrently 并发扫描音乐文件（简化版本）
+func (l *LocalMusicService) scanMusicFilesConcurrently(filePaths []string) []LocalMusicFile {
+	if len(filePaths) == 0 {
+		return []LocalMusicFile{}
+	}
+
+	fmt.Printf("🚀 开始并发扫描 %d 个音乐文件\n", len(filePaths))
+
+	// 创建结果通道
+	resultChan := make(chan ScanResult, len(filePaths))
+	var wg sync.WaitGroup
+
+	// 为每个文件启动一个协程
+	for _, filePath := range filePaths {
+		wg.Add(1)
+		go func(path string) {
+			defer wg.Done()
+
+			musicFile, err := l.parseMusicFile(path)
+			result := ScanResult{
+				MusicFile: musicFile,
+				Error:     err,
+			}
+			resultChan <- result
+		}(filePath)
+	}
+
+	// 等待所有协程完成
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	// 收集结果
+	var musicFiles []LocalMusicFile
+	successCount := 0
+	failedCount := 0
+
+	for result := range resultChan {
+		if result.Error != nil {
+			fmt.Printf("❌ 扫描失败: %v\n", result.Error)
+			failedCount++
+		} else {
+			musicFiles = append(musicFiles, *result.MusicFile)
+			successCount++
+		}
+	}
+
+	fmt.Printf("✅ 并发扫描完成: 成功 %d 个，失败 %d 个\n", successCount, failedCount)
+	return musicFiles
 }
 
 // parseMusicFile 解析音乐文件
@@ -325,8 +489,6 @@ func (l *LocalMusicService) parseMusicFile(filePath string) (*LocalMusicFile, er
 		coverURL, err := l.saveCoverToCache(musicFile.Hash, picture.Data, picture.MIMEType)
 		if err == nil {
 			musicFile.UnionCover = coverURL
-		} else {
-			fmt.Printf("保存封面失败 %s: %v\n", filePath, err)
 		}
 	}
 
@@ -485,12 +647,44 @@ func (l *LocalMusicService) GetCachedMusicFiles() LocalMusicResponse {
 	// 计算统计信息
 	stats := l.calculateStats(musicFiles)
 
+	// 按文件夹路径分组音乐文件
+	folderGroups := l.groupMusicFilesByFolder(musicFiles)
+
 	return LocalMusicResponse{
-		Success: true,
-		Message: fmt.Sprintf("成功加载 %d 首缓存音乐", len(musicFiles)),
-		Data:    musicFiles,
-		Stats:   stats,
+		Success:      true,
+		Message:      fmt.Sprintf("成功加载 %d 首缓存音乐", len(musicFiles)),
+		Data:         musicFiles,
+		FolderGroups: folderGroups,
+		Stats:        stats,
 	}
+}
+
+// groupMusicFilesByFolder 按文件夹路径分组音乐文件
+func (l *LocalMusicService) groupMusicFilesByFolder(musicFiles []LocalMusicFile) []FolderMusicGroup {
+	folderMap := make(map[string][]LocalMusicFile)
+
+	// 按文件夹路径分组
+	for _, musicFile := range musicFiles {
+		folderPath := filepath.Dir(musicFile.FilePath)
+		folderMap[folderPath] = append(folderMap[folderPath], musicFile)
+	}
+
+	// 转换为FolderMusicGroup切片
+	var folderGroups []FolderMusicGroup
+	for folderPath, files := range folderMap {
+		folderName := filepath.Base(folderPath)
+		stats := l.calculateStats(files)
+
+		folderGroup := FolderMusicGroup{
+			FolderPath: folderPath,
+			FolderName: folderName,
+			MusicFiles: files,
+			Stats:      stats,
+		}
+		folderGroups = append(folderGroups, folderGroup)
+	}
+
+	return folderGroups
 }
 
 // parseAudioDuration 解析音频文件时长

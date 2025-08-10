@@ -30,6 +30,13 @@
     --accent-color-rgb: 99, 102, 241;    /* 蓝色强调色RGB值 */
     --accent-hover: rgb(79, 70, 229);    /* 悬停状态 */
 
+    /* 状态色系 */
+    --success-color: rgb(34, 197, 94);   /* 绿色成功 */
+    --warning-color: rgb(245, 158, 11);  /* 黄色警告 */
+    --error-color: rgb(239, 68, 68);     /* 红色错误 */
+    --error-hover: rgb(220, 38, 38);     /* 红色错误悬停 */
+    --info-color: rgb(59, 130, 246);     /* 蓝色信息 */
+
     /* 组件特定颜色 */
     --titlebar-bg: var(--primary-light);
     --card-bg: var(--bg-elevated);

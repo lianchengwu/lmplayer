@@ -1,5 +1,13 @@
 /* 本地音乐页面样式 */
 
+/* 确保必要的CSS变量存在 */
+:root {
+    --success-color: #4caf50;
+    --error-color: #f44336;
+    --error-hover: #d32f2f;
+    --accent-hover: #1976d2;
+}
+
 /* 本地音乐页面容器 */
 .local-page {
     padding: 20px;
@@ -202,18 +210,62 @@
 
 .path-manager-header {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    padding: 20px;
+    padding: 16px 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+    border-radius: 8px;
     background: var(--bg-tertiary);
     border-bottom: 1px solid var(--border-color);
 }
 
+.path-manager-header:hover {
+    background: var(--bg-hover);
+}
+
+.path-manager-toggle {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+    color: var(--text-secondary);
+    transition: transform 0.2s ease;
+}
+
+.path-manager-icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 16px;
+    color: var(--accent-color);
+    font-size: 18px;
+}
+
 .path-manager-header h3 {
     margin: 0;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 600;
     color: var(--text-primary);
+    flex: 1;
+}
+
+.path-manager-count {
+    margin-left: 16px;
+}
+
+.path-count {
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid var(--border-color);
 }
 
 /* 浅色主题下的添加路径按钮 */
@@ -264,6 +316,20 @@
 
 .path-list {
     padding: 20px;
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.path-list.collapsed {
+    max-height: 0;
+    opacity: 0;
+    padding: 0 20px;
+}
+
+.path-list.expanded {
+    max-height: 1000px;
+    opacity: 1;
+    padding: 20px;
 }
 
 .empty-paths {
@@ -288,6 +354,7 @@
     color: var(--text-tertiary);
 }
 
+/* 路径项样式 */
 .path-item {
     display: flex;
     justify-content: space-between;
@@ -302,7 +369,7 @@
 
 .path-item:hover {
     background: var(--bg-hover);
-    border-color: var(--primary-color);
+    border-color: var(--accent-color);
 }
 
 .path-item:last-child {
@@ -318,7 +385,7 @@
 }
 
 .path-info i {
-    color: var(--primary-color);
+    color: var(--accent-color);
     font-size: 16px;
 }
 
@@ -347,6 +414,16 @@
     cursor: pointer;
     transition: all 0.2s ease;
     color: var(--text-secondary);
+}
+
+.path-action-btn:hover {
+    background: var(--accent-color);
+    color: white;
+    transform: translateY(-1px);
+}
+
+.path-delete-btn:hover {
+    background: var(--error-color);
 }
 
 .path-action-btn:hover {
@@ -937,10 +1014,160 @@
     line-height: 1.5;
 }
 
+/* 文件夹分组样式 */
+.local-music-list.folder-grouped {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+}
+
+.folder-section {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    margin-bottom: 16px;
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+.folder-header {
+    display: flex;
+    align-items: center;
+    padding: 16px 20px;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.folder-header:hover {
+    background: var(--bg-hover);
+}
+
+.folder-toggle {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+    color: var(--text-secondary);
+    transition: transform 0.2s ease;
+}
+
+.folder-icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 16px;
+    color: var(--accent-color);
+    font-size: 18px;
+}
+
+.folder-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.folder-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.folder-stats {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.folder-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: 16px;
+}
+
+.folder-action-btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 6px;
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    font-size: 14px;
+}
+
+.folder-action-btn:hover {
+    background: var(--accent-color);
+    color: white;
+    transform: translateY(-1px);
+}
+
+.folder-content {
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.folder-content.collapsed {
+    max-height: 0;
+    opacity: 0;
+}
+
+.folder-content.expanded {
+    max-height: 2000px;
+    opacity: 1;
+}
+
+.folder-music-header {
+    display: grid;
+    grid-template-columns: 24px 60px 1fr 200px 100px 160px;
+    gap: 16px;
+    padding: 12px 20px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.folder-music-list {
+    background: var(--bg-secondary);
+}
+
+.folder-song-item {
+    display: grid;
+    grid-template-columns: 24px 60px 1fr 200px 100px 160px;
+    gap: 16px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border-light);
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.folder-song-item:hover {
+    background: var(--bg-hover);
+}
+
+.folder-song-item:last-child {
+    border-bottom: none;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
     .local-music-header,
-    .local-song-item {
+    .local-song-item,
+    .folder-music-header,
+    .folder-song-item {
         grid-template-columns: 20px 50px 1fr 80px;
         gap: 12px;
     }
@@ -948,6 +1175,28 @@
     .local-song-album,
     .local-song-actions {
         display: none;
+    }
+
+    .folder-header {
+        padding: 12px 16px;
+    }
+
+    .folder-name {
+        font-size: 15px;
+    }
+
+    .folder-stats {
+        font-size: 12px;
+    }
+
+    .folder-actions {
+        gap: 6px;
+    }
+
+    .folder-action-btn {
+        width: 28px;
+        height: 28px;
+        font-size: 12px;
     }
 
     .local-stats {

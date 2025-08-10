@@ -4,9 +4,12 @@ import * as LocalMusicService from "./bindings/wmplayer/localmusicservice.js";
 
 // 全局变量
 let localMusicFiles = [];
+let folderMusicGroups = []; // 存储按文件夹分组的音乐数据
 let currentLocalSong = null;
 let isScanning = false;
 let musicFolderPaths = []; // 存储用户添加的文件夹路径
+let expandedFolders = new Set(); // 存储展开的文件夹
+let isPathListExpanded = true; // 文件夹路径列表是否展开
 
 // 初始化本地音乐功能
 function initLocalMusic() {
@@ -56,10 +59,19 @@ function createFolderPathManager() {
         pathManager = document.createElement('div');
         pathManager.className = 'folder-path-manager';
         pathManager.innerHTML = `
-            <div class="path-manager-header">
+            <div class="path-manager-header" onclick="togglePathManager()">
+                <div class="path-manager-toggle">
+                    <i class="fas fa-chevron-${isPathListExpanded ? 'down' : 'right'}"></i>
+                </div>
+                <div class="path-manager-icon">
+                    <i class="fas fa-folder${isPathListExpanded ? '-open' : ''}"></i>
+                </div>
                 <h3>音乐文件夹路径</h3>
+                <div class="path-manager-count">
+                    <span class="path-count">${musicFolderPaths.length} 个路径</span>
+                </div>
             </div>
-            <div class="path-list" id="musicPathList">
+            <div class="path-list ${isPathListExpanded ? 'expanded' : 'collapsed'}" id="musicPathList">
                 <div class="empty-paths">
                     <i class="fas fa-folder-open"></i>
                     <p>还没有添加任何音乐文件夹路径</p>
@@ -206,6 +218,12 @@ function updatePathListDisplay() {
     const pathList = document.getElementById('musicPathList');
     if (!pathList) return;
 
+    // 更新路径计数
+    const pathCount = document.querySelector('.path-count');
+    if (pathCount) {
+        pathCount.textContent = `${musicFolderPaths.length} 个路径`;
+    }
+
     if (musicFolderPaths.length === 0) {
         pathList.innerHTML = `
             <div class="empty-paths">
@@ -219,10 +237,10 @@ function updatePathListDisplay() {
             <div class="path-item">
                 <div class="path-info">
                     <i class="fas fa-folder"></i>
-                    <span class="path-text" title="${path}">${path}</span>
+                    <span class="path-text" title="${escapeHtml(path)}">${escapeHtml(path)}</span>
                 </div>
                 <div class="path-actions">
-                    <button class="path-action-btn" onclick="scanSingleFolder('${path}')" title="扫描此文件夹">
+                    <button class="path-action-btn" onclick="scanSingleFolder('${escapeHtml(path)}')" title="扫描此文件夹">
                         <i class="fas fa-sync"></i>
                     </button>
                     <button class="path-action-btn path-delete-btn" onclick="removeFolderPath(${index})" title="删除此路径">
@@ -313,6 +331,8 @@ async function scanAllMusicFolders() {
 function saveFolderPaths() {
     try {
         localStorage.setItem('musicFolderPaths', JSON.stringify(musicFolderPaths));
+        // 同时保存路径列表展开状态
+        localStorage.setItem('isPathListExpanded', JSON.stringify(isPathListExpanded));
     } catch (error) {
         console.warn('保存文件夹路径失败:', error);
     }
@@ -324,11 +344,19 @@ function loadFolderPaths() {
         const saved = localStorage.getItem('musicFolderPaths');
         if (saved) {
             musicFolderPaths = JSON.parse(saved);
-            updatePathListDisplay();
         }
+
+        // 加载路径列表展开状态
+        const savedExpandedState = localStorage.getItem('isPathListExpanded');
+        if (savedExpandedState !== null) {
+            isPathListExpanded = JSON.parse(savedExpandedState);
+        }
+
+        updatePathListDisplay();
     } catch (error) {
         console.warn('加载文件夹路径失败:', error);
         musicFolderPaths = [];
+        isPathListExpanded = true;
     }
 }
 
@@ -470,42 +498,29 @@ async function scanMusicFoldersWithBackend() {
 
     try {
         showMessage('开始扫描音乐文件...', 'info');
-        let allMusicFiles = [];
 
-        // 逐个扫描每个文件夹路径
-        for (let i = 0; i < musicFolderPaths.length; i++) {
-            const folderPath = musicFolderPaths[i];
-            console.log(`扫描文件夹 ${i + 1}/${musicFolderPaths.length}: ${folderPath}`);
+        // 使用后端的ScanMusicFolders方法一次性扫描所有文件夹
+        const response = await LocalMusicService.ScanMusicFolders(musicFolderPaths);
 
-            if (scanBtn) {
-                scanBtn.textContent = `扫描中... (${i + 1}/${musicFolderPaths.length})`;
+        if (response.success) {
+            // 更新全局变量
+            localMusicFiles = response.data || [];
+            folderMusicGroups = response.folder_groups || [];
+
+            // 如果后端没有返回分组数据，前端进行分组
+            if (folderMusicGroups.length === 0 && localMusicFiles.length > 0) {
+                folderMusicGroups = groupMusicFilesByFolder(localMusicFiles);
             }
 
-            try {
-                const response = await LocalMusicService.ScanMusicFolder(folderPath);
+            displayLocalMusicWithFolders();
 
-                if (response.success) {
-                    allMusicFiles.push(...(response.data || []));
-                    console.log(`文件夹 ${folderPath} 扫描完成，找到 ${response.data?.length || 0} 首音乐`);
-                } else {
-                    console.warn(`扫描文件夹失败 ${folderPath}: ${response.message}`);
-                    showMessage(`扫描 ${folderPath} 失败: ${response.message}`, 'warning');
-                }
-            } catch (error) {
-                console.error(`扫描文件夹出错 ${folderPath}:`, error);
-                showMessage(`扫描 ${folderPath} 出错`, 'error');
-            }
+            // 更新统计信息
+            updateLocalStats(response.stats);
+
+            showMessage(response.message, 'success');
+        } else {
+            showMessage(response.message || '扫描失败', 'error');
         }
-
-        // 更新显示
-        localMusicFiles = allMusicFiles;
-        displayLocalMusic();
-
-        // 计算统计信息
-        const stats = calculateLocalStats(allMusicFiles);
-        updateLocalStats(stats);
-
-        showMessage(`扫描完成！共找到 ${allMusicFiles.length} 首音乐`, 'success');
 
     } catch (error) {
         console.error('扫描音乐文件夹失败:', error);
@@ -626,7 +641,14 @@ async function scanMusicFolder(folderPath) {
         
         if (response.success) {
             localMusicFiles = response.data || [];
-            updateLocalMusicDisplay();
+            folderMusicGroups = response.folder_groups || [];
+
+            // 如果后端没有返回分组数据，前端进行分组
+            if (folderMusicGroups.length === 0 && localMusicFiles.length > 0) {
+                folderMusicGroups = groupMusicFilesByFolder(localMusicFiles);
+            }
+
+            displayLocalMusicWithFolders();
             updateLocalStats(response.stats);
             showMessage(response.message, 'success');
         } else {
@@ -649,7 +671,14 @@ async function loadCachedMusicFiles() {
         
         if (response.success) {
             localMusicFiles = response.data || [];
-            updateLocalMusicDisplay();
+            folderMusicGroups = response.folder_groups || [];
+
+            // 如果后端没有返回分组数据，前端进行分组
+            if (folderMusicGroups.length === 0 && localMusicFiles.length > 0) {
+                folderMusicGroups = groupMusicFilesByFolder(localMusicFiles);
+            }
+
+            displayLocalMusicWithFolders();
             updateLocalStats(response.stats);
             console.log('成功加载缓存的音乐文件:', localMusicFiles.length);
         } else {
@@ -660,6 +689,74 @@ async function loadCachedMusicFiles() {
     } catch (error) {
         console.error('加载缓存音乐文件失败:', error);
         showEmptyState();
+    }
+}
+
+// 按文件夹分组音乐文件（前端分组函数）
+function groupMusicFilesByFolder(musicFiles) {
+    const folderMap = new Map();
+
+    // 按文件夹路径分组
+    musicFiles.forEach(musicFile => {
+        // 获取文件夹路径
+        const filePath = musicFile.file_path || musicFile.FilePath;
+        const folderPath = filePath.substring(0, filePath.lastIndexOf('/')) || filePath.substring(0, filePath.lastIndexOf('\\'));
+
+        if (!folderMap.has(folderPath)) {
+            folderMap.set(folderPath, []);
+        }
+        folderMap.get(folderPath).push(musicFile);
+    });
+
+    // 转换为分组数组
+    const groups = [];
+    folderMap.forEach((files, folderPath) => {
+        const folderName = folderPath.split('/').pop() || folderPath.split('\\').pop() || folderPath;
+        const stats = calculateLocalStats(files);
+
+        groups.push({
+            folder_path: folderPath,
+            folder_name: folderName,
+            music_files: files,
+            stats: stats
+        });
+    });
+
+    return groups;
+}
+
+// 显示按文件夹分组的音乐列表
+function displayLocalMusicWithFolders() {
+    const localContent = document.querySelector('#localPage .local-content');
+    if (!localContent) return;
+
+    // 同步更新全局变量
+    window.localMusicFiles = localMusicFiles;
+
+    // 移除加载状态和空状态
+    const existingStates = localContent.querySelectorAll('.local-loading, .local-empty');
+    existingStates.forEach(state => state.remove());
+
+    if (folderMusicGroups.length === 0) {
+        showEmptyState();
+        return;
+    }
+
+    // 创建或更新音乐列表
+    let musicList = localContent.querySelector('.local-music-list');
+    if (!musicList) {
+        musicList = createFolderMusicList();
+        localContent.appendChild(musicList);
+    } else {
+        // 更新现有列表
+        const musicListContent = musicList.querySelector('.local-music-content');
+        if (musicListContent) {
+            musicListContent.innerHTML = '';
+            folderMusicGroups.forEach(group => {
+                const folderSection = createFolderSection(group);
+                musicListContent.appendChild(folderSection);
+            });
+        }
     }
 }
 
@@ -699,7 +796,106 @@ function updateLocalMusicDisplay() {
     }
 }
 
-// 创建音乐列表
+// 创建文件夹分组音乐列表
+function createFolderMusicList() {
+    const musicList = document.createElement('div');
+    musicList.className = 'local-music-list folder-grouped';
+    musicList.innerHTML = `
+        <div class="local-music-content"></div>
+    `;
+
+    // 添加文件夹分组内容
+    const musicListContent = musicList.querySelector('.local-music-content');
+    folderMusicGroups.forEach(group => {
+        const folderSection = createFolderSection(group);
+        musicListContent.appendChild(folderSection);
+    });
+
+    return musicList;
+}
+
+// 创建文件夹分组区域
+function createFolderSection(group) {
+    const folderSection = document.createElement('div');
+    folderSection.className = 'folder-section';
+    folderSection.dataset.folderPath = group.folder_path;
+
+    const isExpanded = expandedFolders.has(group.folder_path);
+
+    folderSection.innerHTML = `
+        <div class="folder-header" onclick="toggleFolder('${escapeHtml(group.folder_path)}')">
+            <div class="folder-toggle">
+                <i class="fas fa-chevron-${isExpanded ? 'down' : 'right'}"></i>
+            </div>
+            <div class="folder-icon">
+                <i class="fas fa-folder${isExpanded ? '-open' : ''}"></i>
+            </div>
+            <div class="folder-info">
+                <div class="folder-name" title="${escapeHtml(group.folder_path)}">${escapeHtml(group.folder_name)}</div>
+                <div class="folder-stats">${group.music_files.length} 首歌曲</div>
+            </div>
+            <div class="folder-actions">
+                <button class="folder-action-btn" onclick="event.stopPropagation(); playFolderMusic('${escapeHtml(group.folder_path)}')" title="播放此文件夹">
+                    <i class="fas fa-play"></i>
+                </button>
+                <button class="folder-action-btn" onclick="event.stopPropagation(); scanSingleFolder('${escapeHtml(group.folder_path)}')" title="重新扫描">
+                    <i class="fas fa-sync"></i>
+                </button>
+            </div>
+        </div>
+        <div class="folder-content ${isExpanded ? 'expanded' : 'collapsed'}">
+            <div class="folder-music-header">
+                <div>#</div>
+                <div></div>
+                <div>歌曲</div>
+                <div>专辑</div>
+                <div>时长</div>
+                <div>操作</div>
+            </div>
+            <div class="folder-music-list">
+                ${group.music_files.map((musicFile, index) => createFolderSongItemHTML(musicFile, index, group.folder_path)).join('')}
+            </div>
+        </div>
+    `;
+
+    return folderSection;
+}
+
+// 创建文件夹内歌曲项的HTML
+function createFolderSongItemHTML(musicFile, index, folderPath) {
+    // 计算全局索引
+    const globalIndex = getGlobalSongIndex(musicFile, folderPath);
+    const duration = formatDuration(musicFile.time_length || musicFile.Duration);
+
+    return `
+        <div class="local-song-item folder-song-item" data-index="${globalIndex}" data-folder="${escapeHtml(folderPath)}">
+            <div class="song-index small">${index + 1}</div>
+            <div class="local-song-cover">
+                ${musicFile.union_cover || musicFile.UnionCover ?
+                    `<img src="${musicFile.union_cover || musicFile.UnionCover}" alt="封面" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                     <div class="default-cover" style="display:none;"><i class="fas fa-music"></i></div>` :
+                    `<div class="default-cover"><i class="fas fa-music"></i></div>`
+                }
+            </div>
+            <div class="local-song-info">
+                <div class="local-songname" title="${escapeHtml(musicFile.title || musicFile.Title)}">${escapeHtml(musicFile.title || musicFile.Title)}</div>
+                <div class="local-author_name" title="${escapeHtml(musicFile.artist || musicFile.Artist || musicFile.author_name || '未知艺术家')}">${escapeHtml(musicFile.artist || musicFile.Artist || musicFile.author_name || '未知艺术家')}</div>
+            </div>
+            <div class="local-song-album" title="${escapeHtml(musicFile.album_name || musicFile.Album || '未知专辑')}">${escapeHtml(musicFile.album_name || musicFile.Album || '未知专辑')}</div>
+            <div class="local-song-duration">${duration}</div>
+            <div class="local-song-actions">
+                <button class="local-action-btn" title="播放" onclick="playLocalSong(${globalIndex})">
+                    <i class="fas fa-play"></i>
+                </button>
+                <button class="local-action-btn" title="歌词" onclick="showLocalSongLyrics(${globalIndex})">
+                    <i class="fas fa-file-text"></i>
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+// 创建音乐列表（保持兼容性）
 function createMusicList() {
     const musicList = document.createElement('div');
     musicList.className = 'local-music-list';
@@ -1109,8 +1305,131 @@ function formatLyricsForDisplay(lyrics) {
     return formattedLyrics || '<p class="no-lyrics">聆听音乐</p>';
 }
 
+// 获取歌曲的全局索引
+function getGlobalSongIndex(musicFile, folderPath) {
+    return localMusicFiles.findIndex(file => {
+        const filePath1 = file.file_path || file.FilePath;
+        const filePath2 = musicFile.file_path || musicFile.FilePath;
+        return filePath1 === filePath2;
+    });
+}
+
+// 切换文件夹展开/收缩状态
+window.toggleFolder = function(folderPath) {
+    const folderSection = document.querySelector(`[data-folder-path="${CSS.escape(folderPath)}"]`);
+    if (!folderSection) return;
+
+    const folderContent = folderSection.querySelector('.folder-content');
+    const toggleIcon = folderSection.querySelector('.folder-toggle i');
+    const folderIcon = folderSection.querySelector('.folder-icon i');
+
+    if (expandedFolders.has(folderPath)) {
+        // 收缩文件夹
+        expandedFolders.delete(folderPath);
+        folderContent.classList.remove('expanded');
+        folderContent.classList.add('collapsed');
+        toggleIcon.className = 'fas fa-chevron-right';
+        folderIcon.className = 'fas fa-folder';
+    } else {
+        // 展开文件夹
+        expandedFolders.add(folderPath);
+        folderContent.classList.remove('collapsed');
+        folderContent.classList.add('expanded');
+        toggleIcon.className = 'fas fa-chevron-down';
+        folderIcon.className = 'fas fa-folder-open';
+    }
+};
+
+// 播放文件夹内的所有音乐
+window.playFolderMusic = async function(folderPath) {
+    const group = folderMusicGroups.find(g => g.folder_path === folderPath);
+    if (!group || group.music_files.length === 0) {
+        showMessage('该文件夹没有音乐文件', 'warning');
+        return;
+    }
+
+    console.log(`🎵 准备播放文件夹: ${group.folder_name}，包含 ${group.music_files.length} 首歌曲`);
+
+    try {
+        // 将文件夹中的所有音乐文件转换为播放列表格式
+        const playlistSongs = group.music_files.map(musicFile => {
+            const localHash = 'local-' + musicFile.hash;
+            return {
+                hash: localHash,
+                songname: musicFile.title || musicFile.Title,
+                author_name: musicFile.artist || musicFile.Artist || musicFile.author_name || '未知艺术家',
+                album_name: musicFile.album_name || musicFile.Album || '未知专辑',
+                time_length: musicFile.time_length || musicFile.Duration || 0,
+                union_cover: musicFile.union_cover || musicFile.UnionCover || ''
+            };
+        });
+
+        console.log(`🎵 转换后的播放列表:`, playlistSongs);
+
+        // 使用 PlayerController 播放整个文件夹的歌单
+        if (window.PlayerController && window.PlayerController.playPlaylist) {
+            const success = await window.PlayerController.playPlaylist(
+                playlistSongs,
+                0, // 从第一首开始播放
+                `文件夹: ${group.folder_name}`, // 播放列表名称
+                'repeat_all' // 列表循环播放
+            );
+
+            if (success) {
+                showMessage(`开始播放文件夹: ${group.folder_name} (${group.music_files.length} 首歌曲)`, 'success');
+                console.log(`✅ 成功播放文件夹: ${group.folder_name}`);
+            } else {
+                showMessage('播放文件夹失败', 'error');
+                console.error(`❌ 播放文件夹失败: ${group.folder_name}`);
+            }
+        } else {
+            console.error('❌ PlayerController不可用或缺少playPlaylist方法');
+            showMessage('播放器不可用', 'error');
+        }
+    } catch (error) {
+        console.error('❌ 播放文件夹音乐失败:', error);
+        showMessage('播放文件夹失败: ' + error.message, 'error');
+    }
+};
+
+// 切换文件夹路径管理器展开/收起状态
+window.togglePathManager = function() {
+    const pathManager = document.querySelector('.folder-path-manager');
+    if (!pathManager) return;
+
+    const pathList = pathManager.querySelector('.path-list');
+    const toggleIcon = pathManager.querySelector('.path-manager-toggle i');
+    const managerIcon = pathManager.querySelector('.path-manager-icon i');
+
+    if (isPathListExpanded) {
+        // 收起路径列表
+        isPathListExpanded = false;
+        pathList.classList.remove('expanded');
+        pathList.classList.add('collapsed');
+        toggleIcon.className = 'fas fa-chevron-right';
+        managerIcon.className = 'fas fa-folder';
+    } else {
+        // 展开路径列表
+        isPathListExpanded = true;
+        pathList.classList.remove('collapsed');
+        pathList.classList.add('expanded');
+        toggleIcon.className = 'fas fa-chevron-down';
+        managerIcon.className = 'fas fa-folder-open';
+    }
+
+    // 保存展开状态
+    try {
+        localStorage.setItem('isPathListExpanded', JSON.stringify(isPathListExpanded));
+    } catch (error) {
+        console.warn('保存路径列表展开状态失败:', error);
+    }
+};
+
+
+
 // HTML转义函数
 function escapeHtml(text) {
+    if (!text) return '';
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;

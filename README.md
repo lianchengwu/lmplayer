@@ -96,7 +96,7 @@ export PORT=40000
 
 ```bash
 # 克隆项目
-git clone <repository-url>
+git clone https://github.com/lianchengwu/wmplayer.git
 cd wmplayer
 
 # 安装 Go 依赖
