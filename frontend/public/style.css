@@ -2655,28 +2655,11 @@ h1 {
 
 .player-bar .progress-fill {
     height: 100%;
-    background: rgb(139, 92, 246);
-    border-radius: 3px;
-    width: 100%;
-    transform: scaleX(0);
-    transform-origin: left center;
-    transition: transform 0.1s ease;
-    will-change: transform;
-    backface-visibility: hidden;
-    display: block;
-}
-
-/* 确保底栏播放器的进度条样式正确 */
-.player-bar .progress-fill {
-    height: 100%;
     background: var(--accent-color);
-    border-radius: 2px;
-    width: 100%;
-    transform: scaleX(0);
-    transform-origin: left center;
-    transition: transform 0.1s ease, background 0.2s ease;
-    will-change: transform;
-    backface-visibility: hidden;
+    border-radius: 3px;
+    width: 0%;
+    transition: width 0.1s ease, background 0.2s ease;
+    will-change: width;
     display: block;
 }
 

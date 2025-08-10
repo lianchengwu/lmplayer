@@ -929,8 +929,8 @@ function updateProgressBar(currentTime, duration) {
     const progress = Math.max(0, Math.min(1, currentTime / duration));
     const percentage = (progress * 100).toFixed(1);
 
-    // 更新进度条（使用transform）
-    progressFillElement.style.transform = `scaleX(${progress})`;
+    // 更新进度条（使用width属性保持圆角）
+    progressFillElement.style.width = `${percentage}%`;
 
     // console.log(`🎵 进度条更新: ${percentage}% (${currentTime.toFixed(1)}s / ${duration.toFixed(1)}s)`);
 }
@@ -1198,12 +1198,10 @@ window.getCurrentSong = getCurrentSong;
 
 // 测试播放器进度条
 window.testProgress = (percentage = 50) => {
-    const progress = percentage / 100;
-
-    // 测试播放器进度条（transform方式）
+    // 测试播放器进度条（width方式保持圆角）
     const progressFill = document.querySelector('.player-bar .progress-fill');
     if (progressFill) {
-        progressFill.style.transform = `scaleX(${progress})`;
+        progressFill.style.width = `${percentage}%`;
         console.log(`🧪 播放器进度条测试: 设置为 ${percentage}%`);
         return `播放器进度条已设置为 ${percentage}%`;
     } else {
