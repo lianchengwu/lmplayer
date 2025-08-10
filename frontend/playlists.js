@@ -162,6 +162,9 @@ class PlaylistsPageManager {
                                 <i class="fas fa-list-music"></i>
                              </div>`
                         }
+                        <div class="album-count-badge">
+                            ${playlist.count}首
+                        </div>
                         <div class="album-overlay">
                             <button class="play-album-btn" title="播放歌单">
                                 <i class="fas fa-play"></i>
@@ -171,10 +174,6 @@ class PlaylistsPageManager {
                     <div class="album-info">
                         <div class="album-title">${playlist.name || '未命名歌单'}</div>
                         <div class="album-author_name">由${playlist.create_username || '未知用户'}${playlist.type === 0 ? '创建' : '收藏'}</div>
-                        <div class="album-meta">
-                            <span class="album-count">${playlist.count}首</span>
-                            <span class="album-date">${createTime}</span>
-                        </div>
                     </div>
                 </div>
             `;

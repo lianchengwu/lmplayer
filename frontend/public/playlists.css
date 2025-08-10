@@ -385,12 +385,12 @@
     padding: 12px;
     transition: all 0.3s ease;
     cursor: pointer;
+    will-change: box-shadow, border-color, background-color;
 }
 
 #playlistsPage .playlist-item:hover {
     background: var(--bg-hover);
     border-color: var(--accent-color);
-    transform: translateY(-4px);
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
 }
 
@@ -399,7 +399,7 @@
     aspect-ratio: 1;
     border-radius: 8px;
     overflow: hidden;
-    margin-bottom: 10px;
+    margin-bottom: 6px;
     position: relative;
 }
 
@@ -408,6 +408,7 @@
     height: 100%;
     object-fit: cover;
     transition: transform 0.3s ease;
+    will-change: transform;
 }
 
 #playlistsPage .playlist-item:hover .album-cover img {
@@ -437,6 +438,8 @@
     justify-content: center;
     opacity: 0;
     transition: opacity 0.3s ease;
+    z-index: 1; /* ensure overlay is below count badge */
+    pointer-events: none; /* don't interfere with hover/click */
 }
 
 #playlistsPage .playlist-item:hover .album-overlay {
@@ -453,6 +456,7 @@
     font-size: 18px;
     cursor: pointer;
     transition: all 0.2s ease;
+    pointer-events: auto; /* clickable even if overlay ignores events */
 }
 
 #playlistsPage .playlist-item .play-album-btn:hover {
@@ -460,24 +464,41 @@
     transform: scale(1.1);
 }
 
+/* song count badge at bottom-left of cover */
+#playlistsPage .playlist-item .album-count-badge {
+    position: absolute;
+    left: 8px;
+    bottom: 8px;
+    z-index: 2; /* above overlay */
+    padding: 0;
+    font-size: 12px;
+    line-height: 1.2;
+    color: #fff;
+    background: transparent; /* remove background as requested */
+    border-radius: 0;
+    backdrop-filter: none;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.7); /* improve readability without bg */
+    pointer-events: none; /* do not block clicks */
+}
+
 #playlistsPage .playlist-item .album-info {
     text-align: center;
 }
 
 #playlistsPage .playlist-item .album-title {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     color: var(--text-primary);
-    margin-bottom: 3px;
+    margin-bottom: 2px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
 #playlistsPage .playlist-item .album-author_name {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--text-secondary);
-    margin-bottom: 6px;
+    margin-bottom: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

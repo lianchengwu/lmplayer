@@ -677,18 +677,19 @@ window.formatTime = (seconds) => {
 }
 
 window.setVolume = (value) => {
-    // 音量值现在由 HTML5 Audio API 管理，这里只更新UI
+    // 接受 0-1 或 0-100 的值，统一为 0-1
+    const vol = value > 1 ? Math.max(0, Math.min(100, value)) / 100 : Math.max(0, Math.min(1, value));
     const volumeBtn = document.querySelector('.volume-btn i');
     if (volumeBtn) {
-        if (value === 0) {
+        if (vol === 0) {
             volumeBtn.className = 'fas fa-volume-mute';
-        } else if (value < 50) {
+        } else if (vol < 0.5) {
             volumeBtn.className = 'fas fa-volume-down';
         } else {
             volumeBtn.className = 'fas fa-volume-up';
         }
     }
-    console.log('音量设置为:', value);
+    console.log('音量设置为:', value, '规范化:', vol);
 }
 
 // 左侧栏功能
