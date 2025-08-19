@@ -16,6 +16,7 @@ class PlaylistsPageManager {
             totalCreated: 0,
             totalCollected: 0
         };
+
     }
 
     // 初始化收藏的歌单页面
@@ -165,11 +166,6 @@ class PlaylistsPageManager {
                         <div class="album-count-badge">
                             ${playlist.count}首
                         </div>
-                        <div class="album-overlay">
-                            <button class="play-album-btn" title="播放歌单">
-                                <i class="fas fa-play"></i>
-                            </button>
-                        </div>
                     </div>
                     <div class="album-info">
                         <div class="album-title">${playlist.name || '未命名歌单'}</div>
@@ -190,17 +186,8 @@ class PlaylistsPageManager {
         const container = document.querySelector('#playlistsPage .playlists-grid');
         if (!container) return;
 
-        // 按钮事件
+        // 歌单卡片点击事件
         container.addEventListener('click', (e) => {
-            // 播放按钮事件
-            if (e.target.closest('.play-album-btn')) {
-                e.stopPropagation(); // 阻止事件冒泡
-                const playlistCard = e.target.closest('.playlist-item');
-                const playlistId = playlistCard.dataset.playlistId;
-                this.playPlaylist(playlistId);
-                return;
-            }
-
             // 歌单卡片单击事件 - 跳转到歌单详情
             const playlistCard = e.target.closest('.playlist-item');
             if (playlistCard) {
@@ -209,23 +196,24 @@ class PlaylistsPageManager {
             }
         });
 
-        // 双击播放
+        // 双击查看详情
         container.addEventListener('dblclick', (e) => {
             const playlistCard = e.target.closest('.playlist-item');
             if (playlistCard) {
                 const playlistId = playlistCard.dataset.playlistId;
-                this.playPlaylist(playlistId);
+                this.viewPlaylistDetail(playlistId);
             }
         });
     }
 
-    // 播放歌单
+    // 播放歌单（保留方法以备将来使用）
     async playPlaylist(playlistId) {
         console.log('🎵 播放歌单:', playlistId);
 
         try {
             // 获取歌单的global_collection_id
             const globalCollectionId = this.getPlaylistGlobalCollectionId(playlistId);
+
             if (!globalCollectionId) {
                 console.error('❌ 无法找到歌单的global_collection_id:', playlistId);
                 this.showToast('播放失败: 歌单ID无效', 'error');

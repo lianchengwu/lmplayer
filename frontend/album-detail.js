@@ -451,7 +451,7 @@ class AlbumDetailManager {
 
         // 根据当前类型显示不同的日志信息
         if (this.currentType === 'playlist') {
-            console.log('🎵 播放歌单全部歌曲:', this.playlistData?.playlist_name, '共', this.songsData.length, '首');
+            console.log('🎵 播放歌单全部歌曲:', this.albumData?.album_name, '共', this.songsData.length, '首');
         } else {
             console.log('🎵 播放专辑全部歌曲:', this.albumData?.album_name, '共', this.songsData.length, '首');
         }
@@ -473,7 +473,8 @@ class AlbumDetailManager {
         if (window.PlayerController) {
             let playlistName;
             if (this.currentType === 'playlist') {
-                playlistName = `歌单：${this.playlistData?.playlist_name || '未知歌单'}`;
+                // 对于歌单，从albumData中获取名称（因为后端已转换为专辑格式）
+                playlistName = `歌单：${this.albumData?.album_name || '未知歌单'}`;
             } else {
                 playlistName = `专辑：${this.albumData?.album_name || '未知专辑'}`;
             }
@@ -520,7 +521,8 @@ class AlbumDetailManager {
         if (window.PlayerController) {
             let playlistName;
             if (this.currentType === 'playlist') {
-                playlistName = `歌单：${this.playlistData?.playlist_name || '未知歌单'}`;
+                // 对于歌单，从albumData中获取名称（因为后端已转换为专辑格式）
+                playlistName = `歌单：${this.albumData?.album_name || '未知歌单'}`;
             } else {
                 playlistName = `专辑：${this.albumData?.album_name || '未知专辑'}`;
             }
