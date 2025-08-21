@@ -614,7 +614,7 @@ func (c *CacheService) handleOSDLyricsSSE(w http.ResponseWriter, r *http.Request
 			return
 		case message := <-msgChan:
 			data, _ := json.Marshal(message)
-			fmt.Printf("📤 [OSD歌词] 发送消息到客户端: %s\n", string(data))
+			// fmt.Printf("📤 [OSD歌词] 发送消息到客户端: %s\n", string(data))
 			fmt.Fprintf(w, "data: %s\n\n", data)
 			w.(http.Flusher).Flush()
 		case <-time.After(30 * time.Second):

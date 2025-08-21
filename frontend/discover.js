@@ -893,21 +893,21 @@ class DiscoverPageManager {
     showNewSongsError() {
         const container = document.getElementById('newSongsList');
         if (container) {
-            container.innerHTML = '<div class="error-placeholder">加载失败，请重试</div>';
+            container.innerHTML = '<div class="error-placeholder">加载失败</div>';
         }
     }
 
     showNewAlbumsError() {
         const container = document.getElementById('newAlbumsList');
         if (container) {
-            container.innerHTML = '<div class="error-placeholder">加载失败，请重试</div>';
+            container.innerHTML = '<div class="error-placeholder">加载失败</div>';
         }
     }
 
     showRecommendationsError() {
         const container = document.getElementById('recommendationsList');
         if (container) {
-            container.innerHTML = '<div class="error-placeholder">加载失败，请重试</div>';
+            container.innerHTML = '<div class="error-placeholder">加载失败</div>';
         }
     }
 

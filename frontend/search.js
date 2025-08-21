@@ -660,9 +660,6 @@ class SearchPageManager {
                     <i class="fas fa-exclamation-triangle"></i>
                     <h3>加载失败</h3>
                     <p>${message}</p>
-                    <button class="section-retry-btn" onclick="searchPageManager.loadSectionData('${sectionName}')">
-                        重试
-                    </button>
                 </div>
             `;
         }

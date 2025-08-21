@@ -1217,8 +1217,10 @@ function updateVolumeIcon(volume) {
     if (volumeIcon) {
         if (volume === 0) {
             volumeIcon.className = 'fas fa-volume-mute';
-        } else if (volume < 0.3) {
+        } else if (volume < 0.4) {
             volumeIcon.className = 'fas fa-volume-down';
+        } else if (volume < 0.7) {
+            volumeIcon.className = 'fas fa-volume';
         } else {
             volumeIcon.className = 'fas fa-volume-up';
         }

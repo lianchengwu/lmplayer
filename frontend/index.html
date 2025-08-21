@@ -23,9 +23,9 @@
     <link rel="stylesheet" href="/theme-frosted-dark.css"/>
     <title>wmPlayer</title>
 </head>
-<body style="--custom-contextmenu: test">
+<!-- <body style="--custom-contextmenu: test"> -->
 <!-- 自定义标题栏 -->
-<!-- <body> -->
+<body>
 <div class="custom-titlebar">
     <div class="titlebar-content">
         <!-- 左侧功能按钮区域 -->
@@ -830,9 +830,11 @@
                                 <i class="fas fa-search"></i>
                                 <input type="text" placeholder="搜索收藏的音乐...">
                             </div>
-                            <button class="play-all-btn" onclick="window.favoritesPageManager?.playAllFavorites()" title="播放全部">
-                                <i class="fas fa-play"></i>
-                            </button>
+                            <div class="control-buttons">
+                                <button class="play-all-btn" onclick="window.favoritesPageManager?.playAllFavorites()" title="播放全部">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
 

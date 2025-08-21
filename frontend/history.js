@@ -489,7 +489,7 @@ function renderHistoryListOptimized(historyData, container) {
         console.error('渲染播放历史时出错:', error);
         container.innerHTML = `
             <div class="error-state">
-                <div class="error-text">渲染播放历史时出错，请刷新页面重试</div>
+                <div class="error-text">渲染播放历史时出错</div>
             </div>
         `;
     }

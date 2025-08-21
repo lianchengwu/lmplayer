@@ -117,13 +117,13 @@ async function sendVerificationCode() {
             startCountdown(sendCodeBtn);
         } else {
             // 发送失败，显示错误信息
-            alert(response.message || '验证码发送失败，请重试');
+            alert(response.message || '验证码发送失败');
             sendCodeBtn.disabled = false;
             sendCodeBtn.textContent = '发送验证码';
         }
     } catch (error) {
         console.error('发送验证码失败:', error);
-        alert('网络错误，请检查网络连接后重试');
+        alert('网络错误，请检查网络连接');
         sendCodeBtn.disabled = false;
         sendCodeBtn.textContent = '发送验证码';
     }

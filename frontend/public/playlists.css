@@ -337,20 +337,7 @@
     margin-bottom: 1.5rem;
 }
 
-#playlistsPage .retry-btn {
-    padding: 0.75rem 1.5rem;
-    background: var(--accent-color);
-    color: white;
-    border: none;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    cursor: pointer;
-    transition: background 0.2s ease;
-}
 
-#playlistsPage .retry-btn:hover {
-    background: var(--accent-hover);
-}
 
 @keyframes spin {
     0% { transform: rotate(0deg); }

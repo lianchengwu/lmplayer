@@ -221,21 +221,7 @@
     font-size: 14px;
 }
 
-.section-retry-btn {
-    margin-top: 16px;
-    padding: 8px 16px;
-    background: rgb(59, 130, 246);
-    color: white;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-    transition: background 0.2s ease;
-}
 
-.section-retry-btn:hover {
-    background: rgb(37, 99, 235);
-}
 
 /* 骨架屏动画 */
 .skeleton {

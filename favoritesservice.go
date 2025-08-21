@@ -111,9 +111,9 @@ func (f *FavoritesService) GetFavoritesSongs(page int, pageSize int) FavoritesSo
 
 	log.Printf("调用我喜欢的歌曲API: %s", requestURL)
 
-	// 创建HTTP客户端，设置超时
+	// 创建HTTP客户端，设置超时（增加超时时间，因为可能需要多次请求）
 	client := &http.Client{
-		Timeout: 15 * time.Second,
+		Timeout: 30 * time.Second,
 	}
 
 	// 发送GET请求
@@ -309,6 +309,109 @@ func (f *FavoritesService) GetFavoritesSongs(page int, pageSize int) FavoritesSo
 	}
 }
 
+// GetAllFavoritesSongs 获取所有我喜欢的歌曲（自动分页获取全部并倒序）
+func (f *FavoritesService) GetAllFavoritesSongs() FavoritesSongResponse {
+	log.Printf("🎵 开始获取所有我喜欢的歌曲...")
+
+	// 首先获取用户歌单信息，拿到"我喜欢"歌单的总数
+	log.Printf("📊 获取用户歌单信息以确定总歌曲数...")
+	playlistsResponse := f.GetUserPlaylists()
+	if !playlistsResponse.Success {
+		return FavoritesSongResponse{
+			Success: false,
+			Message: "获取用户歌单失败: " + playlistsResponse.Message,
+		}
+	}
+
+	// 找到"我喜欢"歌单（listid为2）
+	var totalSongs int
+	for _, playlist := range playlistsResponse.Data {
+		if playlist.ListID == 2 {
+			totalSongs = playlist.Count
+			break
+		}
+	}
+
+	if totalSongs == 0 {
+		log.Printf("📊 我喜欢歌单为空")
+		return FavoritesSongResponse{
+			Success: true,
+			Message: "我喜欢歌单为空",
+			Data:    []FavoritesSongData{},
+		}
+	}
+
+	log.Printf("📊 我喜欢歌单总数: %d", totalSongs)
+
+	var allSongs []FavoritesSongData
+	page := 1
+	pageSize := 200                                         // 使用较大的页面大小提高效率
+	expectedPages := (totalSongs + pageSize - 1) / pageSize // 向上取整
+	log.Printf("📊 预期需要获取 %d 页", expectedPages)
+
+	for {
+		log.Printf("📄 获取第%d页，每页%d首", page, pageSize)
+
+		// 调用现有的分页方法
+		response := f.GetFavoritesSongs(page, pageSize)
+
+		if !response.Success {
+			log.Printf("❌ 获取第%d页失败: %s", page, response.Message)
+			return FavoritesSongResponse{
+				Success: false,
+				Message: fmt.Sprintf("获取第%d页失败: %s", page, response.Message),
+			}
+		}
+
+		if response.Data == nil || len(response.Data) == 0 {
+			log.Printf("📄 第%d页没有数据，停止获取", page)
+			break
+		}
+
+		// 追加当前页的歌曲
+		allSongs = append(allSongs, response.Data...)
+		log.Printf("✅ 第%d页获取成功，本页%d首，累计%d首", page, len(response.Data), len(allSongs))
+
+		// 如果当前页的歌曲数量小于页面大小，说明已经是最后一页
+		if len(response.Data) < pageSize {
+			log.Printf("📄 第%d页歌曲数量(%d)小于页面大小(%d)，已获取全部", page, len(response.Data), pageSize)
+			break
+		}
+
+		// 如果已达到预期总数，停止获取
+		if len(allSongs) >= totalSongs {
+			log.Printf("📄 已获取预期数量(%d)的歌曲，停止获取", totalSongs)
+			break
+		}
+
+		// 如果已达到预期页数，停止获取
+		if page >= expectedPages {
+			log.Printf("📄 已获取预期页数(%d)，停止获取", expectedPages)
+			break
+		}
+
+		page++
+
+		// 添加短暂延迟，避免请求过于频繁
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	// 倒序排列（最新的在前面）
+	for i, j := 0, len(allSongs)-1; i < j; i, j = i+1, j-1 {
+		allSongs[i], allSongs[j] = allSongs[j], allSongs[i]
+	}
+
+	log.Printf("🎉 成功获取所有我喜欢的歌曲，共%d首，已倒序排列", len(allSongs))
+
+	return FavoritesSongResponse{
+		Success:   true,
+		Message:   fmt.Sprintf("获取所有我喜欢的歌曲成功，共%d首，已倒序排列", len(allSongs)),
+		ErrorCode: 0,
+		Status:    0,
+		Data:      allSongs,
+	}
+}
+
 // AddFavorite 添加歌曲到我喜欢的
 func (f *FavoritesService) AddFavorite(request AddFavoriteRequest) AddFavoriteResponse {
 	log.Printf("开始添加收藏歌曲: %s - %s", request.SongName, request.Hash)
@@ -463,7 +566,7 @@ func (f *FavoritesService) GetUserPlaylists() PlaylistResponse {
 
 	// 创建HTTP客户端，设置超时
 	client := &http.Client{
-		Timeout: 15 * time.Second,
+		Timeout: 30 * time.Second,
 	}
 
 	// 发送GET请求
@@ -668,7 +771,7 @@ func (f *FavoritesService) GetPlaylistSongs(globalCollectionID string) Favorites
 
 	// 创建HTTP客户端，设置超时
 	client := &http.Client{
-		Timeout: 15 * time.Second,
+		Timeout: 30 * time.Second,
 	}
 
 	// 发送GET请求
@@ -694,12 +797,12 @@ func (f *FavoritesService) GetPlaylistSongs(globalCollectionID string) Favorites
 	log.Printf("歌单歌曲API响应状态码: %d", resp.StatusCode)
 
 	// 打印响应内容用于调试
-	bodyStr := string(body)
-	if len(bodyStr) > 1000 {
-		log.Printf("歌单歌曲API响应前1000字符: %s", bodyStr[:1000])
-	} else {
-		log.Printf("歌单歌曲API响应: %s", bodyStr)
-	}
+	// bodyStr := string(body)
+	// if len(bodyStr) > 1000 {
+	// 	log.Printf("歌单歌曲API响应前1000字符: %s", bodyStr[:1000])
+	// } else {
+	// 	log.Printf("歌单歌曲API响应: %s", bodyStr)
+	// }
 
 	// 解析JSON响应
 	var apiResponse map[string]interface{}

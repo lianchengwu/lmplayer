@@ -414,9 +414,6 @@ class PlaylistsPageManager {
                         <i class="fas fa-exclamation-triangle"></i>
                     </div>
                     <div class="error-text">${message}</div>
-                    <button class="retry-btn" onclick="window.playlistsPageManager?.loadPlaylists()">
-                        重试
-                    </button>
                 </div>
             `;
         }

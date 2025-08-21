@@ -8,70 +8,55 @@ class FavoritesPageManager {
             favoritesSongs: []
         };
         this.loading = {
-            favoritesSongs: false,
-            loadingMore: false
+            favoritesSongs: false
         };
         this.stats = {
             totalSongs: 0,
             totalDuration: 0
         };
-        this.pagination = {
-            currentPage: 1,
-            pageSize: 200,
-            hasMore: true,
-            isInitialLoad: true
-        };
+        this.searchQuery = ''; // 搜索关键词
     }
 
     // 初始化我喜欢的页面
     async init() {
         console.log('🎵 初始化我喜欢的页面');
         this.bindEvents();
-        await this.loadFavoritesSongs(true); // 初始加载
+        await this.loadAllFavoritesSongs();
     }
 
     // 绑定事件
     bindEvents() {
-        // 搜索框
+        // 搜索功能
         const searchInput = document.querySelector('#favoritesPage .search-box-small input');
         if (searchInput) {
             searchInput.addEventListener('input', (e) => {
-                this.filterFavorites(e.target.value);
-            });
-        }
-
-        // 绑定滚动事件进行懒加载
-        this.bindScrollEvent();
-    }
-
-    // 绑定滚动事件
-    bindScrollEvent() {
-        const favoritesContent = document.querySelector('#favoritesPage .favorites-content');
-        if (favoritesContent) {
-            favoritesContent.addEventListener('scroll', () => {
-                this.handleScroll();
+                this.searchQuery = e.target.value.trim();
+                console.log('🔍 搜索关键词:', this.searchQuery);
+                this.renderFavoritesSongs(); // 重新渲染列表
             });
         }
     }
 
-    // 处理滚动事件
-    handleScroll() {
-        const favoritesContent = document.querySelector('#favoritesPage .favorites-content');
-        if (!favoritesContent) return;
+    // 获取过滤后的歌曲列表
+    getFilteredSongs() {
+        let songsToRender = [...this.data.favoritesSongs];
 
-        const scrollTop = favoritesContent.scrollTop;
-        const scrollHeight = favoritesContent.scrollHeight;
-        const clientHeight = favoritesContent.clientHeight;
-
-        // 当滚动到底部附近时加载更多
-        if (scrollTop + clientHeight >= scrollHeight - 100) {
-            this.loadMoreFavorites();
+        // 应用搜索过滤
+        if (this.searchQuery) {
+            const query = this.searchQuery.toLowerCase();
+            songsToRender = songsToRender.filter(song => {
+                const songname = (song.songname || '').toLowerCase();
+                const authorName = (song.author_name || '').toLowerCase();
+                return songname.includes(query) || authorName.includes(query);
+            });
         }
+
+        return songsToRender;
     }
 
-    // 加载我喜欢的歌曲
-    async loadFavoritesSongs(isInitialLoad = false) {
-        console.log('📊 加载我喜欢的歌曲，页码:', this.pagination.currentPage);
+    // 加载所有我喜欢的歌曲（简化版）
+    async loadAllFavoritesSongs() {
+        console.log('🎵 开始加载所有我喜欢的歌曲...');
 
         if (this.loading.favoritesSongs) {
             console.log('⏳ 我喜欢的歌曲正在加载中...');
@@ -79,90 +64,79 @@ class FavoritesPageManager {
         }
 
         this.loading.favoritesSongs = true;
-
-        if (isInitialLoad) {
-            this.showLoadingState();
-        }
+        this.showLoadingState();
 
         try {
-            const response = await FavoritesService.GetFavoritesSongs(
-                this.pagination.currentPage,
-                this.pagination.pageSize
-            );
-            console.log('我喜欢的歌曲API响应:', response);
+            // 先获取用户歌单信息，拿到总数
+            console.log('📊 获取用户歌单信息...');
+            console.log('📊 FavoritesService:', FavoritesService);
+            console.log('📊 GetUserPlaylists方法:', FavoritesService.GetUserPlaylists);
+
+            const playlistsResponse = await FavoritesService.GetUserPlaylists();
+            console.log('📊 用户歌单响应:', playlistsResponse);
+
+            if (!playlistsResponse.success || !playlistsResponse.data) {
+                console.error('❌ 用户歌单响应无效:', playlistsResponse);
+                throw new Error('获取用户歌单失败: ' + (playlistsResponse.message || '未知错误'));
+            }
+
+            // 找到"我喜欢"歌单（listid为2）
+            console.log('📊 查找我喜欢歌单，歌单列表:', playlistsResponse.data);
+            const favoritesPlaylist = playlistsResponse.data.find(playlist => playlist.listid === 2);
+            console.log('📊 找到的我喜欢歌单:', favoritesPlaylist);
+            if (!favoritesPlaylist) {
+                console.error('❌ 未找到我喜欢的歌单，可用歌单:', playlistsResponse.data.map(p => ({listid: p.listid, name: p.name})));
+                throw new Error('未找到我喜欢的歌单');
+            }
+
+            const totalSongs = favoritesPlaylist.count;
+            console.log(`📊 我喜欢歌单总数: ${totalSongs}`);
+
+            if (totalSongs === 0) {
+                console.log('📊 我喜欢歌单为空');
+                this.data.favoritesSongs = [];
+                this.updateStats();
+                this.renderFavoritesSongs();
+                return;
+            }
+
+            // 显示预期加载时间提示
+            const expectedTime = Math.ceil(totalSongs / 200) * 5; // 估算每页5秒
+            this.showLoadingProgress(`正在加载 ${totalSongs} 首歌曲，预计需要 ${expectedTime} 秒...`);
+
+            // 调用后端的GetAllFavoritesSongs方法
+            console.log('🎵 开始调用GetAllFavoritesSongs，请耐心等待...');
+            const response = await FavoritesService.GetAllFavoritesSongs();
+            console.log('所有我喜欢的歌曲API响应:', response);
 
             if (response.success && response.data) {
-                if (isInitialLoad) {
-                    // 初始加载，替换数据
-                    this.data.favoritesSongs = response.data;
-                } else {
-                    // 懒加载，追加数据
-                    this.data.favoritesSongs = [...this.data.favoritesSongs, ...response.data];
-                }
-
-                // 检查是否还有更多数据
-                this.pagination.hasMore = response.data.length === this.pagination.pageSize;
+                // 直接使用后端返回的数据（已经倒序排列）
+                this.data.favoritesSongs = response.data;
+                console.log(`✅ 所有歌曲加载成功，共 ${this.data.favoritesSongs.length} 首，已倒序排列`);
 
                 this.updateStats();
                 this.renderFavoritesSongs();
-                console.log('✅ 我喜欢的歌曲加载成功，当前共', this.data.favoritesSongs.length, '首');
+                this.showSuccessMessage(`已加载全部 ${this.data.favoritesSongs.length} 首歌曲，最新的在前面`);
             } else {
-                console.error('❌ 我喜欢的歌曲加载失败:', response.message);
-                if (isInitialLoad) {
-                    this.showErrorState(response.message || '加载失败');
-                }
+                console.error('❌ 加载歌曲失败:', response.message);
+                this.showErrorState(response.message || '加载失败');
             }
         } catch (error) {
-            console.error('❌ 我喜欢的歌曲加载异常:', error);
-            if (isInitialLoad) {
-                this.showErrorState('网络错误，请稍后重试');
+            console.error('❌ 加载歌曲异常:', error);
+            // 检查是否是超时错误
+            if (error.message && error.message.includes('timeout')) {
+                this.showErrorState('加载超时，歌曲数量较多，请稍后再试');
+            } else {
+                this.showErrorState('加载失败: ' + error.message);
             }
         } finally {
             this.loading.favoritesSongs = false;
         }
     }
 
-    // 加载更多我喜欢的歌曲
-    async loadMoreFavorites() {
-        if (this.loading.loadingMore || !this.pagination.hasMore) {
-            return;
-        }
 
-        console.log('📊 加载更多我喜欢的歌曲...');
-        this.loading.loadingMore = true;
-        this.showLoadMoreState();
 
-        try {
-            this.pagination.currentPage++;
-            const response = await FavoritesService.GetFavoritesSongs(
-                this.pagination.currentPage,
-                this.pagination.pageSize
-            );
 
-            if (response.success && response.data) {
-                // 追加新数据
-                this.data.favoritesSongs = [...this.data.favoritesSongs, ...response.data];
-
-                // 检查是否还有更多数据
-                this.pagination.hasMore = response.data.length === this.pagination.pageSize;
-
-                this.updateStats();
-                this.renderFavoritesSongs();
-                console.log('✅ 加载更多成功，当前共', this.data.favoritesSongs.length, '首');
-            } else {
-                console.error('❌ 加载更多失败:', response.message);
-                // 回退页码
-                this.pagination.currentPage--;
-            }
-        } catch (error) {
-            console.error('❌ 加载更多异常:', error);
-            // 回退页码
-            this.pagination.currentPage--;
-        } finally {
-            this.loading.loadingMore = false;
-            this.hideLoadMoreState();
-        }
-    }
 
     // 更新统计信息
     updateStats() {
@@ -193,7 +167,9 @@ class FavoritesPageManager {
         }
     }
 
-    // 渲染我喜欢的歌曲列表
+    // 排序相关方法已删除
+
+    // 渲染我喜欢的歌曲列表（简化版）
     renderFavoritesSongs() {
         const container = document.querySelector('#favoritesPage .favorites-list');
         if (!container) {
@@ -211,12 +187,32 @@ class FavoritesPageManager {
                     <div class="empty-subtext">去发现页面找找喜欢的音乐吧</div>
                 </div>
             `;
-            // 更新播放全部按钮状态
             this.updatePlayAllButton();
             return;
         }
 
-        const songsHTML = this.data.favoritesSongs.map((song, index) => {
+        // 获取过滤后的歌曲（后端已经倒序排列）
+        const songsToRender = this.getFilteredSongs();
+        console.log('🎵 渲染歌曲列表，歌曲数量:', songsToRender.length);
+
+        // 直接渲染所有歌曲，保持3列布局
+        const songsHTML = this.generateSongsHTML(songsToRender);
+        container.innerHTML = songsHTML;
+
+        // 更新播放全部按钮状态
+        this.updatePlayAllButton();
+
+        // 绑定歌曲项事件
+        this.bindSongEvents();
+    }
+
+
+
+    // 生成歌曲HTML
+    generateSongsHTML(songs) {
+        return songs.map((song) => {
+            // 计算原始索引（用于播放）
+            const originalIndex = this.data.favoritesSongs.findIndex(s => s.hash === song.hash);
             const coverUrl = song.union_cover ?
                 song.union_cover.replace('{size}', '100') : '';
 
@@ -229,7 +225,7 @@ class FavoritesPageManager {
             };
 
             return `
-                <div class="song-list-item" data-index="${index}" data-song-id="${song.hash}">
+                <div class="song-list-item" data-index="${originalIndex}" data-song-id="${song.hash}">
                     <div class="song-cover">
                         ${coverUrl ?
                             `<img src="${coverUrl}" alt="${song.songname}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
@@ -257,17 +253,6 @@ class FavoritesPageManager {
                 </div>
             `;
         }).join('');
-
-        container.innerHTML = songsHTML;
-
-        // 添加加载更多按钮或状态
-        this.addLoadMoreButton();
-
-        // 更新播放全部按钮状态
-        this.updatePlayAllButton();
-
-        // 绑定歌曲项事件
-        this.bindSongEvents();
     }
 
     // 添加加载更多按钮
@@ -430,13 +415,30 @@ class FavoritesPageManager {
         }
     }
 
+    // 显示成功消息
+    showSuccessMessage(message) {
+        // 创建临时提示元素
+        const toast = document.createElement('div');
+        toast.className = 'toast success';
+        toast.innerHTML = `
+            <i class="fas fa-check-circle"></i>
+            <span>${message}</span>
+        `;
 
+        // 添加到页面
+        document.body.appendChild(toast);
 
-    // 过滤收藏歌曲
-    filterFavorites(query) {
-        console.log('🔍 过滤收藏歌曲:', query);
-        // TODO: 实现搜索过滤功能
+        // 显示动画
+        setTimeout(() => toast.classList.add('show'), 100);
+
+        // 3秒后自动移除
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => document.body.removeChild(toast), 300);
+        }, 3000);
     }
+
+    // 搜索过滤功能已移除
 
 
 
@@ -462,6 +464,14 @@ class FavoritesPageManager {
         }
     }
 
+    // 显示加载进度
+    showLoadingProgress(message) {
+        const loadingText = document.querySelector('#favoritesPage .loading-text');
+        if (loadingText) {
+            loadingText.textContent = message;
+        }
+    }
+
     // 显示错误状态
     showErrorState(message) {
         const container = document.querySelector('#favoritesPage .favorites-list');
@@ -472,9 +482,6 @@ class FavoritesPageManager {
                         <i class="fas fa-exclamation-triangle"></i>
                     </div>
                     <div class="error-text">${message}</div>
-                    <button class="retry-btn" onclick="window.favoritesPageManager?.loadFavoritesSongs(true)">
-                        重试
-                    </button>
                 </div>
             `;
         }
@@ -542,7 +549,7 @@ window.refreshFavoritesPage = async () => {
         window.favoritesPageManager.pagination.currentPage = 1;
         window.favoritesPageManager.pagination.hasMore = true;
         // 重新加载数据
-        await window.favoritesPageManager.loadFavoritesSongs(true);
+        await window.favoritesPageManager.loadLastPageFirst();
     }
 };
 
