@@ -11,6 +11,13 @@ class AlbumDetailManager {
         this.playlistData = null;
         this.songsData = [];
         this.loading = false;
+
+        // 分页相关
+        this.currentPage = 1;
+        this.pageSize = 50;
+        this.hasMoreData = true;
+        this.totalSongs = 0;
+        this.loadingMore = false;
     }
 
     // 初始化专辑详情页面
@@ -40,7 +47,11 @@ class AlbumDetailManager {
                 }
             });
         }
+
+        // 不再使用自动滚动加载，改为手动按钮加载
     }
+
+    // 移除滚动监听器相关代码，改为手动按钮加载
 
     // 显示专辑详情
     async showAlbumDetail(albumId) {
@@ -116,6 +127,12 @@ class AlbumDetailManager {
         this.currentPlaylistId = playlistId;
         this.currentType = 'playlist'; // 设置当前类型为歌单
 
+        // 重置分页状态
+        this.currentPage = 1;
+        this.hasMoreData = true;
+        this.totalSongs = 0;
+        this.songsData = [];
+
         // 移除默认状态（如果存在）
         const defaultState = document.querySelector('.album-default-state');
         if (defaultState) {
@@ -125,14 +142,14 @@ class AlbumDetailManager {
         // 显示加载状态
         this.showLoading();
 
-        console.log('📡 开始加载歌单详情和歌曲列表...');
+        console.log('📡 开始加载歌单详情和第一页歌曲列表...');
 
         try {
-            // 并发加载歌单详情和歌曲列表（后端已转换为专辑格式）
-            console.log('📡 调用API获取歌单详情和歌曲列表...');
+            // 并发加载歌单详情和第一页歌曲列表
+            console.log('📡 调用API获取歌单详情和第一页歌曲列表...');
             const [playlistResponse, songsResponse] = await Promise.all([
                 this.loadPlaylistDetail(playlistId),
-                this.loadPlaylistSongs(playlistId)
+                this.loadPlaylistSongs(playlistId, 1, this.pageSize)
             ]);
 
             console.log('📡 API调用完成');
@@ -145,6 +162,21 @@ class AlbumDetailManager {
                 // 后端已经将歌单数据转换为专辑格式，直接使用
                 this.albumData = playlistResponse.data;
                 this.songsData = songsResponse.data;
+
+                // 检查是否还有更多数据
+                this.hasMoreData = songsResponse.data.length >= this.pageSize;
+
+                // 更新总数（如果歌单详情中有总数信息）
+                console.log('🔍 检查歌单详情中的总数信息:', this.albumData);
+                if (this.albumData && this.albumData.song_count) {
+                    this.totalSongs = this.albumData.song_count;
+                    this.hasMoreData = this.songsData.length < this.totalSongs;
+                    console.log(`✅ 从歌单详情获取总数: ${this.totalSongs}`);
+                } else {
+                    console.log('⚠️ 歌单详情中没有找到song_count字段');
+                }
+
+                console.log(`📊 歌单统计: 当前加载${this.songsData.length}首，总共${this.totalSongs}首，还有更多数据: ${this.hasMoreData}`);
 
                 this.showContent();
                 this.renderAlbumDetail(); // 直接使用专辑渲染方法
@@ -283,7 +315,66 @@ class AlbumDetailManager {
         }
     }
 
+    // 加载更多歌曲（分页加载）
+    async loadMoreSongs() {
+        console.log('🔍 loadMoreSongs 被调用，检查条件：', {
+            loadingMore: this.loadingMore,
+            hasMoreData: this.hasMoreData,
+            currentType: this.currentType,
+            currentPage: this.currentPage,
+            totalSongs: this.totalSongs,
+            currentSongsCount: this.songsData.length
+        });
 
+        if (this.loadingMore || !this.hasMoreData || this.currentType !== 'playlist') {
+            console.log('⏸️ 跳过加载更多：', {
+                loadingMore: this.loadingMore,
+                hasMoreData: this.hasMoreData,
+                currentType: this.currentType
+            });
+            return;
+        }
+
+        this.loadingMore = true;
+        const nextPage = this.currentPage + 1;
+
+        console.log(`🔄 开始加载第${nextPage}页歌曲...`);
+
+        try {
+            const songsResponse = await this.loadPlaylistSongs(this.currentPlaylistId, nextPage, this.pageSize);
+
+            if (songsResponse.success && songsResponse.data && songsResponse.data.length > 0) {
+                // 追加新数据
+                this.songsData = [...this.songsData, ...songsResponse.data];
+                this.currentPage = nextPage;
+
+                console.log(`✅ 第${nextPage}页加载成功，本页${songsResponse.data.length}首，累计${this.songsData.length}首`);
+
+                // 检查是否还有更多数据
+                if (this.totalSongs > 0) {
+                    this.hasMoreData = this.songsData.length < this.totalSongs;
+                } else {
+                    // 如果没有总数信息，使用返回数据量判断
+                    this.hasMoreData = songsResponse.data.length >= this.pageSize;
+                }
+
+                if (!this.hasMoreData) {
+                    console.log('📄 已加载全部歌曲');
+                }
+
+                // 重新渲染歌曲列表
+                this.renderSongsList();
+            } else {
+                this.hasMoreData = false;
+                console.log('📄 没有更多歌曲了');
+            }
+        } catch (error) {
+            console.error('❌ 加载更多歌曲失败:', error);
+            this.hasMoreData = false;
+        } finally {
+            this.loadingMore = false;
+        }
+    }
 
     // 获取歌单信息
     getPlaylistInfo(playlistId) {
@@ -367,10 +458,20 @@ class AlbumDetailManager {
             yearElement.textContent = album.publish_date || (this.currentType === 'playlist' ? '未知时间' : '未知年份');
         }
 
-        // 更新歌曲数量
+        // 更新歌曲数量 - 优先显示总数，如果没有则显示当前加载数
         const songCountElement = document.getElementById('albumSongCount');
         if (songCountElement) {
-            songCountElement.textContent = `${this.songsData.length}首歌曲`;
+            if (this.currentType === 'playlist' && album.song_count > 0) {
+                // 歌单显示总数
+                if (this.songsData.length < album.song_count) {
+                    songCountElement.textContent = `${album.song_count}首歌曲 (已加载${this.songsData.length}首)`;
+                } else {
+                    songCountElement.textContent = `${album.song_count}首歌曲`;
+                }
+            } else {
+                // 专辑或没有总数信息时显示当前加载数
+                songCountElement.textContent = `${this.songsData.length}首歌曲`;
+            }
         }
 
         // 更新描述
@@ -439,7 +540,41 @@ class AlbumDetailManager {
             `;
         }).join('');
 
-        container.innerHTML = html;
+        // 添加加载状态和手动加载按钮
+        let loadingInfo = '';
+        if (this.currentType === 'playlist') {
+            if (this.loadingMore) {
+                loadingInfo = `
+                    <div class="loading-more-songs">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <span>正在加载更多歌曲...</span>
+                    </div>
+                `;
+            } else if (this.hasMoreData) {
+                const remainingSongs = this.totalSongs > 0 ? this.totalSongs - this.songsData.length : '更多';
+                loadingInfo = `
+                    <div class="load-more-section">
+                        <div class="load-more-info">
+                            <span>已加载 ${this.songsData.length} 首歌曲</span>
+                            ${this.totalSongs > 0 ? `<span>，还有 ${remainingSongs} 首</span>` : ''}
+                        </div>
+                        <button class="load-more-btn" onclick="window.AlbumDetailManager.loadMoreSongs()">
+                            <i class="fas fa-plus"></i>
+                            <span>加载更多歌曲</span>
+                        </button>
+                    </div>
+                `;
+            } else if (this.totalSongs > 0) {
+                loadingInfo = `
+                    <div class="all-songs-loaded">
+                        <i class="fas fa-check-circle"></i>
+                        <span>已加载全部 ${this.songsData.length} 首歌曲</span>
+                    </div>
+                `;
+            }
+        }
+
+        container.innerHTML = html + loadingInfo;
     }
 
     // 播放全部歌曲

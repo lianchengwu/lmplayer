@@ -1,6 +1,6 @@
 
 import {Window, Events} from "@wailsio/runtime";
-import {initLoginModule} from "./login.js";
+import {initLoginModule, getLoginStatus} from "./login.js";
 import {initHomePage} from "./homepage.js";
 import * as SettingsService from "./bindings/wmplayer/settingsservice.js";
 
@@ -233,6 +233,18 @@ const PAGE_STATES = {
 // 将PAGE_STATES暴露到全局作用域
 window.PAGE_STATES = PAGE_STATES;
 
+// 获取当前用户ID
+async function getCurrentUserId() {
+    const loginStatus = getLoginStatus();
+    if (loginStatus.isLoggedIn && loginStatus.userInfo && loginStatus.userInfo.userid) {
+        return loginStatus.userInfo.userid;
+    }
+    return null;
+}
+
+// 暴露到全局作用域
+window.getCurrentUserId = getCurrentUserId;
+
 // 导航到指定页面
 window.navigateToPage = (pageState, addToHistory = true) => {
     console.log('🧭 导航到页面:', pageState, '添加到历史:', addToHistory);
@@ -308,7 +320,25 @@ function updatePageContent(pageState) {
             break;
         case PAGE_STATES.FAVORITES:
             activateSidebarItem('我喜欢的');
-            showMainContent(pageState);
+            // 导航到专辑详情页面显示"我喜欢的"歌单
+            showMainContent(PAGE_STATES.ALBUM_DETAIL);
+            // 显示"我喜欢的"歌单详情
+            if (window.AlbumDetailManager) {
+                // 获取当前用户ID来构建我喜欢的歌单ID
+                getCurrentUserId().then(userid => {
+                    if (userid) {
+                        const favoritesPlaylistId = `collection_3_${userid}_2_0`;
+                        console.log('🎵 显示我喜欢的歌单详情:', favoritesPlaylistId);
+                        window.AlbumDetailManager.showPlaylistDetail(favoritesPlaylistId);
+                    } else {
+                        console.error('❌ 无法获取用户ID');
+                    }
+                }).catch(error => {
+                    console.error('❌ 获取用户ID失败:', error);
+                });
+            } else {
+                console.error('❌ AlbumDetailManager不可用');
+            }
             break;
         case PAGE_STATES.PLAYLISTS:
             activateSidebarItem('收藏的歌单');
@@ -499,10 +529,20 @@ window.refreshPage = () => {
             }
             break;
         case PAGE_STATES.FAVORITES:
-            // 刷新我喜欢的音乐
+            // 刷新我喜欢的音乐（使用歌单逻辑）
             console.log('刷新我喜欢的音乐');
-            if (window.refreshFavoritesPage) {
-                window.refreshFavoritesPage();
+            if (window.AlbumDetailManager) {
+                getCurrentUserId().then(userid => {
+                    if (userid) {
+                        const favoritesPlaylistId = `collection_3_${userid}_2_0`;
+                        console.log('🔄 刷新我喜欢的歌单详情:', favoritesPlaylistId);
+                        window.AlbumDetailManager.showPlaylistDetail(favoritesPlaylistId);
+                    } else {
+                        console.error('❌ 无法获取用户ID');
+                    }
+                }).catch(error => {
+                    console.error('❌ 获取用户ID失败:', error);
+                });
             }
             break;
         case PAGE_STATES.PLAYLISTS:

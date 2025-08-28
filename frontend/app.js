@@ -13,7 +13,6 @@ import './main.js';
 import './search.js';
 import './discover.js';
 import './history.js';
-import './favorites.js';
 import './album-detail.js';
 import './playlists.js';
 

@@ -871,8 +871,31 @@ func (h *HomepageService) GetAIRecommend() AIRecommendResponse {
 	}
 
 	// 首先获取我喜欢的歌曲列表，提取mixsongid
+	// 使用通用的歌单API获取"我喜欢的"歌曲
 	favoritesService := &FavoritesService{}
-	favoritesResponse := favoritesService.GetFavoritesSongs(1, 50) // 获取前50首用于AI推荐
+
+	// 读取cookie获取用户ID
+	cookie, err2 := favoritesService.readCookieFromFile()
+	if err2 != nil {
+		return AIRecommendResponse{
+			Success: false,
+			Message: fmt.Sprintf("读取cookie失败: %v", err2),
+		}
+	}
+
+	userid, err3 := favoritesService.getUserIDFromCookie(cookie)
+	if err3 != nil {
+		return AIRecommendResponse{
+			Success: false,
+			Message: fmt.Sprintf("获取用户ID失败: %v", err3),
+		}
+	}
+
+	// 构建我喜欢的歌单ID
+	favoritesPlaylistId := fmt.Sprintf("collection_3_%d_2_0", userid)
+
+	// 使用通用的歌单歌曲API
+	favoritesResponse := favoritesService.GetPlaylistSongs(favoritesPlaylistId)
 
 	if !favoritesResponse.Success {
 		return AIRecommendResponse{
@@ -881,26 +904,26 @@ func (h *HomepageService) GetAIRecommend() AIRecommendResponse {
 		}
 	}
 
-	// 提取mixsongid，最多15个，用逗号拼接
-	var mixsongids []string
+	// 提取歌曲hash，最多15个，用逗号拼接（替代mixsongid）
+	var songHashes []string
 	for i, song := range favoritesResponse.Data {
 		if i >= 15 { // 最多15个
 			break
 		}
-		if song.Mixsongid > 0 {
-			mixsongids = append(mixsongids, fmt.Sprintf("%d", song.Mixsongid))
+		if song.Hash != "" {
+			songHashes = append(songHashes, song.Hash)
 		}
 	}
 
-	if len(mixsongids) == 0 {
+	if len(songHashes) == 0 {
 		return AIRecommendResponse{
 			Success: false,
-			Message: "我喜欢的歌曲中没有找到有效的mixsongid",
+			Message: "我喜欢的歌曲中没有找到有效的歌曲hash",
 		}
 	}
 
-	albumAudioIds := strings.Join(mixsongids, ",")
-	log.Printf("使用的album_audio_id: %s", albumAudioIds)
+	albumAudioIds := strings.Join(songHashes, ",")
+	log.Printf("使用的歌曲hash: %s", albumAudioIds)
 
 	// 构建请求URL
 	requestURL := fmt.Sprintf("%s/ai/recommend", baseApi)

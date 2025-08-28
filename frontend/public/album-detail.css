@@ -439,4 +439,87 @@
     line-height: 1.5;
 }
 
+/* 分页加载相关样式 */
+.loading-more-songs,
+.load-more-section,
+.all-songs-loaded {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 20px;
+    margin: 20px 0;
+    border-radius: 8px;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.loading-more-songs {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+}
+
+.loading-more-songs i {
+    color: var(--accent-color);
+}
+
+.load-more-section {
+    flex-direction: column;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    gap: 16px;
+}
+
+.load-more-info {
+    color: var(--text-secondary);
+    font-size: 14px;
+    text-align: center;
+}
+
+.load-more-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 160px;
+    justify-content: center;
+}
+
+.load-more-btn:hover {
+    background: var(--accent-color-hover, #1976d2);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.load-more-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.load-more-btn:disabled {
+    background: var(--bg-tertiary);
+    color: var(--text-tertiary);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.all-songs-loaded {
+    background: var(--success-bg, rgba(34, 197, 94, 0.1));
+    border: 1px solid var(--success-color, #22c55e);
+    color: var(--success-color, #22c55e);
+}
+
+.all-songs-loaded i {
+    color: var(--success-color, #22c55e);
+}
+
 

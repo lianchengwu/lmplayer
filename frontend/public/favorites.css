@@ -165,7 +165,48 @@
     margin-bottom: 24px;
 }
 
+/* 加载更多指示器 */
+.load-more-indicator {
+    padding: 20px;
+    text-align: center;
+    grid-column: 1 / -1; /* 占满整行 */
+}
 
+.loading-more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.loading-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border-color);
+    border-top: 2px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.load-more-hint {
+    color: var(--text-secondary);
+    font-size: 14px;
+    padding: 10px;
+}
+
+.load-more-end {
+    color: var(--text-secondary);
+    font-size: 14px;
+    padding: 10px;
+    border-top: 1px solid var(--border-color);
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
 
 /* 我喜欢的歌曲列表容器 - 与推荐歌曲保持一致的布局 */
 .favorites-list {

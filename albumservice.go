@@ -645,11 +645,24 @@ func (a *AlbumService) GetPlaylistDetail(playlistID string) AlbumDetailResponse 
 	if pic, ok := dataMap["pic"].(string); ok {
 		playlistDetail.UnionCover = pic
 	}
+	// 提取歌曲总数
 	if count, ok := dataMap["count"].(float64); ok {
 		playlistDetail.SongCount = int(count)
+		log.Printf("✅ 从API响应提取歌曲总数: %d", playlistDetail.SongCount)
+	} else if countInt, ok := dataMap["count"].(int); ok {
+		playlistDetail.SongCount = countInt
+		log.Printf("✅ 从API响应提取歌曲总数(int): %d", playlistDetail.SongCount)
+	} else {
+		// 打印所有可用字段以便调试
+		var keys []string
+		for k := range dataMap {
+			keys = append(keys, k)
+		}
+		log.Printf("⚠️ API响应中没有找到count字段，dataMap中的所有字段: %v", keys)
+		playlistDetail.SongCount = 0
 	}
 
-	log.Printf("成功获取歌单详情: %s", playlistDetail.AlbumName)
+	log.Printf("成功获取歌单详情: %s，歌曲总数: %d", playlistDetail.AlbumName, playlistDetail.SongCount)
 
 	return AlbumDetailResponse{
 		Success:   true,
