@@ -464,33 +464,33 @@
 }
 
 .load-more-section {
-    flex-direction: column;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    gap: 16px;
-}
-
-.load-more-info {
-    color: var(--text-secondary);
-    font-size: 14px;
-    text-align: center;
+    position: fixed;
+    bottom: 100px; /* 避免被底部播放器遮挡 */
+    right: 20px;
+    z-index: 1001; /* 高于播放器的z-index */
+    background: transparent;
+    border: none;
+    gap: 0;
+    padding: 0;
 }
 
 .load-more-btn {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 12px 24px;
+    padding: 12px 20px;
     background: var(--accent-color);
     color: white;
     border: none;
-    border-radius: 6px;
+    border-radius: 25px;
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.3s ease;
-    min-width: 160px;
+    min-width: 120px;
     justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    backdrop-filter: blur(10px);
 }
 
 .load-more-btn:hover {
@@ -509,7 +509,23 @@
     color: var(--text-tertiary);
     cursor: not-allowed;
     transform: none;
-    box-shadow: none;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    opacity: 0.6;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .load-more-section {
+        bottom: 80px; /* 避免与底部播放器重叠 */
+        right: 15px;
+    }
+
+    .load-more-btn {
+        min-width: 100px;
+        padding: 10px 16px;
+        font-size: 13px;
+    }
+}
 }
 
 .all-songs-loaded {

@@ -1,6 +1,10 @@
 // 专辑详情页面功能模块
 import { AlbumService } from "./bindings/wmplayer/index.js";
 
+// 缓存配置
+const FAVORITES_CACHE_EXPIRY = 10 * 60 * 60 * 1000; // 10小时缓存
+const PLAYLIST_CACHE_EXPIRY = 10 * 60 * 60 * 1000;  // 10小时缓存
+
 // 专辑详情页面管理器
 class AlbumDetailManager {
     constructor() {
@@ -18,6 +22,57 @@ class AlbumDetailManager {
         this.hasMoreData = true;
         this.totalSongs = 0;
         this.loadingMore = false;
+
+        // 缓存相关
+        this.cache = new Map();
+    }
+
+    // 缓存相关方法
+    getCacheKey(type, id, page = 1) {
+        return `${type}_${id}_${page}`;
+    }
+
+    setCache(key, data, expiry = PLAYLIST_CACHE_EXPIRY) {
+        const cacheData = {
+            data: data,
+            timestamp: Date.now(),
+            expiry: expiry
+        };
+        this.cache.set(key, cacheData);
+        console.log(`💾 缓存数据: ${key}`);
+    }
+
+    getCache(key) {
+        const cached = this.cache.get(key);
+        if (!cached) {
+            return null;
+        }
+
+        const now = Date.now();
+        if (now - cached.timestamp > cached.expiry) {
+            this.cache.delete(key);
+            console.log(`🗑️ 缓存过期已清理: ${key}`);
+            return null;
+        }
+
+        console.log(`✅ 使用缓存数据: ${key}`);
+        return cached.data;
+    }
+
+    clearCache(pattern = null) {
+        if (pattern) {
+            // 清理匹配模式的缓存
+            for (const key of this.cache.keys()) {
+                if (key.includes(pattern)) {
+                    this.cache.delete(key);
+                    console.log(`🗑️ 清理缓存: ${key}`);
+                }
+            }
+        } else {
+            // 清理所有缓存
+            this.cache.clear();
+            console.log('🗑️ 清理所有缓存');
+        }
     }
 
     // 初始化专辑详情页面
@@ -45,6 +100,14 @@ class AlbumDetailManager {
                     const songIndex = parseInt(songItem.dataset.index);
                     this.playSong(songIndex);
                 }
+            });
+        }
+
+        // 刷新按钮事件
+        const refreshBtn = document.getElementById('refreshAlbumBtn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => {
+                this.refreshCurrentData();
             });
         }
 
@@ -167,16 +230,10 @@ class AlbumDetailManager {
                 this.hasMoreData = songsResponse.data.length >= this.pageSize;
 
                 // 更新总数（如果歌单详情中有总数信息）
-                console.log('🔍 检查歌单详情中的总数信息:', this.albumData);
                 if (this.albumData && this.albumData.song_count) {
                     this.totalSongs = this.albumData.song_count;
                     this.hasMoreData = this.songsData.length < this.totalSongs;
-                    console.log(`✅ 从歌单详情获取总数: ${this.totalSongs}`);
-                } else {
-                    console.log('⚠️ 歌单详情中没有找到song_count字段');
                 }
-
-                console.log(`📊 歌单统计: 当前加载${this.songsData.length}首，总共${this.totalSongs}首，还有更多数据: ${this.hasMoreData}`);
 
                 this.showContent();
                 this.renderAlbumDetail(); // 直接使用专辑渲染方法
@@ -279,11 +336,25 @@ class AlbumDetailManager {
     async loadPlaylistDetail(playlistId) {
         console.log('📡 调用歌单详情API（后端转换为专辑格式）...');
 
+        // 检查缓存
+        const cacheKey = this.getCacheKey('playlist_detail', playlistId);
+        const cachedData = this.getCache(cacheKey);
+        if (cachedData) {
+            console.log('✅ 使用歌单详情缓存数据');
+            return cachedData;
+        }
+
         try {
             const response = await AlbumService.GetPlaylistDetail(playlistId);
 
             if (response && response.success) {
                 console.log('✅ 歌单详情API调用成功，后端已转换为专辑格式');
+
+                // 缓存数据 - 我喜欢的歌单使用更长的缓存时间
+                const isMyFavorites = playlistId.includes('_2_0');
+                const expiry = isMyFavorites ? FAVORITES_CACHE_EXPIRY : PLAYLIST_CACHE_EXPIRY;
+                this.setCache(cacheKey, response, expiry);
+
                 return response;
             } else {
                 console.error('❌ 歌单详情API返回错误:', response);
@@ -299,11 +370,25 @@ class AlbumDetailManager {
     async loadPlaylistSongs(playlistId, page = 1, pageSize = 50) {
         console.log('📡 调用歌单歌曲列表API（后端转换为专辑格式）...');
 
+        // 检查缓存
+        const cacheKey = this.getCacheKey('playlist_songs', playlistId, page);
+        const cachedData = this.getCache(cacheKey);
+        if (cachedData) {
+            console.log('✅ 使用歌单歌曲缓存数据');
+            return cachedData;
+        }
+
         try {
             const response = await AlbumService.GetPlaylistSongs(playlistId, page, pageSize);
 
             if (response && response.success) {
                 console.log('✅ 歌单歌曲列表API调用成功，后端已转换为专辑格式');
+
+                // 缓存数据 - 我喜欢的歌单使用更长的缓存时间
+                const isMyFavorites = playlistId.includes('_2_0'); // 我喜欢的歌单ID包含_2_0
+                const expiry = isMyFavorites ? FAVORITES_CACHE_EXPIRY : PLAYLIST_CACHE_EXPIRY;
+                this.setCache(cacheKey, response, expiry);
+
                 return response;
             } else {
                 console.error('❌ 歌单歌曲列表API返回错误:', response);
@@ -340,6 +425,9 @@ class AlbumDetailManager {
 
         console.log(`🔄 开始加载第${nextPage}页歌曲...`);
 
+        // 立即更新按钮状态
+        this.renderSongsList();
+
         try {
             const songsResponse = await this.loadPlaylistSongs(this.currentPlaylistId, nextPage, this.pageSize);
 
@@ -348,7 +436,7 @@ class AlbumDetailManager {
                 this.songsData = [...this.songsData, ...songsResponse.data];
                 this.currentPage = nextPage;
 
-                console.log(`✅ 第${nextPage}页加载成功，本页${songsResponse.data.length}首，累计${this.songsData.length}首`);
+                console.log(`✅ 第${nextPage}页加载成功`);
 
                 // 检查是否还有更多数据
                 if (this.totalSongs > 0) {
@@ -358,21 +446,18 @@ class AlbumDetailManager {
                     this.hasMoreData = songsResponse.data.length >= this.pageSize;
                 }
 
-                if (!this.hasMoreData) {
-                    console.log('📄 已加载全部歌曲');
-                }
-
                 // 重新渲染歌曲列表
                 this.renderSongsList();
             } else {
                 this.hasMoreData = false;
-                console.log('📄 没有更多歌曲了');
             }
         } catch (error) {
             console.error('❌ 加载更多歌曲失败:', error);
             this.hasMoreData = false;
         } finally {
             this.loadingMore = false;
+            // 确保按钮状态正确更新
+            this.renderSongsList();
         }
     }
 
@@ -425,6 +510,9 @@ class AlbumDetailManager {
             typeBadge.textContent = this.currentType === 'playlist' ? '歌单' : '专辑';
         }
 
+        // 显示刷新按钮（仅歌单显示）
+        this.showRefreshButton();
+
         // 更新封面
         const coverImage = document.getElementById('albumCoverImage');
         if (coverImage) {
@@ -458,16 +546,12 @@ class AlbumDetailManager {
             yearElement.textContent = album.publish_date || (this.currentType === 'playlist' ? '未知时间' : '未知年份');
         }
 
-        // 更新歌曲数量 - 优先显示总数，如果没有则显示当前加载数
+        // 更新歌曲数量 - 简化显示
         const songCountElement = document.getElementById('albumSongCount');
         if (songCountElement) {
             if (this.currentType === 'playlist' && album.song_count > 0) {
                 // 歌单显示总数
-                if (this.songsData.length < album.song_count) {
-                    songCountElement.textContent = `${album.song_count}首歌曲 (已加载${this.songsData.length}首)`;
-                } else {
-                    songCountElement.textContent = `${album.song_count}首歌曲`;
-                }
+                songCountElement.textContent = `${album.song_count}首歌曲`;
             } else {
                 // 专辑或没有总数信息时显示当前加载数
                 songCountElement.textContent = `${this.songsData.length}首歌曲`;
@@ -540,41 +624,100 @@ class AlbumDetailManager {
             `;
         }).join('');
 
-        // 添加加载状态和手动加载按钮
-        let loadingInfo = '';
-        if (this.currentType === 'playlist') {
-            if (this.loadingMore) {
-                loadingInfo = `
-                    <div class="loading-more-songs">
-                        <i class="fas fa-spinner fa-spin"></i>
-                        <span>正在加载更多歌曲...</span>
-                    </div>
-                `;
-            } else if (this.hasMoreData) {
-                const remainingSongs = this.totalSongs > 0 ? this.totalSongs - this.songsData.length : '更多';
-                loadingInfo = `
-                    <div class="load-more-section">
-                        <div class="load-more-info">
-                            <span>已加载 ${this.songsData.length} 首歌曲</span>
-                            ${this.totalSongs > 0 ? `<span>，还有 ${remainingSongs} 首</span>` : ''}
-                        </div>
-                        <button class="load-more-btn" onclick="window.AlbumDetailManager.loadMoreSongs()">
-                            <i class="fas fa-plus"></i>
-                            <span>加载更多歌曲</span>
-                        </button>
-                    </div>
-                `;
-            } else if (this.totalSongs > 0) {
-                loadingInfo = `
-                    <div class="all-songs-loaded">
-                        <i class="fas fa-check-circle"></i>
-                        <span>已加载全部 ${this.songsData.length} 首歌曲</span>
-                    </div>
-                `;
-            }
+        container.innerHTML = html;
+
+        // 单独处理右下角固定的加载更多按钮
+        this.updateLoadMoreButton();
+    }
+
+    // 更新加载更多按钮
+    updateLoadMoreButton() {
+        // 先移除现有的按钮
+        const existingButton = document.querySelector('.load-more-section');
+        if (existingButton) {
+            existingButton.remove();
         }
 
-        container.innerHTML = html + loadingInfo;
+        // 只在歌单页面且有更多数据时显示按钮
+        if (this.currentType === 'playlist' && this.hasMoreData) {
+            const isLoading = this.loadingMore;
+            const buttonHTML = `
+                <div class="load-more-section">
+                    <button class="load-more-btn"
+                            onclick="window.AlbumDetailManager.loadMoreSongs()"
+                            ${isLoading ? 'disabled' : ''}>
+                        <i class="fas ${isLoading ? 'fa-spinner fa-spin' : 'fa-plus'}"></i>
+                        <span>${isLoading ? '加载中...' : '加载更多'}</span>
+                    </button>
+                </div>
+            `;
+
+            // 将按钮添加到body中，作为固定定位元素
+            document.body.insertAdjacentHTML('beforeend', buttonHTML);
+        }
+    }
+
+    // 清理加载更多按钮
+    clearLoadMoreButton() {
+        const existingButton = document.querySelector('.load-more-section');
+        if (existingButton) {
+            existingButton.remove();
+        }
+    }
+
+    // 显示刷新按钮（仅在歌单页面显示）
+    showRefreshButton() {
+        const refreshBtn = document.getElementById('refreshAlbumBtn');
+        if (refreshBtn) {
+            if (this.currentType === 'playlist') {
+                refreshBtn.style.display = 'flex';
+            } else {
+                refreshBtn.style.display = 'none';
+            }
+        }
+    }
+
+    // 隐藏刷新按钮
+    hideRefreshButton() {
+        const refreshBtn = document.getElementById('refreshAlbumBtn');
+        if (refreshBtn) {
+            refreshBtn.style.display = 'none';
+        }
+    }
+
+    // 刷新当前数据
+    async refreshCurrentData() {
+        console.log('🔄 刷新当前数据...');
+
+        // 显示刷新动画
+        const refreshBtn = document.getElementById('refreshAlbumBtn');
+        if (refreshBtn) {
+            refreshBtn.disabled = true;
+            refreshBtn.querySelector('i').style.animation = 'spin 1s linear infinite';
+        }
+
+        try {
+            if (this.currentType === 'playlist' && this.currentPlaylistId) {
+                // 清除相关缓存
+                this.clearCache(`playlist_detail_${this.currentPlaylistId}`);
+                this.clearCache(`playlist_songs_${this.currentPlaylistId}`);
+
+                // 重新加载歌单数据
+                await this.showPlaylistDetail(this.currentPlaylistId);
+                console.log('✅ 歌单数据刷新完成');
+            } else if (this.currentType === 'album' && this.currentAlbumId) {
+                // 专辑暂时不需要刷新功能，因为专辑数据相对固定
+                console.log('专辑数据不需要刷新');
+            }
+        } catch (error) {
+            console.error('❌ 数据刷新失败:', error);
+        } finally {
+            // 恢复按钮状态
+            if (refreshBtn) {
+                refreshBtn.disabled = false;
+                refreshBtn.querySelector('i').style.animation = '';
+            }
+        }
     }
 
     // 播放全部歌曲
@@ -700,6 +843,12 @@ class AlbumDetailManager {
 
     // 显示加载状态
     showLoading() {
+        // 清理加载更多按钮
+        this.clearLoadMoreButton();
+
+        // 隐藏刷新按钮
+        this.hideRefreshButton();
+
         // 隐藏专辑信息和歌曲列表
         const albumInfoSection = document.querySelector('.album-info-section');
         const albumSongsSection = document.querySelector('.album-songs-section');
@@ -735,6 +884,12 @@ class AlbumDetailManager {
 
     // 显示错误状态
     showError(message) {
+        // 清理加载更多按钮
+        this.clearLoadMoreButton();
+
+        // 隐藏刷新按钮
+        this.hideRefreshButton();
+
         // 隐藏专辑信息和歌曲列表
         const albumInfoSection = document.querySelector('.album-info-section');
         const albumSongsSection = document.querySelector('.album-songs-section');

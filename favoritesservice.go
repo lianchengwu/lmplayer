@@ -13,7 +13,16 @@ import (
 )
 
 // FavoritesService 处理我喜欢的页面相关的服务
-type FavoritesService struct{}
+type FavoritesService struct {
+	cacheService *CacheService
+}
+
+// NewFavoritesService 创建新的收藏服务实例
+func NewFavoritesService(cacheService *CacheService) *FavoritesService {
+	return &FavoritesService{
+		cacheService: cacheService,
+	}
+}
 
 // processSongName 处理歌曲名称：去掉艺术家名称、扩展名和"- "分隔符
 func (f *FavoritesService) processSongName(originalName string) string {

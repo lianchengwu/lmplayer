@@ -1,6 +1,9 @@
 // 收藏的歌单页面功能模块
 import { FavoritesService } from "./bindings/wmplayer/index.js";
 
+// 缓存配置
+const PLAYLISTS_CACHE_EXPIRY = 10 * 60 * 60 * 1000; // 10小时缓存
+
 // 收藏的歌单页面数据管理
 class PlaylistsPageManager {
     constructor() {
@@ -17,6 +20,68 @@ class PlaylistsPageManager {
             totalCollected: 0
         };
 
+        // 缓存相关
+        this.cache = new Map();
+    }
+
+    // 缓存相关方法
+    setCache(key, data, expiry = PLAYLISTS_CACHE_EXPIRY) {
+        const cacheData = {
+            data: data,
+            timestamp: Date.now(),
+            expiry: expiry
+        };
+        this.cache.set(key, cacheData);
+        console.log(`💾 缓存歌单数据: ${key}`);
+    }
+
+    getCache(key) {
+        const cached = this.cache.get(key);
+        if (!cached) {
+            return null;
+        }
+
+        const now = Date.now();
+        if (now - cached.timestamp > cached.expiry) {
+            this.cache.delete(key);
+            console.log(`🗑️ 歌单缓存过期已清理: ${key}`);
+            return null;
+        }
+
+        console.log(`✅ 使用歌单缓存数据: ${key}`);
+        return cached.data;
+    }
+
+    clearCache() {
+        this.cache.clear();
+        console.log('🗑️ 清理所有歌单缓存');
+    }
+
+    // 刷新歌单列表
+    async refreshPlaylists() {
+        console.log('🔄 刷新歌单列表...');
+
+        // 显示刷新动画
+        const refreshBtn = document.getElementById('refreshPlaylistsBtn');
+        if (refreshBtn) {
+            refreshBtn.disabled = true;
+            refreshBtn.querySelector('i').style.animation = 'spin 1s linear infinite';
+        }
+
+        try {
+            // 清除缓存并强制刷新
+            this.clearCache();
+            await this.loadPlaylists(true);
+            console.log('✅ 歌单列表刷新完成');
+        } catch (error) {
+            console.error('❌ 歌单列表刷新失败:', error);
+        } finally {
+            // 恢复按钮状态
+            if (refreshBtn) {
+                refreshBtn.disabled = false;
+                refreshBtn.querySelector('i').style.animation = '';
+            }
+        }
     }
 
     // 初始化收藏的歌单页面
@@ -53,15 +118,36 @@ class PlaylistsPageManager {
                 this.showCreatePlaylistDialog();
             });
         }
+
+        // 刷新按钮事件
+        const refreshBtn = document.getElementById('refreshPlaylistsBtn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => {
+                this.refreshPlaylists();
+            });
+        }
     }
 
     // 加载歌单
-    async loadPlaylists() {
+    async loadPlaylists(forceRefresh = false) {
         console.log('📊 加载用户歌单');
-        
+
         if (this.loading.playlists) {
             console.log('⏳ 歌单正在加载中...');
             return;
+        }
+
+        // 检查缓存（除非强制刷新）
+        if (!forceRefresh) {
+            const cachedData = this.getCache('user_playlists');
+            if (cachedData) {
+                console.log('✅ 使用歌单缓存数据');
+                this.data.myPlaylists = cachedData.myPlaylists;
+                this.data.collectedPlaylists = cachedData.collectedPlaylists;
+                this.updateStats();
+                this.renderPlaylists();
+                return;
+            }
         }
 
         this.loading.playlists = true;
@@ -75,7 +161,13 @@ class PlaylistsPageManager {
                 // 分类歌单
                 this.data.myPlaylists = response.data.filter(playlist => playlist.type === 0);
                 this.data.collectedPlaylists = response.data.filter(playlist => playlist.type === 1);
-                
+
+                // 缓存数据
+                this.setCache('user_playlists', {
+                    myPlaylists: this.data.myPlaylists,
+                    collectedPlaylists: this.data.collectedPlaylists
+                });
+
                 this.updateStats();
                 this.renderPlaylists();
                 console.log('✅ 用户歌单加载成功，我创建的:', this.data.myPlaylists.length, '个，我收藏的:', this.data.collectedPlaylists.length, '个');
