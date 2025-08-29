@@ -14,7 +14,7 @@ class AlbumDetailManager {
 
         // 分页相关
         this.currentPage = 1;
-        this.pageSize = 50;
+        this.pageSize = 150;  // 修改单页大小为150
         this.hasMoreData = true;
         this.totalSongs = 0;
         this.loadingMore = false;

@@ -4309,4 +4309,40 @@ h1 {
     }
 }
 
+/* 每日推荐加载状态样式 */
+.loading-state,
+.empty-state,
+.error-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 14px;
+    min-height: 120px;
+}
+
+.loading-state i,
+.empty-state i,
+.error-state i {
+    font-size: 24px;
+    margin-bottom: 12px;
+    opacity: 0.6;
+}
+
+.loading-state i {
+    color: var(--accent-color);
+    animation: spin 1s linear infinite;
+}
+
+.empty-state i {
+    color: var(--text-tertiary);
+}
+
+.error-state i {
+    color: #ef4444;
+}
+
 /* PC专用版本 - 移除了移动设备响应式布局 */

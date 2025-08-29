@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"strings"
@@ -870,7 +871,7 @@ func (h *HomepageService) GetAIRecommend() AIRecommendResponse {
 		}
 	}
 
-	// 首先获取我喜欢的歌曲列表，提取mixsongid
+	// 首先获取我喜欢的歌曲列表，提取hash用于AI推荐
 	// 使用通用的歌单API获取"我喜欢的"歌曲
 	favoritesService := &FavoritesService{}
 
@@ -894,8 +895,8 @@ func (h *HomepageService) GetAIRecommend() AIRecommendResponse {
 	// 构建我喜欢的歌单ID
 	favoritesPlaylistId := fmt.Sprintf("collection_3_%d_2_0", userid)
 
-	// 使用通用的歌单歌曲API
-	favoritesResponse := favoritesService.GetPlaylistSongs(favoritesPlaylistId)
+	// 使用专门的AI推荐方法获取更多我喜欢的歌曲
+	favoritesResponse := favoritesService.GetFavoriteSongsForAI(favoritesPlaylistId)
 
 	if !favoritesResponse.Success {
 		return AIRecommendResponse{
@@ -904,26 +905,71 @@ func (h *HomepageService) GetAIRecommend() AIRecommendResponse {
 		}
 	}
 
-	// 提取歌曲hash，最多15个，用逗号拼接（替代mixsongid）
-	var songHashes []string
-	for i, song := range favoritesResponse.Data {
-		if i >= 15 { // 最多15个
-			break
-		}
+	// 提取歌曲hash，最多50个，用逗号拼接（提高AI推荐准确性）
+	var allValidSongs []AlbumSongData
+	for _, song := range favoritesResponse.Data {
 		if song.Hash != "" {
-			songHashes = append(songHashes, song.Hash)
+			allValidSongs = append(allValidSongs, song)
 		}
 	}
 
-	if len(songHashes) == 0 {
+	if len(allValidSongs) == 0 {
 		return AIRecommendResponse{
 			Success: false,
 			Message: "我喜欢的歌曲中没有找到有效的歌曲hash",
 		}
 	}
 
+	// 智能选择歌曲策略：
+	// 1. 如果歌曲数量 <= 30，全部使用
+	// 2. 如果歌曲数量 > 30，随机选择30首以增加推荐多样性
+	maxSongs := 30
+	var selectedSongs []AlbumSongData
+
+	if len(allValidSongs) <= maxSongs {
+		selectedSongs = allValidSongs
+		log.Printf("使用全部%d首我喜欢的歌曲用于AI推荐", len(selectedSongs))
+	} else {
+		// 随机选择30首歌曲
+		selectedSongs = make([]AlbumSongData, maxSongs)
+
+		// 使用简单的随机选择算法
+		rand.Seed(time.Now().UnixNano())
+
+		// 创建索引数组
+		indices := make([]int, len(allValidSongs))
+		for i := range indices {
+			indices[i] = i
+		}
+
+		// 随机打乱索引
+		for i := len(indices) - 1; i > 0; i-- {
+			j := rand.Intn(i + 1)
+			indices[i], indices[j] = indices[j], indices[i]
+		}
+
+		// 选择前30首
+		for i := 0; i < maxSongs; i++ {
+			selectedSongs[i] = allValidSongs[indices[i]]
+		}
+
+		log.Printf("从%d首我喜欢的歌曲中随机选择%d首用于AI推荐", len(allValidSongs), maxSongs)
+	}
+
+	// 提取选中歌曲的hash
+	var songHashes []string
+	for _, song := range selectedSongs {
+		songHashes = append(songHashes, song.Hash)
+	}
+
 	albumAudioIds := strings.Join(songHashes, ",")
-	log.Printf("使用的歌曲hash: %s", albumAudioIds)
+	log.Printf("AI推荐使用的歌曲数量: %d", len(songHashes))
+	log.Printf("AI推荐使用的歌曲hash前10个: %s", func() string {
+		if len(songHashes) > 10 {
+			return strings.Join(songHashes[:10], ",") + "..."
+		}
+		return albumAudioIds
+	}())
 
 	// 构建请求URL
 	requestURL := fmt.Sprintf("%s/ai/recommend", baseApi)

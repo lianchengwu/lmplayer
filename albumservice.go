@@ -688,7 +688,7 @@ func (a *AlbumService) GetPlaylistSongs(playlistID string, page int, pageSize in
 		page = 1
 	}
 	if pageSize <= 0 {
-		pageSize = 30
+		pageSize = 150 // 修改默认页面大小为150
 	}
 
 	// 读取cookie

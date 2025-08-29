@@ -607,3 +607,173 @@ func (f *FavoritesService) GetPlaylistSongs(globalCollectionID string) AlbumSong
 		Data:      songs,
 	}
 }
+
+// GetFavoriteSongsForAI 专门为AI推荐获取我喜欢的歌曲，使用更大的pagesize
+func (f *FavoritesService) GetFavoriteSongsForAI(globalCollectionID string) AlbumSongsResponse {
+	log.Printf("开始为AI推荐获取我喜欢的歌曲列表，globalCollectionID: %s", globalCollectionID)
+
+	if globalCollectionID == "" {
+		return AlbumSongsResponse{
+			Success: false,
+			Message: "歌单ID不能为空",
+		}
+	}
+
+	// 读取cookie
+	cookie, err := f.readCookieFromFile()
+	if err != nil {
+		return AlbumSongsResponse{
+			Success: false,
+			Message: fmt.Sprintf("读取cookie失败: %v", err),
+		}
+	}
+
+	// 构建请求URL
+	requestURL := fmt.Sprintf("%s/playlist/track/all", baseApi)
+
+	// 构建查询参数 - 使用适中的pagesize获取更多歌曲用于AI推荐
+	queryParams := url.Values{}
+	queryParams.Add("id", globalCollectionID)
+	queryParams.Add("pagesize", "150") // 使用300，平衡性能和数据量
+	queryParams.Add("cookie", cookie)
+
+	// 添加查询参数到URL
+	requestURL += "?" + queryParams.Encode()
+
+	log.Printf("调用AI推荐专用歌单歌曲API: %s", requestURL)
+
+	// 创建HTTP客户端，设置超时
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	// 发送GET请求
+	resp, err := client.Get(requestURL)
+	if err != nil {
+		log.Printf("AI推荐歌单歌曲API请求失败: %v", err)
+		return AlbumSongsResponse{
+			Success: false,
+			Message: "API请求失败",
+		}
+	}
+	defer resp.Body.Close()
+
+	// 读取响应体
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return AlbumSongsResponse{
+			Success: false,
+			Message: fmt.Sprintf("读取响应失败: %v", err),
+		}
+	}
+
+	log.Printf("AI推荐歌单歌曲API响应状态码: %d", resp.StatusCode)
+
+	// 解析JSON响应
+	var apiResponse map[string]interface{}
+	if err := json.Unmarshal(body, &apiResponse); err != nil {
+		return AlbumSongsResponse{
+			Success: false,
+			Message: fmt.Sprintf("解析响应失败: %v", err),
+		}
+	}
+
+	// 检查API响应状态
+	if status, ok := apiResponse["status"].(float64); ok && status != 1 {
+		message := "获取AI推荐歌单歌曲失败"
+		if msg, ok := apiResponse["error"].(string); ok {
+			message = msg
+		}
+		return AlbumSongsResponse{
+			Success: false,
+			Message: message,
+		}
+	}
+
+	// 提取data字段
+	data, ok := apiResponse["data"].(map[string]interface{})
+	if !ok {
+		return AlbumSongsResponse{
+			Success: false,
+			Message: "响应数据格式错误",
+		}
+	}
+
+	// 提取info字段（歌曲列表）
+	info, ok := data["songs"].([]interface{})
+	if !ok {
+		return AlbumSongsResponse{
+			Success: false,
+			Message: "歌曲列表数据格式错误",
+		}
+	}
+
+	var songs []AlbumSongData
+	for _, item := range info {
+		songMap, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		song := AlbumSongData{}
+
+		// hash - 歌曲唯一标识
+		if hash, ok := songMap["hash"].(string); ok {
+			song.Hash = hash
+		}
+
+		// songname - 歌曲名称
+		if songname, ok := songMap["songname"].(string); ok {
+			song.SongName = songname
+		}
+
+		// filename - 文件名
+		if filename, ok := songMap["filename"].(string); ok {
+			song.FileName = filename
+		}
+
+		// album_name - 专辑名称
+		if albumName, ok := songMap["album_name"].(string); ok {
+			song.AlbumName = albumName
+		}
+
+		// album_id - 专辑ID
+		if albumID, ok := songMap["album_id"].(string); ok {
+			song.AlbumID = albumID
+		}
+
+		// author_name - 艺术家名称
+		if authorName, ok := songMap["author_name"].(string); ok {
+			song.AuthorName = authorName
+		}
+
+		// time_length - 从timelen获取，转换为秒
+		if timelen, ok := songMap["timelen"].(float64); ok {
+			song.TimeLength = int(timelen / 1000)
+		} else if timelenInt, ok := songMap["timelen"].(int); ok {
+			song.TimeLength = timelenInt / 1000
+		}
+
+		// union_cover - 从trans_param中获取
+		if transParam, ok := songMap["trans_param"].(map[string]interface{}); ok {
+			if unionCover, ok := transParam["union_cover"].(string); ok {
+				song.UnionCover = unionCover
+			}
+		}
+
+		// 只添加有效的歌曲（至少有hash）
+		if song.Hash != "" {
+			songs = append(songs, song)
+		}
+	}
+
+	log.Printf("成功为AI推荐获取我喜欢的歌曲列表，共%d首歌曲", len(songs))
+
+	return AlbumSongsResponse{
+		Success:   true,
+		Message:   "获取AI推荐歌曲成功",
+		ErrorCode: 0,
+		Status:    0,
+		Data:      songs,
+	}
+}
