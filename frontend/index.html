@@ -619,7 +619,7 @@
                     </div>
                 </section>
 
-                
+
             </div>
 
             <!-- 播放历史页面 -->
@@ -934,7 +934,7 @@
                         <h3>当前播放列表</h3>
                         <span class="playlist-count">0首歌曲</span>
                     </div>
-                    <div class="playlist-items"> 
+                    <div class="playlist-items">
                     </div>
                 </div>
             </div>
@@ -1264,7 +1264,7 @@
                     <div class="qrcode-placeholder" id="qrcodePlaceholder">
                         <i class="fas fa-qrcode"></i>
                     </div>
-                    <div class="qrcode-actions"> 
+                    <div class="qrcode-actions">
                         <button class="refresh-qrcode-btn" id="refreshQrcodeBtn">
                             <i class="fas fa-redo"></i>
                             刷新二维码
@@ -1277,15 +1277,15 @@
 </div>
 
 <!-- 统一播放器控制器 - 最先加载 -->
-<script src="./unified-player-controller.js"></script>
+<script type="module" src="./unified-player-controller.js"></script>
 
 <!-- HTML5 音频播放器 - 统一版本（优先加载） -->
 <script type="module" src="./html5-audio-player-unified.js"></script>
 
 <!-- 资源管理器 - 必须最先加载 -->
-<script src="./resource-manager.js"></script>
+<script type="module" src="./resource-manager.js"></script>
 <!-- 内存监控工具 -->
-<script src="./memory-monitor.js"></script>
+<script type="module" src="./memory-monitor.js"></script>
 
 <!-- 核心模块 -->
 <script type="module" src="./playlist-manager.js"></script>
@@ -1319,8 +1319,7 @@ console.log('🔧 Wails环境对象已安全初始化');
 <script type="module" src="./osd-lyrics.js"></script>
 
 <!-- 媒体控制模块 -->
-<script src="./media-key-handler.js"></script>
-<script src="./mpris-integration.js"></script>
+<script type="module" src="./mpris-integration.js"></script>
 
 <!-- 性能监控工具已移除 - 浏览器兼容性问题 -->
 </body>
