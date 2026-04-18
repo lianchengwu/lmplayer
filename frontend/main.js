@@ -19,6 +19,26 @@ window.minimizeWindow = () => {
     Window.Minimise();
 }
 
+function setMaximizeButtonState(isMaximised) {
+    const maximizeBtn = document.querySelector('.maximize-btn i');
+
+    if (!maximizeBtn) {
+        console.warn('⚠️ 未找到最大化按钮图标元素');
+        return;
+    }
+
+    if (isMaximised) {
+        maximizeBtn.className = 'fas fa-compress';
+        maximizeBtn.title = '还原';
+        console.log('🪟 图标更新: 显示还原图标 (compress)');
+        return;
+    }
+
+    maximizeBtn.className = 'fas fa-expand';
+    maximizeBtn.title = '最大化';
+    console.log('🪟 图标更新: 显示最大化图标 (expand)');
+}
+
 window.maximizeWindow = async () => {
     try {
         const isMaximised = await Window.IsMaximised();
@@ -823,23 +843,10 @@ window.navigateToSection = (section, clickedElement) => {
 window.updateMaximizeIcon = async () => {
     try {
         const isMaximised = await Window.IsMaximised();
-        const maximizeBtn = document.querySelector('.maximize-btn i');
-
-        if (maximizeBtn) {
-            if (isMaximised) {
-                maximizeBtn.className = 'fas fa-compress';
-                maximizeBtn.title = '还原';
-                console.log('🪟 图标更新: 显示还原图标 (compress)');
-            } else {
-                maximizeBtn.className = 'fas fa-expand';
-                maximizeBtn.title = '最大化';
-                console.log('🪟 图标更新: 显示最大化图标 (expand)');
-            }
-        } else {
-            console.warn('⚠️ 未找到最大化按钮图标元素');
-        }
+        setMaximizeButtonState(isMaximised);
     } catch (error) {
         console.error('❌ 更新最大化图标失败:', error);
+        setMaximizeButtonState(false);
     }
 }
 

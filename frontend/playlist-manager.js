@@ -50,8 +50,16 @@ async function loadPlaylistFromCache() {
             return false;
         }
     } catch (error) {
-        console.error('❌ 加载播放列表失败:', error);
+        console.error('❌ 加载播放列表失败，已回退为空播放列表:', error);
         // 即使出现异常，也要设置为已加载状态并显示空播放列表
+        currentPlaylist = {
+            songs: [],
+            currentIndex: -1,
+            playMode: 'normal',
+            shuffleMode: false,
+            repeatMode: 'off',
+            name: '播放列表'
+        };
         isPlaylistLoaded = true;
         updatePlaylistUI();
         return false;
