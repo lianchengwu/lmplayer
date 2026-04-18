@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -148,7 +149,7 @@ func (l *LocalMusicService) ScanMusicFolders(folderPaths []string) LocalMusicRes
 		// 检查文件夹是否存在
 		if _, err := os.Stat(folderPath); os.IsNotExist(err) {
 			failedPaths = append(failedPaths, folderPath)
-			fmt.Printf("文件夹不存在: %s\n", folderPath)
+			log.Printf("文件夹不存在: %s\n", folderPath)
 			continue
 		}
 
@@ -175,12 +176,12 @@ func (l *LocalMusicService) ScanMusicFolders(folderPaths []string) LocalMusicRes
 
 		if err != nil {
 			failedPaths = append(failedPaths, folderPath)
-			fmt.Printf("扫描文件夹失败 %s: %v\n", folderPath, err)
+			log.Printf("扫描文件夹失败 %s: %v\n", folderPath, err)
 			continue
 		}
 
 		folderFileMap[folderPath] = folderFiles
-		fmt.Printf("收集文件夹 %s: %d 个音乐文件\n", folderPath, len(folderFiles))
+		log.Printf("收集文件夹 %s: %d 个音乐文件\n", folderPath, len(folderFiles))
 	}
 
 	if len(allFilePaths) == 0 {
@@ -197,7 +198,7 @@ func (l *LocalMusicService) ScanMusicFolders(folderPaths []string) LocalMusicRes
 	}
 
 	// 使用协程并发扫描所有音乐文件
-	fmt.Printf("🚀 开始并发扫描 %d 个音乐文件\n", len(allFilePaths))
+	log.Printf("🚀 开始并发扫描 %d 个音乐文件\n", len(allFilePaths))
 	allMusicFiles = l.scanMusicFilesConcurrently(allFilePaths)
 
 	// 按文件夹分组音乐文件
@@ -224,7 +225,7 @@ func (l *LocalMusicService) ScanMusicFolders(folderPaths []string) LocalMusicRes
 				Stats:      folderStats,
 			}
 			folderGroups = append(folderGroups, folderGroup)
-			fmt.Printf("✅ 文件夹 %s: %d 首音乐\n", folderPath, len(folderMusicFiles))
+			log.Printf("✅ 文件夹 %s: %d 首音乐\n", folderPath, len(folderMusicFiles))
 		}
 	}
 
@@ -236,12 +237,12 @@ func (l *LocalMusicService) ScanMusicFolders(folderPaths []string) LocalMusicRes
 
 	// 缓存扫描结果
 	if err := l.cacheMusicFiles(uniqueFiles); err != nil {
-		fmt.Printf("缓存音乐文件失败: %v\n", err)
+		log.Printf("缓存音乐文件失败: %v\n", err)
 	}
 
 	// 生成本地音乐映射
 	if err := l.generateLocalMusicMappings(uniqueFiles); err != nil {
-		fmt.Printf("生成本地音乐映射失败: %v\n", err)
+		log.Printf("生成本地音乐映射失败: %v\n", err)
 	}
 
 	message := fmt.Sprintf("成功扫描到 %d 首音乐", len(uniqueFiles))
@@ -330,12 +331,12 @@ func (l *LocalMusicService) ScanMusicFolder(folderPath string) LocalMusicRespons
 
 	// 缓存扫描结果
 	if err := l.cacheMusicFiles(musicFiles); err != nil {
-		fmt.Printf("缓存音乐文件失败: %v\n", err)
+		log.Printf("缓存音乐文件失败: %v\n", err)
 	}
 
 	// 生成本地音乐映射
 	if err := l.generateLocalMusicMappings(musicFiles); err != nil {
-		fmt.Printf("生成本地音乐映射失败: %v\n", err)
+		log.Printf("生成本地音乐映射失败: %v\n", err)
 	}
 
 	// 创建文件夹分组
@@ -362,7 +363,7 @@ func (l *LocalMusicService) scanMusicFilesConcurrently(filePaths []string) []Loc
 		return []LocalMusicFile{}
 	}
 
-	fmt.Printf("🚀 开始并发扫描 %d 个音乐文件\n", len(filePaths))
+	log.Printf("🚀 开始并发扫描 %d 个音乐文件\n", len(filePaths))
 
 	// 创建结果通道
 	resultChan := make(chan ScanResult, len(filePaths))
@@ -396,7 +397,7 @@ func (l *LocalMusicService) scanMusicFilesConcurrently(filePaths []string) []Loc
 
 	for result := range resultChan {
 		if result.Error != nil {
-			fmt.Printf("❌ 扫描失败: %v\n", result.Error)
+			log.Printf("❌ 扫描失败: %v\n", result.Error)
 			failedCount++
 		} else {
 			musicFiles = append(musicFiles, *result.MusicFile)
@@ -404,7 +405,7 @@ func (l *LocalMusicService) scanMusicFilesConcurrently(filePaths []string) []Loc
 		}
 	}
 
-	fmt.Printf("✅ 并发扫描完成: 成功 %d 个，失败 %d 个\n", successCount, failedCount)
+	log.Printf("✅ 并发扫描完成: 成功 %d 个，失败 %d 个\n", successCount, failedCount)
 	return musicFiles
 }
 
@@ -496,9 +497,9 @@ func (l *LocalMusicService) parseMusicFile(filePath string) (*LocalMusicFile, er
 	lyrics := l.extractLyricsFromMetadata(metadata)
 	if lyrics != "" {
 		musicFile.Lyrics = lyrics
-		fmt.Printf("✅ 成功提取歌词 %s: %d 字符\n", filepath.Base(filePath), len(lyrics))
+		log.Printf("✅ 成功提取歌词 %s: %d 字符\n", filepath.Base(filePath), len(lyrics))
 	} else {
-		fmt.Printf("📝 未找到歌词信息: %s\n", filepath.Base(filePath))
+		log.Printf("📝 未找到歌词信息: %s\n", filepath.Base(filePath))
 	}
 
 	return musicFile, nil
@@ -538,7 +539,7 @@ func (l *LocalMusicService) deduplicateMusicFiles(musicFiles []LocalMusicFile) [
 		}
 	}
 
-	fmt.Printf("去重处理: %d -> %d 首音乐\n", len(musicFiles), len(uniqueFiles))
+	log.Printf("去重处理: %d -> %d 首音乐\n", len(musicFiles), len(uniqueFiles))
 	return uniqueFiles
 }
 
@@ -707,7 +708,7 @@ func (l *LocalMusicService) parseAudioDuration(filePath string) (int, error) {
 	case ".m4a", ".aac", ".ogg", ".wma":
 		// 对于这些格式，目前使用估算方法
 		// 可以在未来添加更精确的解析器
-		fmt.Printf("📊 使用估算方法解析 %s 格式: %s\n", ext, filepath.Base(filePath))
+		log.Printf("📊 使用估算方法解析 %s 格式: %s\n", ext, filepath.Base(filePath))
 		return l.estimateAudioDuration(filePath)
 	default:
 		return 0, fmt.Errorf("不支持的音频格式: %s", ext)
@@ -719,19 +720,19 @@ func (l *LocalMusicService) parseMp3Duration(filePath string) (int, error) {
 	// 方法1：尝试使用 go-mp3 库快速解析
 	duration, err := l.parseMp3DurationFast(filePath)
 	if err == nil && duration > 0 {
-		fmt.Printf("✅ MP3时长解析成功 %s: %d秒\n", filepath.Base(filePath), duration)
+		log.Printf("✅ MP3时长解析成功 %s: %d秒\n", filepath.Base(filePath), duration)
 		return duration, nil
 	}
 
 	// 方法2：如果快速解析失败，尝试通过帧分析
 	duration, err = l.parseMp3DurationByFrames(filePath)
 	if err == nil && duration > 0 {
-		fmt.Printf("✅ MP3帧分析时长成功 %s: %d秒\n", filepath.Base(filePath), duration)
+		log.Printf("✅ MP3帧分析时长成功 %s: %d秒\n", filepath.Base(filePath), duration)
 		return duration, nil
 	}
 
 	// 方法3：最后使用估算方法
-	fmt.Printf("⚠️ MP3精确解析失败，使用估算方法: %s\n", filepath.Base(filePath))
+	log.Printf("⚠️ MP3精确解析失败，使用估算方法: %s\n", filepath.Base(filePath))
 	return l.estimateAudioDuration(filePath)
 }
 
@@ -917,7 +918,7 @@ func (l *LocalMusicService) estimateAudioDuration(filePath string) (int, error) 
 	}
 
 	estimatedDuration := int(fileInfo.Size()) / avgBitrate
-	fmt.Printf("📊 估算音频时长 %s: %d秒 (基于文件大小 %d 字节)\n",
+	log.Printf("📊 估算音频时长 %s: %d秒 (基于文件大小 %d 字节)\n",
 		filepath.Base(filePath), estimatedDuration, fileInfo.Size())
 
 	return estimatedDuration, nil
@@ -967,7 +968,7 @@ func (l *LocalMusicService) parseFlacDuration(filePath string) (int, error) {
 
 				if sampleRate > 0 && totalSamples > 0 {
 					duration := float64(totalSamples) / float64(sampleRate)
-					fmt.Printf("✅ FLAC时长解析成功 %s: %.2f秒\n", filepath.Base(filePath), duration)
+					log.Printf("✅ FLAC时长解析成功 %s: %.2f秒\n", filepath.Base(filePath), duration)
 					return int(duration + 0.5), nil
 				}
 			}
@@ -1021,7 +1022,7 @@ func (l *LocalMusicService) parseWavDuration(filePath string) (int, error) {
 			// 减去头部大小
 			audioDataSize := fileInfo.Size() - 44
 			duration := float64(audioDataSize) / float64(byteRate)
-			fmt.Printf("✅ WAV时长解析成功 %s: %.2f秒\n", filepath.Base(filePath), duration)
+			log.Printf("✅ WAV时长解析成功 %s: %.2f秒\n", filepath.Base(filePath), duration)
 			return int(duration + 0.5), nil
 		}
 	}
@@ -1033,7 +1034,7 @@ func (l *LocalMusicService) parseWavDuration(filePath string) (int, error) {
 // generateLocalMusicMappings 生成本地音乐映射关系
 func (l *LocalMusicService) generateLocalMusicMappings(musicFiles []LocalMusicFile) error {
 	if len(musicFiles) == 0 {
-		fmt.Printf("📋 没有音乐文件需要生成映射\n")
+		log.Printf("📋 没有音乐文件需要生成映射\n")
 		return nil
 	}
 
@@ -1053,11 +1054,11 @@ func (l *LocalMusicService) generateLocalMusicMappings(musicFiles []LocalMusicFi
 		if response.Success {
 			successCount++
 		} else {
-			fmt.Printf("⚠️ 注册本地音乐映射失败 %s: %s\n", musicFile.Filename, response.Message)
+			log.Printf("⚠️ 注册本地音乐映射失败 %s: %s\n", musicFile.Filename, response.Message)
 		}
 	}
 
-	fmt.Printf("✅ 本地音乐映射生成完成: %d/%d 成功\n", successCount, len(musicFiles))
+	log.Printf("✅ 本地音乐映射生成完成: %d/%d 成功\n", successCount, len(musicFiles))
 	return nil
 }
 
@@ -1216,7 +1217,7 @@ func (l *LocalMusicService) GetLocalAudioURL(filePath string) CacheResponse {
 				Message: fmt.Sprintf("复制文件到缓存失败: %v", err),
 			}
 		}
-		fmt.Printf("✅ 本地音乐文件已缓存: %s -> %s\n", filePath, cachedFilePath)
+		log.Printf("✅ 本地音乐文件已缓存: %s -> %s\n", filePath, cachedFilePath)
 	}
 
 	// 生成本地HTTP URL
@@ -1297,7 +1298,7 @@ func (l *LocalMusicService) saveCoverToCache(fileHash string, imageData []byte, 
 		if err := os.WriteFile(coverFilePath, imageData, 0644); err != nil {
 			return "", fmt.Errorf("保存封面文件失败: %v", err)
 		}
-		fmt.Printf("✅ 本地音乐封面已缓存: %s\n", coverFilePath)
+		log.Printf("✅ 本地音乐封面已缓存: %s\n", coverFilePath)
 	}
 
 	// 生成本地HTTP URL
@@ -1414,6 +1415,6 @@ func (l *LocalMusicService) cleanLyrics(lyrics string) string {
 func (l *LocalMusicService) getDurationFromTags(filePath string) int {
 	// 对于大多数音频格式，标签中通常不包含时长信息
 	// 这个方法主要是为了保持接口一致性，实际时长获取依赖格式特定的方法
-	fmt.Printf("📋 尝试从标签获取时长信息: %s\n", filepath.Base(filePath))
+	log.Printf("📋 尝试从标签获取时长信息: %s\n", filepath.Base(filePath))
 	return 0 // 让其他方法处理时长获取
 }

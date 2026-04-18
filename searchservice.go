@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"time"
@@ -758,7 +759,7 @@ func (s *SearchService) SearchSongs(keyword string, page int, pageSize int) Sear
 				}
 			}
 		}
-		fmt.Println("曲：", results.Songs)
+		log.Println("曲：", results.Songs)
 		return SearchResponse{
 			Success: true,
 			Message: "搜索歌曲成功",

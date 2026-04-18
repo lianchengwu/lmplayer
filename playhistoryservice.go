@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -142,17 +143,17 @@ func (p *PlayHistoryService) savePlayHistory(historyData *PlayHistoryData) error
 
 // AddPlayHistory 添加播放历史记录
 func (p *PlayHistoryService) AddPlayHistory(request AddPlayHistoryRequest) PlayHistoryResponse {
-	fmt.Printf("🎵 后端处理播放历史: %s - %s\n", request.SongName, request.ArtistName)
+	log.Printf("🎵 后端处理播放历史: %s - %s\n", request.SongName, request.ArtistName)
 
 	if request.Hash == "" {
-		fmt.Printf("❌ 播放历史处理失败: 歌曲hash不能为空\n")
+		log.Printf("❌ 播放历史处理失败: 歌曲hash不能为空\n")
 		return PlayHistoryResponse{Success: false, Message: "歌曲hash不能为空"}
 	}
 
 	// 加载现有播放历史
 	historyData, err := p.loadPlayHistory()
 	if err != nil {
-		fmt.Printf("❌ 播放历史处理失败: 加载播放历史失败: %v\n", err)
+		log.Printf("❌ 播放历史处理失败: 加载播放历史失败: %v\n", err)
 		return PlayHistoryResponse{Success: false, Message: "加载播放历史失败"}
 	}
 
@@ -169,7 +170,7 @@ func (p *PlayHistoryService) AddPlayHistory(request AddPlayHistoryRequest) PlayH
 
 	if existingRecord != nil {
 		// 更新现有记录
-		fmt.Printf("📝 更新播放记录: %s (播放次数: %d -> %d)\n", request.SongName, existingRecord.PlayCount, existingRecord.PlayCount+1)
+		log.Printf("📝 更新播放记录: %s (播放次数: %d -> %d)\n", request.SongName, existingRecord.PlayCount, existingRecord.PlayCount+1)
 		existingRecord.PlayCount++
 		existingRecord.LastPlayTime = now
 		existingRecord.PlayTime = now // 更新为最新播放时间，用于排序
@@ -184,7 +185,7 @@ func (p *PlayHistoryService) AddPlayHistory(request AddPlayHistoryRequest) PlayH
 		existingRecord.UnionCover = request.UnionCover
 	} else {
 		// 创建新记录
-		fmt.Printf("➕ 创建新播放记录: %s\n", request.SongName)
+		log.Printf("➕ 创建新播放记录: %s\n", request.SongName)
 		newRecord := PlayHistoryRecord{
 			ID:           request.Hash,
 			Hash:         request.Hash,
@@ -210,17 +211,17 @@ func (p *PlayHistoryService) AddPlayHistory(request AddPlayHistoryRequest) PlayH
 	// 限制记录数量（保留最近1000条记录）
 	maxRecords := 1000
 	if len(historyData.Records) > maxRecords {
-		fmt.Printf("🗂️ 播放历史记录超过限制，保留最近%d条记录\n", maxRecords)
+		log.Printf("🗂️ 播放历史记录超过限制，保留最近%d条记录\n", maxRecords)
 		historyData.Records = historyData.Records[:maxRecords]
 	}
 
 	// 保存播放历史
 	if err := p.savePlayHistory(historyData); err != nil {
-		fmt.Printf("❌ 播放历史处理失败: 保存播放历史失败: %v\n", err)
+		log.Printf("❌ 播放历史处理失败: 保存播放历史失败: %v\n", err)
 		return PlayHistoryResponse{Success: false, Message: "保存播放历史失败"}
 	}
 
-	fmt.Printf("✅ 播放历史处理完成，当前总记录数: %d\n", len(historyData.Records))
+	log.Printf("✅ 播放历史处理完成，当前总记录数: %d\n", len(historyData.Records))
 	return PlayHistoryResponse{Success: true, Message: "播放历史处理成功"}
 }
 

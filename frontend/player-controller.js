@@ -158,8 +158,8 @@ async function playCurrentSong() {
                 window.setPlayerErrorState('无法获取播放地址，8秒后自动下一首');
             }
 
-            // 等待8秒后自动播放下一首
-            console.log('🎵 播放地址获取失败，8秒后自动播放下一首');
+            // 等待30秒后自动播放下一首
+            console.log('🎵 播放地址获取失败，30秒后自动播放下一首');
             setTimeout(async () => {
                 console.log('🎵 开始自动播放下一首（播放地址获取失败）');
                 try {
@@ -170,7 +170,7 @@ async function playCurrentSong() {
                 } catch (error) {
                     console.error('❌ 自动播放下一首时出错:', error);
                 }
-            }, 8000);
+            }, 30000);
 
             return false;
         }
@@ -183,7 +183,9 @@ async function playCurrentSong() {
                 try {
                     // 直接调用HTML5播放器的play方法，避免循环调用
                     success = await player.play(legacySong, playUrls);
-                    console.log('✅ HTML5 音频播放器播放成功');
+                    if (success) {
+                        console.log('✅ HTML5 音频播放器播放成功');
+                    }
                 } catch (error) {
                     console.error('❌ HTML5 音频播放器播放失败:', error);
                     success = false;
@@ -197,14 +199,31 @@ async function playCurrentSong() {
             success = false;
         }
 
+        const player = window.audioPlayer && typeof window.audioPlayer === 'function'
+            ? window.audioPlayer()
+            : null;
+        const playbackBlockedReason = player && typeof player.getLastPlaybackBlockReason === 'function'
+            ? player.getLastPlaybackBlockReason()
+            : null;
+
+        if (!success && playbackBlockedReason === 'autoplay-blocked') {
+            console.warn('⛔ 当前播放被自动播放策略阻止，等待用户手动点击继续播放');
+
+            if (window.setPlayerErrorState) {
+                window.setPlayerErrorState('当前播放被系统拦截，请点击播放按钮继续');
+            }
+
+            return false;
+        }
+
         if (!success) {
             // 设置错误状态
             if (window.setPlayerErrorState) {
-                window.setPlayerErrorState('播放器播放失败，8秒后自动下一首');
+                window.setPlayerErrorState('播放器播放失败，30秒后自动下一首');
             }
 
-            // 等待8秒后自动播放下一首
-            console.log('🎵 播放器播放失败，8秒后自动播放下一首');
+            // 等待30秒后自动播放下一首
+            console.log('🎵 播放器播放失败，30秒后自动播放下一首');
             setTimeout(async () => {
                 console.log('🎵 开始自动播放下一首（播放器播放失败）');
                 try {
@@ -215,7 +234,7 @@ async function playCurrentSong() {
                 } catch (error) {
                     console.error('❌ 自动播放下一首时出错:', error);
                 }
-            }, 8000);
+            }, 30000);
         }
 
         if (!success) {

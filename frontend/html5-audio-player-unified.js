@@ -17,6 +17,8 @@ class HTML5AudioPlayer {
     this.currentUrlIndex = 0;
     this.retryCount = 0;
     this.maxRetries = 3;
+    this.playbackMetrics = null;
+    this.lastPlaybackBlockReason = null;
 
     // 调试变量
     this.lastLoggedCurrentTime = 0;
@@ -42,6 +44,67 @@ class HTML5AudioPlayer {
     this.initializeAudioElement();
   }
 
+  resetPlaybackMetrics(song, url) {
+    this.lastPlaybackBlockReason = null;
+    this.playbackMetrics = {
+      songHash: song?.hash || "",
+      songName: song?.songname || song?.title || "未知歌曲",
+      url,
+      startedAt: performance.now(),
+      marks: {
+        srcAssigned: null,
+        loadedmetadata: null,
+        loadeddata: null,
+        canplay: null,
+        playResolved: null,
+      },
+    };
+  }
+
+  markPlaybackMetric(stage) {
+    if (!this.playbackMetrics || !this.playbackMetrics.marks) {
+      return;
+    }
+
+    if (this.playbackMetrics.marks[stage] !== null) {
+      return;
+    }
+
+    const now = performance.now();
+    this.playbackMetrics.marks[stage] = now;
+    const elapsed = (now - this.playbackMetrics.startedAt).toFixed(1);
+    console.log(
+      `⏱️ 播放阶段 [${stage}] ${elapsed}ms`,
+      {
+        song: this.playbackMetrics.songName,
+        hash: this.playbackMetrics.songHash,
+        url: this.playbackMetrics.url,
+      },
+    );
+  }
+
+  logPlaybackMetricsSummary(status = "completed") {
+    if (!this.playbackMetrics) {
+      return;
+    }
+
+    const marks = this.playbackMetrics.marks;
+    const relative = Object.fromEntries(
+      Object.entries(marks).map(([key, value]) => [
+        key,
+        value === null ? null : Number((value - this.playbackMetrics.startedAt).toFixed(1)),
+      ]),
+    );
+
+    console.log("⏱️ 播放耗时汇总", {
+      status,
+      song: this.playbackMetrics.songName,
+      hash: this.playbackMetrics.songHash,
+      url: this.playbackMetrics.url,
+      stagesMs: relative,
+    });
+  }
+
   /**
    * 初始化音频元素
    */
@@ -57,7 +120,7 @@ class HTML5AudioPlayer {
     } else {
       this.audio = new Audio();
     }
-    this.audio.preload = "auto";
+    this.audio.preload = "metadata";
     this.audio.volume = this.volume;
 
     // 绑定事件监听器
@@ -155,7 +218,12 @@ class HTML5AudioPlayer {
     });
 
     // 加载完成
+    addListener("loadedmetadata", () => {
+      this.markPlaybackMetric("loadedmetadata");
+    });
+
     addListener("loadeddata", () => {
+      this.markPlaybackMetric("loadeddata");
       console.log("🎵 音频数据加载完成");
       if (this.onLoadCallback) this.onLoadCallback();
     });
@@ -169,6 +237,7 @@ class HTML5AudioPlayer {
 
     // 可以播放
     addListener("canplay", () => {
+      this.markPlaybackMetric("canplay");
       console.log("🎵 音频可以开始播放");
     });
 
@@ -303,14 +372,27 @@ class HTML5AudioPlayer {
     }
 
     try {
+      this.resetPlaybackMetrics(this.currentSong, url);
       this.audio.src = url;
+      this.markPlaybackMetric("srcAssigned");
       await this.audio.play();
+      this.markPlaybackMetric("playResolved");
+      this.logPlaybackMetricsSummary("play-resolved");
       console.log("✅ 播放成功");
       return true;
     } catch (error) {
+      this.logPlaybackMetricsSummary("play-failed");
       console.error(`❌ 播放地址 ${this.currentUrlIndex + 1} 失败:`, error);
       console.error("❌ 播放错误:", error.message);
       console.error("❌ 当前URL:", url);
+
+      if (error?.name === "NotAllowedError") {
+        this.lastPlaybackBlockReason = "autoplay-blocked";
+        this._isPlaying = false;
+        console.warn("⛔ 播放被平台自动播放策略阻止，等待用户手动恢复播放");
+        return false;
+      }
+
       return await this.handlePlaybackError();
     }
   }
@@ -348,8 +430,8 @@ class HTML5AudioPlayer {
       } else {
         console.error("❌ 所有播放地址都失败了");
 
-        // 等待8秒后自动播放下一首
-        console.log("🎵 所有播放地址都失败，8秒后自动播放下一首");
+        // 等待30秒后自动播放下一首
+        console.log("🎵 所有播放地址都失败，30秒后自动播放下一首");
         // 🔧 内存泄漏修复：使用资源管理器管理定时器
         const addTimer = (callback, delay) => {
           if (this.resourceManager) {
@@ -375,7 +457,7 @@ class HTML5AudioPlayer {
           } catch (error) {
             console.error("❌ 自动播放下一首时出错:", error);
           }
-        }, 8000);
+        }, 30000);
 
         if (this.onErrorCallback) this.onErrorCallback();
         return false;
@@ -399,6 +481,12 @@ class HTML5AudioPlayer {
   resume() {
     if (this.audio && this.audio.paused) {
       this.audio.play().catch((error) => {
+        if (error?.name === "NotAllowedError") {
+          this.lastPlaybackBlockReason = "autoplay-blocked";
+          this._isPlaying = false;
+          console.warn("⛔ 继续播放被平台自动播放策略阻止，等待用户手动恢复播放");
+          return;
+        }
         console.error("❌ 继续播放失败:", error);
       });
       console.log("▶️ 继续播放");
@@ -458,6 +546,10 @@ class HTML5AudioPlayer {
     return this._isPlaying;
   }
 
+  getLastPlaybackBlockReason() {
+    return this.lastPlaybackBlockReason;
+  }
+
   /**
    * 设置事件回调
    */
@@ -508,6 +600,10 @@ class HTML5AudioPlayer {
 
 // 全局播放器实例
 let audioPlayer = null;
+
+// 下一首预缓存状态
+let lastPrefetchedSongHash = null;
+let lastPrefetchTriggerKey = null;
 
 // 时间更新定时器
 let timeUpdateInterval = null;
@@ -716,6 +812,10 @@ async function handlePlaybackEnd() {
     if (window.handleFmSongEnded) {
       await window.handleFmSongEnded();
     }
+
+    // FM 模式的实际切歌由 homepage.js 中的 ended 监听统一处理，
+    // 这里必须停止，避免同一个 ended 事件触发两次下一首。
+    return;
   }
 
   // 检查是否有播放列表管理器和播放控制器
@@ -802,6 +902,9 @@ async function handlePlaybackEnd() {
 function setupPlayerCallbacks() {
   // 播放开始回调
   audioPlayer.onPlay(() => {
+    const currentSong = audioPlayer.getCurrentSong();
+    lastPrefetchedSongHash = null;
+    lastPrefetchTriggerKey = currentSong?.hash || null;
     updatePlayerBar();
     startTimeUpdateInterval();
   });
@@ -827,8 +930,8 @@ function setupPlayerCallbacks() {
     console.error("🎵 播放器错误");
     updatePlayerBar();
 
-    // 等待8秒后自动播放下一首
-    console.log("🎵 播放器错误，8秒后自动播放下一首");
+    // 等待30秒后自动播放下一首
+    console.log("🎵 播放器错误，30秒后自动播放下一首");
     // 🔧 内存泄漏修复：使用全局资源管理器管理定时器
     const addTimer = (callback, delay) => {
       if (window.GlobalResourceManager) {
@@ -851,7 +954,7 @@ function setupPlayerCallbacks() {
       } catch (error) {
         console.error("❌ 自动播放下一首时出错:", error);
       }
-    }, 8000);
+    }, 30000);
   });
 
   // 时间更新回调
@@ -862,7 +965,85 @@ function setupPlayerCallbacks() {
     if (window.updateLyricsHighlight) {
       window.updateLyricsHighlight(currentTime);
     }
+
+    void maybePrefetchNextSong(currentTime, duration);
   });
+}
+
+async function maybePrefetchNextSong(currentTime, duration) {
+  if (!Number.isFinite(currentTime) || !Number.isFinite(duration) || duration <= 10) {
+    return;
+  }
+
+  const remainingTime = duration - currentTime;
+  if (remainingTime > 10) {
+    return;
+  }
+
+  const currentSong = audioPlayer?.getCurrentSong?.();
+  const currentSongHash = currentSong?.hash || null;
+  if (!currentSongHash) {
+    return;
+  }
+
+  // 同一首歌只触发一次预缓存
+  if (lastPrefetchTriggerKey === currentSongHash && lastPrefetchedSongHash) {
+    return;
+  }
+
+  if (!window.PlaylistManager?.peekNextSong) {
+    return;
+  }
+
+  const nextSong = window.PlaylistManager.peekNextSong();
+  const nextSongHash = nextSong?.hash;
+  if (!nextSongHash || nextSongHash === lastPrefetchedSongHash) {
+    return;
+  }
+
+  try {
+    console.log('🎵 开始预缓存下一首歌曲:', nextSong.songname || nextSongHash);
+
+    const { GetCachedURL, CacheAudioFile } = await import('./bindings/wmplayer/cacheservice.js');
+    const cachedResponse = await GetCachedURL(nextSongHash);
+    if (cachedResponse?.success && cachedResponse?.data) {
+      console.log('✅ 下一首歌曲已存在缓存，跳过预缓存:', nextSong.songname || nextSongHash);
+      lastPrefetchedSongHash = nextSongHash;
+      lastPrefetchTriggerKey = currentSongHash;
+      return;
+    }
+
+    const { GetSongUrl } = await import('./bindings/wmplayer/homepageservice.js');
+    const nextSongUrlResponse = await GetSongUrl(nextSongHash);
+    if (!nextSongUrlResponse?.success || !nextSongUrlResponse?.data) {
+      console.warn('⚠️ 下一首歌曲播放地址获取失败，跳过预缓存:', nextSong.songname || nextSongHash);
+      return;
+    }
+
+    const nextUrls = [];
+    if (nextSongUrlResponse.data.url?.trim()) {
+      nextUrls.push(nextSongUrlResponse.data.url.trim());
+    }
+    if (nextSongUrlResponse.data.backupUrl?.trim()) {
+      nextUrls.push(nextSongUrlResponse.data.backupUrl.trim());
+    }
+    if (nextUrls.length === 0) {
+      console.warn('⚠️ 下一首歌曲没有可用播放地址，跳过预缓存:', nextSong.songname || nextSongHash);
+      return;
+    }
+
+    const cacheResponse = await CacheAudioFile(nextSongHash, nextUrls);
+    if (cacheResponse?.success) {
+      console.log('✅ 下一首歌曲预缓存成功:', nextSong.songname || nextSongHash);
+      lastPrefetchedSongHash = nextSongHash;
+      lastPrefetchTriggerKey = currentSongHash;
+      return;
+    }
+
+    console.warn('⚠️ 下一首歌曲预缓存失败:', cacheResponse?.message || '未知错误');
+  } catch (error) {
+    console.error('❌ 预缓存下一首歌曲失败:', error);
+  }
 }
 
 /**

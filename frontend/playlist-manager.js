@@ -363,6 +363,38 @@ function hasNext() {
     }
 }
 
+// 获取下一首歌曲（只读，不改变当前播放列表状态）
+function peekNextSong() {
+    if (!isPlaylistLoaded || !currentPlaylist || !Array.isArray(currentPlaylist.songs)) {
+        return null;
+    }
+
+    const songs = currentPlaylist.songs;
+    const currentIndex = currentPlaylist.current_index ?? currentPlaylist.CurrentIndex ?? -1;
+    const repeatMode = currentPlaylist.repeat_mode ?? currentPlaylist.repeatMode ?? 'off';
+    const shuffleMode = currentPlaylist.shuffle_mode ?? currentPlaylist.shuffleMode ?? false;
+    const playlistName = currentPlaylist.name ?? '';
+
+    if (songs.length === 0 || currentIndex < 0 || currentIndex >= songs.length) {
+        return null;
+    }
+
+    // 安全策略：随机播放 / FM / 单曲循环不做预判，避免预缓存错歌
+    if (shuffleMode || playlistName === '私人FM' || repeatMode === 'one') {
+        return null;
+    }
+
+    if (currentIndex + 1 < songs.length) {
+        return songs[currentIndex + 1];
+    }
+
+    if (repeatMode === 'all' && songs.length > 0) {
+        return songs[0];
+    }
+
+    return null;
+}
+
 // 清空播放列表
 async function clearPlaylist() {
     try {
@@ -525,6 +557,7 @@ window.PlaylistManager = {
     updatePlayMode,
     clearPlaylist,
     hasNext,
+    peekNextSong,
     getCurrentPlaylist: () => currentPlaylist,
     isLoaded: () => isPlaylistLoaded
 };

@@ -17,32 +17,11 @@ type HomepageService struct {
 	cacheService *CacheService
 }
 
-const (
-	preCacheMaxWait      = 1200 * time.Millisecond
-	preCachePollInterval = 120 * time.Millisecond
-)
-
 // NewHomepageService 创建新的首页服务实例
 func NewHomepageService(cacheService *CacheService) *HomepageService {
 	return &HomepageService{
 		cacheService: cacheService,
 	}
-}
-
-func (h *HomepageService) waitForCachedURL(hash string, timeout time.Duration) string {
-	if h.cacheService == nil || timeout <= 0 {
-		return ""
-	}
-
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		if cachedResponse := h.cacheService.GetCachedURL(hash); cachedResponse.Success && cachedResponse.Data != "" {
-			return cachedResponse.Data
-		}
-		time.Sleep(preCachePollInterval)
-	}
-
-	return ""
 }
 
 // FmSongData 私人FM歌曲数据结构
@@ -361,7 +340,7 @@ func (h *HomepageService) GetSongUrl(hash string) SongUrlResponse {
 	// 🎵 首先检查是否已缓存
 	if h.cacheService != nil {
 		if cachedResponse := h.cacheService.GetCachedURL(hash); cachedResponse.Success {
-			fmt.Printf("✅ 使用缓存的播放地址: %s\n", hash)
+			log.Printf("✅ 使用缓存的播放地址: %s\n", hash)
 
 			// 获取歌词内容
 			lyricsContent := ""
@@ -387,7 +366,7 @@ func (h *HomepageService) GetSongUrl(hash string) SongUrlResponse {
 	}
 
 	// 🎵 如果没有缓存，从API获取播放地址
-	fmt.Printf("🎵 从API获取播放地址: %s\n", hash)
+	log.Printf("🎵 从API获取播放地址: %s\n", hash)
 
 	// 读取cookie
 	cookie, err := h.readCookieFromFile()
@@ -451,7 +430,7 @@ func (h *HomepageService) GetSongUrl(hash string) SongUrlResponse {
 	}
 
 	// 简化日志记录
-	fmt.Printf("🎵 GetSongUrl API调用成功\n")
+	log.Printf("🎵 GetSongUrl API调用成功\n")
 
 	// 收集所有播放地址用于缓存
 	var remoteUrls []string
@@ -485,61 +464,34 @@ func (h *HomepageService) GetSongUrl(hash string) SongUrlResponse {
 	// 如果获取到播放地址，尝试缓存并返回本地地址
 	if len(remoteUrls) > 0 {
 
-		fmt.Printf("✅ 获取到 %d 个播放地址\n", len(remoteUrls))
+		log.Printf("✅ 获取到 %d 个播放地址\n", len(remoteUrls))
 
-		var cachedURL string
-		cacheDone := make(chan string, 1)
-
-		// 🎵 后台抢跑缓存，给本地缓存一个短暂窗口
+		// 🎵 后台异步缓存音频文件，但不改变当前这次播放地址
 		go func() {
-			defer close(cacheDone)
 			if h.cacheService != nil {
-				fmt.Printf("🎵 开始预缓存音频文件: %s\n", hash)
+				log.Printf("🎵 开始异步缓存音频文件: %s\n", hash)
 				cacheResponse := h.cacheService.CacheAudioFile(hash, remoteUrls)
 				if cacheResponse.Success {
-					fmt.Printf("✅ 音频文件缓存成功: %s -> %s\n", hash, cacheResponse.Data)
-					cacheDone <- cacheResponse.Data
+					log.Printf("✅ 音频文件缓存成功: %s -> %s\n", hash, cacheResponse.Data)
 				} else {
-					fmt.Printf("❌ 音频文件缓存失败: %s, 错误: %s\n", hash, cacheResponse.Message)
-					cacheDone <- ""
+					log.Printf("❌ 音频文件缓存失败: %s, 错误: %s\n", hash, cacheResponse.Message)
 				}
-				return
 			}
-			cacheDone <- ""
 		}()
-
-		select {
-		case cachedURL = <-cacheDone:
-			if cachedURL != "" {
-				fmt.Printf("🎵 预缓存命中，直接使用本地地址: %s\n", cachedURL)
-			}
-		case <-time.After(preCacheMaxWait):
-			cachedURL = h.waitForCachedURL(hash, preCachePollInterval)
-			if cachedURL != "" {
-				fmt.Printf("🎵 在预缓存等待窗口内获取到本地地址: %s\n", cachedURL)
-			} else {
-				fmt.Printf("🎵 预缓存等待超时，回退远程直链播放: %s\n", hash)
-			}
-		}
-
-		primaryURL := remoteUrls[0]
-		if cachedURL != "" {
-			primaryURL = cachedURL
-		}
-
-		backupURL := primaryURL
-		if len(remoteUrls) > 1 {
-			backupURL = remoteUrls[1]
-		}
 
 		return SongUrlResponse{
 			Success:   true,
 			Message:   "获取播放地址成功",
 			ErrorCode: 0,
 			Data: SongUrlData{
-				URL:       primaryURL,
-				BackupURL: backupURL,
-				Lyrics:    lyricsContent,
+				URL: remoteUrls[0],
+				BackupURL: func() string {
+					if len(remoteUrls) > 1 {
+						return remoteUrls[1]
+					}
+					return remoteUrls[0]
+				}(),
+				Lyrics: lyricsContent,
 			},
 		}
 	}
@@ -647,16 +599,16 @@ func (h *HomepageService) getLyrics(id string, accesskey string, cookie string) 
 	// 首先尝试获取KRC格式歌词（包含逐字时间戳）
 	krcLyrics, err := h.getLyricsWithFormat(id, accesskey, cookie, "krc")
 	if err == nil && krcLyrics != "" {
-		fmt.Printf("✅ 获取到KRC格式歌词，长度: %d\n", len(krcLyrics))
+		log.Printf("✅ 获取到KRC格式歌词，长度: %d\n", len(krcLyrics))
 		return krcLyrics, nil
 	}
 
-	fmt.Printf("⚠️ KRC格式歌词获取失败，降级到LRC格式: %v\n", err)
+	log.Printf("⚠️ KRC格式歌词获取失败，降级到LRC格式: %v\n", err)
 
 	// 降级到LRC格式
 	lrcLyrics, err := h.getLyricsWithFormat(id, accesskey, cookie, "lrc")
 	if err == nil && lrcLyrics != "" {
-		fmt.Printf("✅ 获取到LRC格式歌词，长度: %d\n", len(lrcLyrics))
+		log.Printf("✅ 获取到LRC格式歌词，长度: %d\n", len(lrcLyrics))
 		return lrcLyrics, nil
 	}
 

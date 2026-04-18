@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -309,13 +310,13 @@ func (l *LoginService) LoginWithPhone(mobile, code string) LoginResponse {
 		if loginData.Token != "" && loginData.UserID != 0 {
 			if err := saveCookieToFile(loginData.Token, loginData.UserID); err != nil {
 				// 记录错误但不影响登录成功
-				fmt.Printf("保存cookie失败: %v\n", err)
+				log.Printf("保存cookie失败: %v\n", err)
 			}
 
 			// 保存登录方式
 			if err := saveLoginMethodToFile("phone"); err != nil {
 				// 记录错误但不影响登录成功
-				fmt.Printf("保存登录方式失败: %v\n", err)
+				log.Printf("保存登录方式失败: %v\n", err)
 			}
 		}
 
@@ -1029,13 +1030,13 @@ func (l *LoginService) CheckQRStatus(key string) QRStatusResponse {
 			if qrStatusData.Status == 4 && qrStatusData.Token != "" && qrStatusData.UserID != 0 {
 				if err := saveCookieToFile(qrStatusData.Token, qrStatusData.UserID); err != nil {
 					// 记录错误但不影响登录成功
-					fmt.Printf("保存cookie失败: %v\n", err)
+					log.Printf("保存cookie失败: %v\n", err)
 				}
 
 				// 保存登录方式
 				if err := saveLoginMethodToFile("qrcode"); err != nil {
 					// 记录错误但不影响登录成功
-					fmt.Printf("保存登录方式失败: %v\n", err)
+					log.Printf("保存登录方式失败: %v\n", err)
 				}
 			}
 

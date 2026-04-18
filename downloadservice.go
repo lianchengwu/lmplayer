@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -158,7 +159,7 @@ func (d *DownloadService) AddDownloadRecord(request AddDownloadRecordRequest) Do
 				}
 			}
 
-			fmt.Printf("✅ 更新下载记录: %s\n", request.SongName)
+			log.Printf("✅ 更新下载记录: %s\n", request.SongName)
 			return DownloadRecordsResponse{
 				Success: true,
 				Message: "下载记录更新成功",
@@ -190,7 +191,7 @@ func (d *DownloadService) AddDownloadRecord(request AddDownloadRecordRequest) Do
 		}
 	}
 
-	fmt.Printf("✅ 添加下载记录: %s\n", request.SongName)
+	log.Printf("✅ 添加下载记录: %s\n", request.SongName)
 	return DownloadRecordsResponse{
 		Success: true,
 		Message: "下载记录添加成功",
@@ -270,7 +271,7 @@ func (d *DownloadService) DeleteDownloadRecord(request DeleteDownloadRecordReque
 				}
 			}
 
-			fmt.Printf("✅ 删除下载记录: %s\n", record.SongName)
+			log.Printf("✅ 删除下载记录: %s\n", record.SongName)
 			return DownloadRecordsResponse{
 				Success: true,
 				Message: "下载记录删除成功",
@@ -300,7 +301,7 @@ func (d *DownloadService) ClearDownloadRecords() DownloadRecordsResponse {
 		}
 	}
 
-	fmt.Println("✅ 清空下载记录成功")
+	log.Println("✅ 清空下载记录成功")
 	return DownloadRecordsResponse{
 		Success: true,
 		Message: "下载记录清空成功",
@@ -353,7 +354,7 @@ func (d *DownloadService) OpenFileFolder(filePath string) ApiResponse[string] {
 		}
 	}
 
-	fmt.Printf("✅ 打开文件夹: %s\n", dir)
+	log.Printf("✅ 打开文件夹: %s\n", dir)
 	return ApiResponse[string]{
 		Success: true,
 		Message: "文件夹打开成功",

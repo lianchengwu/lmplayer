@@ -26,6 +26,7 @@ type CacheService struct {
 	serverPort    string
 	localMusicMap map[string]string // 本地音乐hash到文件路径的映射
 	localMapFile  string            // 本地音乐映射文件路径
+	downloadLocks sync.Map          // songHash -> *sync.Mutex
 	// OSD歌词相关字段
 	osdClients sync.Map // 使用 sync.Map 管理客户端: *http.Request -> chan LyricsMessage
 	// OSD歌词进程管理
@@ -99,12 +100,12 @@ func (c *CacheService) StartHTTPServerWithOSDLyrics() error {
 
 	// 包装文件服务器，添加日志和错误处理
 	wrappedHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Printf("🎵 HTTP请求: %s %s\n", r.Method, r.URL.Path)
+		log.Printf("🎵 HTTP请求: %s %s\n", r.Method, r.URL.Path)
 
 		// 检查文件是否存在
 		filePath := filepath.Join(c.cacheDir, r.URL.Path)
 		if _, err := os.Stat(filePath); os.IsNotExist(err) {
-			fmt.Printf("❌ 文件不存在: %s\n", filePath)
+			log.Printf("❌ 文件不存在: %s\n", filePath)
 			http.NotFound(w, r)
 			return
 		}
@@ -120,7 +121,7 @@ func (c *CacheService) StartHTTPServerWithOSDLyrics() error {
 			return
 		}
 
-		fmt.Printf("✅ 提供文件: %s\n", filePath)
+		log.Printf("✅ 提供文件: %s\n", filePath)
 		fileServer.ServeHTTP(w, r)
 	})
 
@@ -133,7 +134,7 @@ func (c *CacheService) StartHTTPServerWithOSDLyrics() error {
 	mux.HandleFunc("/api/osd-lyrics/sse", func(w http.ResponseWriter, r *http.Request) {
 		c.handleOSDLyricsSSE(w, r)
 	})
-	fmt.Printf("✅ OSD歌词SSE端点已注册: /api/osd-lyrics/sse\n")
+	log.Printf("✅ OSD歌词SSE端点已注册: /api/osd-lyrics/sse\n")
 
 	// 创建HTTP服务器
 	c.server = &http.Server{
@@ -143,10 +144,10 @@ func (c *CacheService) StartHTTPServerWithOSDLyrics() error {
 
 	// 在goroutine中启动服务器
 	go func() {
-		fmt.Printf("🎵 本地HTTP缓存服务器启动在端口 %s\n", c.serverPort)
-		fmt.Printf("🎵 缓存根目录: %s\n", c.cacheDir)
+		log.Printf("🎵 本地HTTP缓存服务器启动在端口 %s\n", c.serverPort)
+		log.Printf("🎵 缓存根目录: %s\n", c.cacheDir)
 		if err := c.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			fmt.Printf("❌ HTTP服务器启动失败: %v\n", err)
+			log.Printf("❌ HTTP服务器启动失败: %v\n", err)
 		}
 	}()
 
@@ -190,8 +191,8 @@ func (c *CacheService) ensureCacheDir() error {
 		return err
 	}
 
-	fmt.Printf("✅ 缓存目录已创建: %s\n", c.cacheDir)
-	fmt.Printf("✅ MP3缓存目录已创建: %s\n", c.mp3Dir)
+	log.Printf("✅ 缓存目录已创建: %s\n", c.cacheDir)
+	log.Printf("✅ MP3缓存目录已创建: %s\n", c.mp3Dir)
 	return nil
 }
 
@@ -208,12 +209,32 @@ func (c *CacheService) getCachedFilePath(songHash string) string {
 	return filepath.Join(c.mp3Dir, fileHash+".mp3")
 }
 
+func (c *CacheService) getDownloadLock(songHash string) *sync.Mutex {
+	lock, _ := c.downloadLocks.LoadOrStore(songHash, &sync.Mutex{})
+	return lock.(*sync.Mutex)
+}
+
+func (c *CacheService) isValidCachedFile(filePath string) bool {
+	info, err := os.Stat(filePath)
+	if err != nil {
+		return false
+	}
+
+	if info.IsDir() || info.Size() <= 0 {
+		log.Printf("⚠️ 缓存文件无效，准备清理: %s\n", filePath)
+		if removeErr := os.Remove(filePath); removeErr != nil && !os.IsNotExist(removeErr) {
+			log.Printf("⚠️ 清理无效缓存文件失败: %s, 错误: %v\n", filePath, removeErr)
+		}
+		return false
+	}
+
+	return true
+}
+
 // isCached 检查文件是否已缓存
 func (c *CacheService) isCached(songHash string) bool {
-	// 需要判断一下
 	filePath := c.getCachedFilePath(songHash)
-	_, err := os.Stat(filePath)
-	return err == nil
+	return c.isValidCachedFile(filePath)
 }
 
 // getLocalURL 获取本地缓存文件的URL
@@ -234,9 +255,13 @@ func (c *CacheService) getProxyURL(songHash, remoteURL string) string {
 
 // downloadAndCache 下载并缓存音频文件
 func (c *CacheService) downloadAndCache(songHash string, urls []string) (string, error) {
+	lock := c.getDownloadLock(songHash)
+	lock.Lock()
+	defer lock.Unlock()
+
 	// 检查是否已缓存
 	if c.isCached(songHash) {
-		fmt.Printf("✅ 文件已缓存: %s\n", songHash)
+		log.Printf("✅ 文件已缓存: %s\n", songHash)
 		return c.getLocalURL(songHash), nil
 	}
 
@@ -253,15 +278,15 @@ func (c *CacheService) downloadAndCache(songHash string, urls []string) (string,
 			continue
 		}
 
-		fmt.Printf("🎵 尝试下载音频文件 (%d/%d): %s\n", i+1, len(urls), url)
+		log.Printf("🎵 尝试下载音频文件 (%d/%d): %s\n", i+1, len(urls), url)
 
 		if err := c.downloadFile(url, filePath); err != nil {
-			fmt.Printf("⚠️ 下载失败 (%d/%d): %v\n", i+1, len(urls), err)
+			log.Printf("⚠️ 下载失败 (%d/%d): %v\n", i+1, len(urls), err)
 			continue
 		}
 
 		// 下载成功
-		fmt.Printf("✅ 音频文件下载成功: %s\n", filePath)
+		log.Printf("✅ 音频文件下载成功: %s\n", filePath)
 		return c.getLocalURL(songHash), nil
 	}
 
@@ -302,6 +327,9 @@ func (c *CacheService) downloadFile(url, filePath string) error {
 
 	// 创建临时文件
 	tempFile := filePath + ".tmp"
+	if err := os.Remove(tempFile); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("清理旧临时文件失败: %v", err)
+	}
 	out, err := os.Create(tempFile)
 	if err != nil {
 		return err
@@ -309,14 +337,38 @@ func (c *CacheService) downloadFile(url, filePath string) error {
 	defer out.Close()
 
 	// 复制数据
-	_, err = io.Copy(out, resp.Body)
+	written, err := io.Copy(out, resp.Body)
 	if err != nil {
 		os.Remove(tempFile)
 		return err
 	}
 
+	if written <= 0 {
+		os.Remove(tempFile)
+		return fmt.Errorf("下载内容为空")
+	}
+
+	if err := out.Sync(); err != nil {
+		os.Remove(tempFile)
+		return fmt.Errorf("写入缓存文件失败: %v", err)
+	}
+
+	if err := out.Close(); err != nil {
+		os.Remove(tempFile)
+		return fmt.Errorf("关闭缓存文件失败: %v", err)
+	}
+
 	// 重命名临时文件为最终文件
-	return os.Rename(tempFile, filePath)
+	if err := os.Rename(tempFile, filePath); err != nil {
+		os.Remove(tempFile)
+		return err
+	}
+
+	if !c.isValidCachedFile(filePath) {
+		return fmt.Errorf("下载后的缓存文件无效")
+	}
+
+	return nil
 }
 
 // handleAudioProxy 代理远程音频流，优化嵌入式 WebView 首次播放体验
@@ -464,11 +516,11 @@ func (c *CacheService) RegisterLocalMusic(localHash, filePath string) CacheRespo
 	}
 
 	c.localMusicMap[localHash] = filePath
-	fmt.Printf("🎵 注册本地音乐映射: %s -> %s\n", localHash, filePath)
+	log.Printf("🎵 注册本地音乐映射: %s -> %s\n", localHash, filePath)
 
 	// 保存映射到文件
 	if err := c.saveLocalMusicMap(); err != nil {
-		fmt.Printf("⚠️ 保存本地音乐映射失败: %v\n", err)
+		log.Printf("⚠️ 保存本地音乐映射失败: %v\n", err)
 	}
 
 	return CacheResponse{
@@ -521,7 +573,7 @@ func (c *CacheService) getLocalMusicURL(localHash string) CacheResponse {
 				Message: fmt.Sprintf("复制本地文件到缓存失败: %v", err),
 			}
 		}
-		fmt.Printf("✅ 本地音乐文件已缓存: %s -> %s\n", filePath, cachedFilePath)
+		log.Printf("✅ 本地音乐文件已缓存: %s -> %s\n", filePath, cachedFilePath)
 	}
 
 	// 生成本地HTTP URL
@@ -583,24 +635,24 @@ func (c *CacheService) copyLocalFileToCache(srcPath, dstPath string) error {
 // loadLocalMusicMap 从文件加载本地音乐映射
 func (c *CacheService) loadLocalMusicMap() {
 	if _, err := os.Stat(c.localMapFile); os.IsNotExist(err) {
-		fmt.Printf("🎵 本地音乐映射文件不存在，创建新的映射: %s\n", c.localMapFile)
+		log.Printf("🎵 本地音乐映射文件不存在，创建新的映射: %s\n", c.localMapFile)
 		return
 	}
 
 	data, err := os.ReadFile(c.localMapFile)
 	if err != nil {
-		fmt.Printf("⚠️ 读取本地音乐映射文件失败: %v\n", err)
+		log.Printf("⚠️ 读取本地音乐映射文件失败: %v\n", err)
 		return
 	}
 
 	if len(data) == 0 {
-		fmt.Printf("🎵 本地音乐映射文件为空\n")
+		log.Printf("🎵 本地音乐映射文件为空\n")
 		return
 	}
 
 	var loadedMap map[string]string
 	if err := json.Unmarshal(data, &loadedMap); err != nil {
-		fmt.Printf("⚠️ 解析本地音乐映射文件失败: %v\n", err)
+		log.Printf("⚠️ 解析本地音乐映射文件失败: %v\n", err)
 		return
 	}
 
@@ -615,16 +667,16 @@ func (c *CacheService) loadLocalMusicMap() {
 			c.localMusicMap[hash] = filePath
 			validCount++
 		} else {
-			fmt.Printf("🗑️ 清理无效的本地音乐映射: %s -> %s (文件不存在)\n", hash, filePath)
+			log.Printf("🗑️ 清理无效的本地音乐映射: %s -> %s (文件不存在)\n", hash, filePath)
 		}
 	}
 
-	fmt.Printf("✅ 加载本地音乐映射成功: %d 个有效映射\n", validCount)
+	log.Printf("✅ 加载本地音乐映射成功: %d 个有效映射\n", validCount)
 
 	// 如果有无效映射被清理，保存更新后的映射
 	if validCount != len(loadedMap) {
 		if err := c.saveLocalMusicMap(); err != nil {
-			fmt.Printf("⚠️ 保存清理后的本地音乐映射失败: %v\n", err)
+			log.Printf("⚠️ 保存清理后的本地音乐映射失败: %v\n", err)
 		}
 	}
 }
@@ -645,13 +697,13 @@ func (c *CacheService) saveLocalMusicMap() error {
 		return fmt.Errorf("写入本地音乐映射文件失败: %v", err)
 	}
 
-	fmt.Printf("💾 本地音乐映射已保存: %s (%d 个映射)\n", c.localMapFile, len(c.localMusicMap))
+	log.Printf("💾 本地音乐映射已保存: %s (%d 个映射)\n", c.localMapFile, len(c.localMusicMap))
 	return nil
 }
 
 // handleOSDLyricsSSE 处理OSD歌词SSE连接
 func (c *CacheService) handleOSDLyricsSSE(w http.ResponseWriter, r *http.Request) {
-	fmt.Printf("🔗 [OSD歌词] 新的SSE连接来自: %s\n", r.RemoteAddr)
+	// log.Printf("🔗 [OSD歌词] 新的SSE连接来自: %s\n", r.RemoteAddr)
 
 	// 设置SSE头部
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -672,7 +724,7 @@ func (c *CacheService) handleOSDLyricsSSE(w http.ResponseWriter, r *http.Request
 	// 监听客户端断开连接
 	ctx := r.Context()
 	defer func() {
-		fmt.Printf("🔌 [OSD歌词] 客户端断开连接: %s\n", r.RemoteAddr)
+		// log.Printf("🔌 [OSD歌词] 客户端断开连接: %s\n", r.RemoteAddr)
 		c.removeOSDClient(r)
 	}()
 
@@ -682,7 +734,7 @@ func (c *CacheService) handleOSDLyricsSSE(w http.ResponseWriter, r *http.Request
 			return
 		case message := <-msgChan:
 			data, _ := json.Marshal(message)
-			// fmt.Printf("📤 [OSD歌词] 发送消息到客户端: %s\n", string(data))
+			// log.Printf("📤 [OSD歌词] 发送消息到客户端: %s\n", string(data))
 			fmt.Fprintf(w, "data: %s\n\n", data)
 			w.(http.Flusher).Flush()
 		case <-time.After(30 * time.Second):
@@ -692,7 +744,7 @@ func (c *CacheService) handleOSDLyricsSSE(w http.ResponseWriter, r *http.Request
 				f.Flush()
 			} else {
 				// 无法刷新，连接可能已断开
-				fmt.Printf("⚠️ [OSD歌词] 无法刷新响应，连接可能已断开: %s\n", r.RemoteAddr)
+				log.Printf("⚠️ [OSD歌词] 无法刷新响应，连接可能已断开: %s\n", r.RemoteAddr)
 				return
 			}
 		}
@@ -708,13 +760,13 @@ func (c *CacheService) UpdateCurrentLyrics(lyricsText string, songName string, a
 	if strings.HasPrefix(lyricsText, "[") && strings.Contains(lyricsText, ",") && strings.Contains(lyricsText, "]<") {
 		// KRC格式特征：[数字,数字]<数字,数字,数字>
 		format = "krc"
-		fmt.Printf("🎵 [OSD歌词] 收到原始KRC歌词: %s - %s\n", songName, artist)
+		// log.Printf("🎵 [OSD歌词] 收到原始KRC歌词: %s - %s\n", songName, artist)
 	} else if strings.HasPrefix(lyricsText, "[") && strings.Contains(lyricsText, ":") && strings.Contains(lyricsText, "]") {
 		// LRC格式特征：[mm:ss.xx]
 		format = "lrc"
-		fmt.Printf("🎵 [OSD歌词] 收到原始LRC歌词: %s - %s\n", songName, artist)
+		// log.Printf("🎵 [OSD歌词] 收到原始LRC歌词: %s - %s\n", songName, artist)
 	} else {
-		fmt.Printf("🎵 [OSD歌词] 收到纯文本歌词: %s - %s: %s\n", songName, artist, lyricsText)
+		// log.Printf("🎵 [OSD歌词] 收到纯文本歌词: %s - %s: %s\n", songName, artist, lyricsText)
 	}
 
 	// 广播原始歌词消息
@@ -791,7 +843,7 @@ func (cs *CacheService) startOSDLyricsProcess() error {
 
 	// 查找OSD歌词程序
 	osdPath := fmt.Sprintf("%s/osdlyric/osd_lyrics", exPath) // 相对路径 "./osdlyric/osd_lyrics"
-	fmt.Println("OSD歌词程序路径:", osdPath)
+	log.Println("OSD歌词程序路径:", osdPath)
 	if _, err := os.Stat(osdPath); os.IsNotExist(err) {
 		// 尝试在系统路径中查找
 		if path, err := exec.LookPath("osd_lyrics"); err == nil {
@@ -922,16 +974,11 @@ func (c *CacheService) broadcastLyricsMessage(message LyricsMessage) {
 			// 发送成功
 		default:
 			// 发送失败，客户端缓冲区满或已断开
-			fmt.Printf("⚠️ [OSD歌词] 客户端 %s 缓冲区满或已断开，跳过此次发送\n", req.RemoteAddr)
+			log.Printf("⚠️ [OSD歌词] 客户端 %s 缓冲区满或已断开，跳过此次发送\n", req.RemoteAddr)
 		}
 		return true // 继续遍历
 	})
 
-	if clientCount == 0 {
-		fmt.Printf("📡 [OSD歌词] 无客户端连接，跳过广播\n")
-	} else {
-		fmt.Printf("📡 [OSD歌词] 广播到 %d 个客户端\n", clientCount)
-	}
 }
 
 // addOSDClient 添加OSD歌词SSE客户端
@@ -945,7 +992,7 @@ func (c *CacheService) addOSDClient(req *http.Request, msgChan chan LyricsMessag
 		return true
 	})
 
-	fmt.Printf("🔗 [OSD歌词] 添加客户端: %s，当前连接数: %d\n", req.RemoteAddr, clientCount)
+	log.Printf("🔗 [OSD歌词] 添加客户端: %s，当前连接数: %d\n", req.RemoteAddr, clientCount)
 }
 
 // removeOSDClient 移除OSD歌词SSE客户端
@@ -958,9 +1005,9 @@ func (c *CacheService) removeOSDClient(req *http.Request) {
 			return true
 		})
 
-		fmt.Printf("🔌 [OSD歌词] 成功移除客户端: %s，当前连接数: %d\n", req.RemoteAddr, clientCount)
+		log.Printf("🔌 [OSD歌词] 成功移除客户端: %s，当前连接数: %d\n", req.RemoteAddr, clientCount)
 	} else {
-		fmt.Printf("⚠️ [OSD歌词] 尝试移除不存在的客户端: %s\n", req.RemoteAddr)
+		log.Printf("⚠️ [OSD歌词] 尝试移除不存在的客户端: %s\n", req.RemoteAddr)
 	}
 }
 
