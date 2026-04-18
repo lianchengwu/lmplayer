@@ -17,11 +17,32 @@ type HomepageService struct {
 	cacheService *CacheService
 }
 
+const (
+	preCacheMaxWait      = 1200 * time.Millisecond
+	preCachePollInterval = 120 * time.Millisecond
+)
+
 // NewHomepageService 创建新的首页服务实例
 func NewHomepageService(cacheService *CacheService) *HomepageService {
 	return &HomepageService{
 		cacheService: cacheService,
 	}
+}
+
+func (h *HomepageService) waitForCachedURL(hash string, timeout time.Duration) string {
+	if h.cacheService == nil || timeout <= 0 {
+		return ""
+	}
+
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if cachedResponse := h.cacheService.GetCachedURL(hash); cachedResponse.Success && cachedResponse.Data != "" {
+			return cachedResponse.Data
+		}
+		time.Sleep(preCachePollInterval)
+	}
+
+	return ""
 }
 
 // FmSongData 私人FM歌曲数据结构
@@ -466,34 +487,59 @@ func (h *HomepageService) GetSongUrl(hash string) SongUrlResponse {
 
 		fmt.Printf("✅ 获取到 %d 个播放地址\n", len(remoteUrls))
 
-		// 🎵 同步缓存音频文件，确保立即返回本地URL
+		var cachedURL string
+		cacheDone := make(chan string, 1)
+
+		// 🎵 后台抢跑缓存，给本地缓存一个短暂窗口
 		go func() {
+			defer close(cacheDone)
 			if h.cacheService != nil {
-				fmt.Printf("🎵 开始同步缓存音频文件: %s\n", hash)
+				fmt.Printf("🎵 开始预缓存音频文件: %s\n", hash)
 				cacheResponse := h.cacheService.CacheAudioFile(hash, remoteUrls)
 				if cacheResponse.Success {
 					fmt.Printf("✅ 音频文件缓存成功: %s -> %s\n", hash, cacheResponse.Data)
-
+					cacheDone <- cacheResponse.Data
 				} else {
 					fmt.Printf("❌ 音频文件缓存失败: %s, 错误: %s\n", hash, cacheResponse.Message)
-
+					cacheDone <- ""
 				}
+				return
 			}
+			cacheDone <- ""
 		}()
+
+		select {
+		case cachedURL = <-cacheDone:
+			if cachedURL != "" {
+				fmt.Printf("🎵 预缓存命中，直接使用本地地址: %s\n", cachedURL)
+			}
+		case <-time.After(preCacheMaxWait):
+			cachedURL = h.waitForCachedURL(hash, preCachePollInterval)
+			if cachedURL != "" {
+				fmt.Printf("🎵 在预缓存等待窗口内获取到本地地址: %s\n", cachedURL)
+			} else {
+				fmt.Printf("🎵 预缓存等待超时，回退远程直链播放: %s\n", hash)
+			}
+		}
+
+		primaryURL := remoteUrls[0]
+		if cachedURL != "" {
+			primaryURL = cachedURL
+		}
+
+		backupURL := primaryURL
+		if len(remoteUrls) > 1 {
+			backupURL = remoteUrls[1]
+		}
 
 		return SongUrlResponse{
 			Success:   true,
 			Message:   "获取播放地址成功",
 			ErrorCode: 0,
 			Data: SongUrlData{
-				URL: remoteUrls[0],
-				BackupURL: func() string {
-					if len(remoteUrls) > 1 {
-						return remoteUrls[1]
-					}
-					return remoteUrls[0]
-				}(),
-				Lyrics: lyricsContent,
+				URL:       primaryURL,
+				BackupURL: backupURL,
+				Lyrics:    lyricsContent,
 			},
 		}
 	}

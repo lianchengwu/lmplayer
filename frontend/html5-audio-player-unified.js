@@ -57,7 +57,7 @@ class HTML5AudioPlayer {
     } else {
       this.audio = new Audio();
     }
-    this.audio.preload = "metadata";
+    this.audio.preload = "auto";
     this.audio.volume = this.volume;
 
     // 绑定事件监听器

@@ -8,6 +8,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -125,6 +127,7 @@ func (c *CacheService) StartHTTPServerWithOSDLyrics() error {
 	// 设置路由
 	mux := http.NewServeMux()
 	mux.Handle("/", wrappedHandler)
+	mux.HandleFunc("/api/audio-proxy", c.handleAudioProxy)
 
 	// 如果提供了OSD歌词服务，添加SSE端点
 	mux.HandleFunc("/api/osd-lyrics/sse", func(w http.ResponseWriter, r *http.Request) {
@@ -219,6 +222,16 @@ func (c *CacheService) getLocalURL(songHash string) string {
 	return fmt.Sprintf("http://127.0.0.1:%s/cache/mp3/%s.mp3", c.serverPort, fileHash)
 }
 
+// getProxyURL 获取远程音频的本地代理URL
+func (c *CacheService) getProxyURL(songHash, remoteURL string) string {
+	params := url.Values{}
+	params.Set("url", remoteURL)
+	if songHash != "" {
+		params.Set("hash", songHash)
+	}
+	return fmt.Sprintf("http://127.0.0.1:%s/api/audio-proxy?%s", c.serverPort, params.Encode())
+}
+
 // downloadAndCache 下载并缓存音频文件
 func (c *CacheService) downloadAndCache(songHash string, urls []string) (string, error) {
 	// 检查是否已缓存
@@ -304,6 +317,61 @@ func (c *CacheService) downloadFile(url, filePath string) error {
 
 	// 重命名临时文件为最终文件
 	return os.Rename(tempFile, filePath)
+}
+
+// handleAudioProxy 代理远程音频流，优化嵌入式 WebView 首次播放体验
+func (c *CacheService) handleAudioProxy(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Range")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	remoteURL := strings.TrimSpace(r.URL.Query().Get("url"))
+	if remoteURL == "" {
+		http.Error(w, "missing url", http.StatusBadRequest)
+		return
+	}
+
+	targetURL, err := url.Parse(remoteURL)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("invalid remote url: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	proxy := &httputil.ReverseProxy{
+		Rewrite: func(proxyReq *httputil.ProxyRequest) {
+			proxyReq.SetURL(targetURL)
+			proxyReq.Out.Host = targetURL.Host
+			proxyReq.Out.Method = r.Method
+			proxyReq.Out.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/136.0.0.0 Safari/537.36")
+			proxyReq.Out.Header.Set("Accept", "audio/mpeg,audio/*,*/*")
+			proxyReq.Out.Header.Set("Accept-Encoding", "identity")
+			proxyReq.Out.Header.Set("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
+			proxyReq.Out.Header.Set("Cache-Control", "no-cache")
+			if rangeHeader := r.Header.Get("Range"); rangeHeader != "" {
+				proxyReq.Out.Header.Set("Range", rangeHeader)
+			}
+		},
+		ModifyResponse: func(resp *http.Response) error {
+			resp.Header.Set("Access-Control-Allow-Origin", "*")
+			resp.Header.Set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
+			resp.Header.Set("Access-Control-Allow-Headers", "Range")
+			return nil
+		},
+		ErrorHandler: func(rw http.ResponseWriter, req *http.Request, err error) {
+			http.Error(rw, fmt.Sprintf("proxy request failed: %v", err), http.StatusBadGateway)
+		},
+	}
+
+	proxy.ServeHTTP(w, r)
 }
 
 // CacheAudioFile 缓存音频文件（供前端调用）
