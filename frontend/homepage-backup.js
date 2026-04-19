@@ -170,6 +170,32 @@ async function getSongPlayUrls(hash) {
     try {
         console.log('🎵 正在获取播放地址和歌词...', hash);
 
+        const normalizeSongUrls = (data) => {
+            if (!data) {
+                return [];
+            }
+
+            const normalizedUrls = [];
+            const seenUrls = new Set();
+            const appendUrl = (value) => {
+                if (typeof value !== 'string') {
+                    return;
+                }
+                const trimmed = value.trim();
+                if (!trimmed || seenUrls.has(trimmed)) {
+                    return;
+                }
+                seenUrls.add(trimmed);
+                normalizedUrls.push(trimmed);
+            };
+
+            if (Array.isArray(data.urls)) {
+                data.urls.forEach(appendUrl);
+            }
+
+            return normalizedUrls;
+        };
+
         // 检查是否是本地音乐hash（以"local-"开头）
         if (hash.startsWith('local-')) {
             console.log('🎵 检测到本地音乐hash，获取播放地址和歌词');
@@ -248,25 +274,17 @@ async function getSongPlayUrls(hash) {
             // 更新右侧歌词显示
             updateLyricsDisplay(lyrics);
 
+            const urls = normalizeSongUrls(response.data);
+
             console.log('🎵 ========== 播放地址汇总 ==========');
-            console.log(`🎵 歌曲Hash: ${hash}`)
-            console.log(`🎵 主播放地址: ${response.data.url}`);
-            console.log(`🎵 备用播放地址: ${response.data.backupUrl}`);
+            console.log(`🎵 歌曲Hash: ${hash}`);
+            console.log('🎵 候选播放地址列表:', urls);
             console.log('🎵 =====================================');
 
             if (lyrics) {
                 console.log('获取歌词成功，歌词长度:', lyrics.length);
             } else {
                 console.log('未获取到歌词');
-            }
-
-            // 返回播放地址数组，优先使用主地址，备用地址作为后备
-            const urls = [];
-            if (response.data.url && response.data.url.trim() !== '') {
-                urls.push(response.data.url);
-            }
-            if (response.data.backupUrl && response.data.backupUrl.trim() !== '') {
-                urls.push(response.data.backupUrl);
             }
 
             if (urls.length === 0) {

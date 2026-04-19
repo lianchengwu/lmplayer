@@ -3,6 +3,34 @@
  * 包含播放器核心类和页面集成功能
  */
 
+function normalizeSongUrls(data) {
+  if (!data) {
+    return [];
+  }
+
+  const normalizedUrls = [];
+  const seenUrls = new Set();
+  const appendUrl = (value) => {
+    if (typeof value !== "string") {
+      return;
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed || seenUrls.has(trimmed)) {
+      return;
+    }
+
+    seenUrls.add(trimmed);
+    normalizedUrls.push(trimmed);
+  };
+
+  if (Array.isArray(data.urls)) {
+    data.urls.forEach(appendUrl);
+  }
+
+  return normalizedUrls;
+}
+
 /**
  * HTML5 音频播放器类
  * 使用原生 HTML5 Audio API 实现音频播放功能
@@ -1020,13 +1048,7 @@ async function maybePrefetchNextSong(currentTime, duration) {
       return;
     }
 
-    const nextUrls = [];
-    if (nextSongUrlResponse.data.url?.trim()) {
-      nextUrls.push(nextSongUrlResponse.data.url.trim());
-    }
-    if (nextSongUrlResponse.data.backupUrl?.trim()) {
-      nextUrls.push(nextSongUrlResponse.data.backupUrl.trim());
-    }
+    const nextUrls = normalizeSongUrls(nextSongUrlResponse.data);
     if (nextUrls.length === 0) {
       console.warn('⚠️ 下一首歌曲没有可用播放地址，跳过预缓存:', nextSong.songname || nextSongHash);
       return;

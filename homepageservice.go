@@ -54,9 +54,8 @@ type FmResponse = ApiResponse[[]FmSongData]
 
 // SongUrlData 歌曲播放地址数据结构
 type SongUrlData struct {
-	URL       string `json:"url"`
-	BackupURL string `json:"backupUrl"`
-	Lyrics    string `json:"lyrics"` // 歌词内容
+	URLs   []string `json:"urls"`
+	Lyrics string   `json:"lyrics"` // 歌词内容
 }
 
 // LyricsSearchData 歌词搜索数据结构
@@ -357,8 +356,7 @@ func (h *HomepageService) GetSongUrl(hash string) SongUrlResponse {
 				Message:   "获取缓存播放地址成功",
 				ErrorCode: 0,
 				Data: SongUrlData{
-					URL:       cachedResponse.Data,
-					BackupURL: "",
+					URLs:      []string{cachedResponse.Data},
 					Lyrics:    lyricsContent,
 				},
 			}
@@ -432,14 +430,26 @@ func (h *HomepageService) GetSongUrl(hash string) SongUrlResponse {
 	// 简化日志记录
 	log.Printf("🎵 GetSongUrl API调用成功\n")
 
-	// 收集所有播放地址用于缓存
+	// 收集所有播放地址用于缓存和返回
 	var remoteUrls []string
+	seenUrls := make(map[string]struct{})
+	appendUniqueURL := func(raw string) {
+		urlStr := strings.TrimSpace(raw)
+		if urlStr == "" {
+			return
+		}
+		if _, exists := seenUrls[urlStr]; exists {
+			return
+		}
+		seenUrls[urlStr] = struct{}{}
+		remoteUrls = append(remoteUrls, urlStr)
+	}
 
 	// 从$.url数组获取主播放地址
 	if urlArray, ok := apiResponse["url"].([]any); ok && len(urlArray) > 0 {
 		for _, urlItem := range urlArray {
-			if urlStr, ok := urlItem.(string); ok && urlStr != "" {
-				remoteUrls = append(remoteUrls, urlStr)
+			if urlStr, ok := urlItem.(string); ok {
+				appendUniqueURL(urlStr)
 			}
 		}
 	}
@@ -447,8 +457,8 @@ func (h *HomepageService) GetSongUrl(hash string) SongUrlResponse {
 	// 从$.backupUrl数组获取备用播放地址
 	if backupUrlArray, ok := apiResponse["backupUrl"].([]any); ok && len(backupUrlArray) > 0 {
 		for _, backupUrlItem := range backupUrlArray {
-			if backupUrlStr, ok := backupUrlItem.(string); ok && backupUrlStr != "" {
-				remoteUrls = append(remoteUrls, backupUrlStr)
+			if backupUrlStr, ok := backupUrlItem.(string); ok {
+				appendUniqueURL(backupUrlStr)
 			}
 		}
 	}
@@ -484,13 +494,7 @@ func (h *HomepageService) GetSongUrl(hash string) SongUrlResponse {
 			Message:   "获取播放地址成功",
 			ErrorCode: 0,
 			Data: SongUrlData{
-				URL: remoteUrls[0],
-				BackupURL: func() string {
-					if len(remoteUrls) > 1 {
-						return remoteUrls[1]
-					}
-					return remoteUrls[0]
-				}(),
+				URLs:   remoteUrls,
 				Lyrics: lyricsContent,
 			},
 		}
