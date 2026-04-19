@@ -462,36 +462,6 @@
 
 
 
-.immersive-lyrics-display .lyrics-line.active::before {
-    content: '';
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    width: 120%;
-    height: 120%;
-    background: radial-gradient(ellipse at center,
-        rgba(255, 255, 255, 0.08) 0%,
-        rgba(255, 255, 255, 0.02) 50%,
-        transparent 70%);
-    border-radius: 50px;
-    z-index: -1;
-    animation: lyricGlow 3s ease-in-out infinite alternate;
-}
-
-@keyframes lyricGlow {
-    0% {
-        opacity: 0.3;
-        transform: translate(-50%, -50%) scale(0.95);
-    }
-    100% {
-        opacity: 0.6;
-        transform: translate(-50%, -50%) scale(1.05);
-    }
-}
-
-
-
 .immersive-lyrics-display .lyrics-line.no-lyrics {
     color: rgba(255, 255, 255, 0.3);
     font-style: italic;
