@@ -475,10 +475,10 @@
 
 .immersive-player .lyrics-display .lyrics-word {
     display: inline;
-    transition: color 0.3s ease, text-shadow 0.3s ease;
+    transition: color 0.18s ease-out, text-shadow 0.18s ease-out, opacity 0.18s ease-out;
     position: relative;
     /* GPU加速优化 */
-    will-change: color, text-shadow;
+    will-change: color, text-shadow, opacity;
     backface-visibility: hidden;
     transform: translateZ(0);
 }
@@ -489,22 +489,23 @@
     color: inherit;
     font-weight: inherit;
     text-shadow: inherit;
-    transition: color 0.1s cubic-bezier(0.4, 0, 0.2, 1),
-                font-weight 0.1s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    opacity: 1;
+    transition: color 0.12s ease-out, text-shadow 0.12s ease-out, opacity 0.12s ease-out !important;
     /* GPU加速优化 */
-    will-change: color, font-weight;
+    will-change: color, text-shadow, opacity;
     backface-visibility: hidden;
     transform: translateZ(0);
 }
 
 /* 渐进式播放：未播放的字符（暗淡显示） */
 .immersive-player .lyrics-display .lyrics-word.unplayed {
-    color: rgba(255, 255, 255, 0.4) !important;
-    font-weight: 400 !important;
-    transition: color 0.1s cubic-bezier(0.4, 0, 0.2, 1),
-                font-weight 0.1s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    color: rgba(255, 255, 255, 0.42) !important;
+    font-weight: inherit !important;
+    text-shadow: none !important;
+    opacity: 0.72;
+    transition: color 0.12s ease-out, text-shadow 0.12s ease-out, opacity 0.12s ease-out !important;
     /* GPU加速优化 */
-    will-change: color, font-weight;
+    will-change: color, text-shadow, opacity;
     backface-visibility: hidden;
     transform: translateZ(0);
 }
