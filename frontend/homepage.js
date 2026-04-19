@@ -2880,7 +2880,9 @@ function updateLRCLyricsHighlight(currentTime) {
     }
 
     // 更新歌词行的高亮状态
-    const lyricsLines = document.querySelectorAll('.lyrics-line');
+    const mainLyricsDisplay = document.querySelector('#lyricsTab .lyrics-display') || document.querySelector('.lyrics-display');
+    if (!mainLyricsDisplay) return;
+    const lyricsLines = mainLyricsDisplay.querySelectorAll('.lyrics-line');
 
     lyricsLines.forEach((line, index) => {
         line.classList.remove('active');
@@ -2927,55 +2929,69 @@ function updateKRCLyricsHighlight(currentTime) {
         }
     }
 
-    // 检查是否有变化
-    const hasLineChanged = activeLineIndex !== lastActiveLineIndex;
+    const prevActiveLineIndex = lastActiveLineIndex;
+    const prevActiveWordIndex = lastActiveWordIndex;
+    const hasLineChanged = activeLineIndex !== prevActiveLineIndex;
 
-    // 只有当行发生变化时才更新OSD歌词（不需要字级变化触发）
+    // 行变化时更新OSD歌词
     if (hasLineChanged && activeLineIndex >= 0) {
-        // 更新记录的状态
-        lastActiveLineIndex = activeLineIndex;
-        lastActiveWordIndex = activeWordIndex;
-
-        // 发送完整的KRC行数据到OSD
         const currentLine = currentLyricsLines[activeLineIndex];
         if (currentLine && window.sendKRCLineToOSD) {
             window.sendKRCLineToOSD(currentLine);
         }
-    } else if (hasLineChanged) {
-        // 行变化但没有活跃行（可能是歌曲结束）
-        lastActiveLineIndex = activeLineIndex;
-        lastActiveWordIndex = activeWordIndex;
     }
 
-    // 更新行级高亮
-    const lyricsLines = document.querySelectorAll('.lyrics-line');
+    // 更新行级高亮（仅在行变化时更新，避免每帧remove/add导致闪烁）
+    const mainLyricsDisplay = document.querySelector('#lyricsTab .lyrics-display') || document.querySelector('.lyrics-display');
+    if (!mainLyricsDisplay) return;
+    const lyricsLines = mainLyricsDisplay.querySelectorAll('.lyrics-line');
+    if (hasLineChanged) {
+        lyricsLines.forEach((line, index) => {
+            if (index === activeLineIndex) {
+                if (!line.classList.contains('active')) {
+                    line.classList.add('active');
+                    debouncedScrollToLyrics(line);
+                }
+            } else if (line.classList.contains('active')) {
+                line.classList.remove('active');
+            }
 
-    lyricsLines.forEach((line, index) => {
-        line.classList.remove('active');
-        line.classList.remove('jelly-active');
+            if (line.classList.contains('jelly-active')) {
+                line.classList.remove('jelly-active');
+            }
+        });
+    }
 
-        if (index === activeLineIndex) {
-            line.classList.add('active');
-
-            // 滚动到当前歌词行（使用防抖）
-            debouncedScrollToLyrics(line);
+    // 更新字级高亮（仅对KRC格式）
+    const allWords = mainLyricsDisplay.querySelectorAll('.lyrics-word');
+    allWords.forEach(word => {
+        if (word.classList.contains('active-word')) {
+            word.classList.remove('active-word');
         }
     });
 
-    // 更新字级高亮（仅对KRC格式）
-    const allWords = document.querySelectorAll('.lyrics-word');
-    allWords.forEach(word => {
-        word.classList.remove('active-word');
-    });
+    // 字边界时沿用上一帧字索引，避免出现整行瞬间无高亮的空帧
+    let displayWordIndex = activeWordIndex;
+    if (activeLineIndex >= 0 && displayWordIndex < 0 && activeLineIndex === prevActiveLineIndex && prevActiveWordIndex >= 0) {
+        displayWordIndex = prevActiveWordIndex;
+    }
 
-    if (activeLineIndex >= 0 && activeWordIndex >= 0) {
+    if (activeLineIndex >= 0 && displayWordIndex >= 0) {
         const activeLine = lyricsLines[activeLineIndex];
         if (activeLine) {
             const wordsInLine = activeLine.querySelectorAll('.lyrics-word');
-            if (wordsInLine[activeWordIndex]) {
-                wordsInLine[activeWordIndex].classList.add('active-word');
+            if (wordsInLine[displayWordIndex]) {
+                wordsInLine[displayWordIndex].classList.add('active-word');
             }
         }
+    }
+
+    // 最后再提交状态，供下一帧使用
+    lastActiveLineIndex = activeLineIndex;
+    if (activeLineIndex >= 0 && activeWordIndex >= 0) {
+        lastActiveWordIndex = activeWordIndex;
+    } else if (activeLineIndex !== prevActiveLineIndex) {
+        lastActiveWordIndex = -1;
     }
 }
 

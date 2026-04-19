@@ -605,37 +605,40 @@ class ImmersivePlayer {
             return;
         }
 
-        // 从主页面的歌词显示组件复制内容 - 使用正确的选择器
         const mainLyricsDisplay = document.querySelector('#lyricsTab .lyrics-display');
         console.log('🎵 查找主页面歌词组件:', !!mainLyricsDisplay);
 
         if (mainLyricsDisplay) {
-            console.log('🎵 主页面歌词内容:', mainLyricsDisplay.innerHTML);
+            const mainLyricsHtml = mainLyricsDisplay.innerHTML;
+            console.log('🎵 主页面歌词内容:', mainLyricsHtml);
 
-            // 检查是否有实际的歌词内容（不只是"聆听音乐"）
-            const hasRealLyrics = mainLyricsDisplay.innerHTML.includes('lyrics-line') &&
-                                 !mainLyricsDisplay.innerHTML.includes('聆听音乐');
+            const hasRealLyrics = mainLyricsHtml.includes('lyrics-line') &&
+                                 !mainLyricsHtml.includes('聆听音乐');
 
-            if (hasRealLyrics || mainLyricsDisplay.innerHTML.trim()) {
-                // 直接复制主页面的歌词内容
-                this.lyricsDisplay.innerHTML = mainLyricsDisplay.innerHTML;
-                console.log('🎵 沉浸式播放器歌词已同步，内容长度:', mainLyricsDisplay.innerHTML.length);
+            if (hasRealLyrics || mainLyricsHtml.trim()) {
+                if (this.lyricsDisplay.innerHTML !== mainLyricsHtml) {
+                    this.lyricsDisplay.innerHTML = mainLyricsHtml;
+                    console.log('🎵 沉浸式播放器歌词已同步，内容长度:', mainLyricsHtml.length);
+                }
 
-                // 同步后立即同步高亮状态
                 setTimeout(() => {
                     this.syncLyricsHighlight();
                 }, 100);
             } else {
-                // 如果主页面也是"聆听音乐"，保持同步
-                this.lyricsDisplay.innerHTML = mainLyricsDisplay.innerHTML;
+                if (this.lyricsDisplay.innerHTML !== mainLyricsHtml) {
+                    this.lyricsDisplay.innerHTML = mainLyricsHtml;
+                }
                 console.log('🎵 沉浸式播放器：同步了"聆听音乐"状态');
             }
         } else {
-            // 如果找不到主页面歌词组件，显示默认内容
-            this.lyricsDisplay.innerHTML = '<div class="lyrics-line">聆听音乐</div>';
+            const fallbackHtml = '<div class="lyrics-line">聆听音乐</div>';
+            if (this.lyricsDisplay.innerHTML !== fallbackHtml) {
+                this.lyricsDisplay.innerHTML = fallbackHtml;
+            }
             console.log('🎵 沉浸式播放器：未找到主页面歌词组件');
         }
     }
+
     
     // 移除歌词高亮逻辑，因为现在直接使用主页面的歌词组件
     // 主页面的歌词高亮会自动更新，沉浸式播放器无需额外处理
@@ -1211,31 +1214,23 @@ if (window.addEventListener) {
                         // 检查是否是歌词高亮变化
                         if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
                             const target = mutation.target;
-                            if (target.classList.contains('lyrics-line')) {
+                            const shouldSyncHighlight = target.classList.contains('lyrics-line') ||
+                                                        target.classList.contains('lyrics-word');
+
+                            if (shouldSyncHighlight) {
                                 // 防抖处理，避免频繁触发
                                 if (immersivePlayer.highlightChangeTimeout) {
                                     clearTimeout(immersivePlayer.highlightChangeTimeout);
                                 }
 
-                                // 🔧 内存泄漏修复：使用全局资源管理器管理定时器
-                                const addTimer = (callback, delay) => {
-                                    if (window.GlobalResourceManager) {
-                                        return window.GlobalResourceManager.addTimer(callback, delay);
-                                    } else {
-                                        return setTimeout(callback, delay);
-                                    }
-                                };
-
                                 immersivePlayer.highlightChangeTimeout = addTimer(() => {
-                                    // 移除频繁的日志输出以减少CPU占用
                                     immersivePlayer.syncLyricsHighlight();
-                                }, 32); // 32ms防抖，约30fps的更新频率，平衡性能和流畅度
+                                }, 16);
                             }
                         }
                         // 检查是否是歌词内容变化
                         else if (mutation.type === 'childList') {
                             // 移除频繁的日志输出以减少CPU占用
-                            // 🔧 内存泄漏修复：使用全局资源管理器管理定时器
                             addTimer(() => {
                                 immersivePlayer.syncLyrics();
                             }, 200); // 增加延迟，减少频繁触发

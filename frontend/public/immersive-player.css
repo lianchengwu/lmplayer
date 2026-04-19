@@ -555,6 +555,11 @@
     transform: translateZ(0);
 }
 
+/* KRC逐字高亮时，关闭整行光晕，避免行级亮度闪烁 */
+.immersive-player .lyrics-display .lyrics-line.active.progressive-highlight {
+    text-shadow: none !important;
+}
+
 
 
 /* 移除滚动条样式，因为现在使用自动滚动 */
@@ -950,33 +955,13 @@
     }
 }
 
-/* 歌词出现动画 */
-.immersive-lyrics-display .lyrics-line {
-    animation: lyricsAppear 0.8s ease-out forwards;
-    opacity: 0;
-    transform: translateY(20px);
-}
-
-/* 优化歌词行动画性能 */
+/* 歌词行动画性能优化（避免进入动画反复触发导致闪烁） */
 .lyrics-line.lyric-animated {
     opacity: var(--lyric-opacity, 1);
     transform: scale(var(--lyric-scale, 1)) translateZ(0);
     transition: opacity 0.4s ease, transform 0.4s ease;
     will-change: opacity, transform;
     backface-visibility: hidden;
-}
-
-.immersive-lyrics-display .lyrics-line:nth-child(1) { animation-delay: 0.1s; }
-.immersive-lyrics-display .lyrics-line:nth-child(2) { animation-delay: 0.2s; }
-.immersive-lyrics-display .lyrics-line:nth-child(3) { animation-delay: 0.3s; }
-.immersive-lyrics-display .lyrics-line:nth-child(4) { animation-delay: 0.4s; }
-.immersive-lyrics-display .lyrics-line:nth-child(5) { animation-delay: 0.5s; }
-
-@keyframes lyricsAppear {
-    to {
-        opacity: 0.6;
-        transform: translateY(0);
-    }
 }
 
 /* 增强沉浸感的细节 */
