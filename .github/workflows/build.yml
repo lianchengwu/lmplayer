@@ -1,0 +1,100 @@
+name: Build
+
+on:
+  push:
+    branches: [main, rust]
+    tags: ['v*', '[0-9]*']
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-linux:
+    name: Build Linux (x86_64)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install GTK4 / WebKitGTK
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libgtk-4-dev \
+            libwebkitgtk-6.0-dev \
+            libsoup-3.0-dev
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build wmplayer
+        run: cargo build --release --bin wmplayer
+
+      - name: Test kugou
+        run: cargo test -p kugou
+
+      - name: Package
+        run: |
+          mkdir -p bin
+          cp target/release/wmplayer bin/wmplayer
+          tar -C bin -czvf wmplayer-linux-amd64.tar.gz wmplayer
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wmplayer-linux-amd64
+          path: wmplayer-linux-amd64.tar.gz
+
+  build-windows:
+    name: Build Windows (x86_64)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      # Desktop shell is GTK4 + WebKitGTK + ksni (Linux). MSYS2 has no
+      # webkitgtk-6.0, so the wmplayer binary cannot be produced here.
+      # kugou (HTTP/protocol crate) is the portable Windows compile.
+      - name: Build kugou
+        run: cargo build -p kugou --release
+
+      - name: Test kugou
+        run: cargo test -p kugou
