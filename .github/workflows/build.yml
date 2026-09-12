@@ -50,7 +50,7 @@ jobs:
         run: cargo build --release --bin wmplayer
 
       - name: Test kugou
-        run: cargo test -p kugou
+        run: cargo test --manifest-path kugou/Cargo.toml
 
       - name: Package
         run: |
@@ -97,4 +97,4 @@ jobs:
         run: cargo build -p kugou --release
 
       - name: Test kugou
-        run: cargo test -p kugou
+        run: cargo test --manifest-path kugou/Cargo.toml
