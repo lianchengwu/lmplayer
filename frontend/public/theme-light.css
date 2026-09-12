@@ -1,0 +1,269 @@
+/* 浅色主题样式 - 基于 248,250,252 主调色 */
+:root[data-theme="light"] {
+    /* 主调色：248,250,252 及其衍生色系 */
+    --primary-base: rgb(248, 250, 252);
+    --primary-color: rgb(226, 232, 240);  /* 稍深的主色调 */
+    --primary-light: rgb(248, 250, 252); /* 原始主调色 */
+    --primary-dark: rgb(203, 213, 225);  /* 更深的主色调 */
+
+    /* 背景色系 - 基于主调色 */
+    --bg-color: rgb(248, 250, 252);      /* 主调色作为主背景 */
+    --bg-secondary: rgb(241, 245, 249);  /* 稍深的次背景 */
+    --bg-elevated: rgb(255, 255, 255);   /* 纯白浮层 */
+
+    /* 文字色系 - 与浅色背景形成对比 */
+    --text-primary: rgb(15, 23, 42);     /* 深色主文字 */
+    --text-secondary: rgb(71, 85, 105);  /* 中等深度次文字 */
+    --text-tertiary: rgb(148, 163, 184); /* 浅色辅助文字 */
+    --text-inverse: rgb(255, 255, 255);  /* 反色文字 */
+
+    /* 边框和分割线 - 基于主调色的深浅变化 */
+    --border-color: rgb(226, 232, 240);
+    --border-light: rgb(241, 245, 249);
+
+    /* 阴影 - 柔和的阴影效果 */
+    --shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.1);
+
+    /* 强调色 - 用于交互元素 */
+    --accent-color: rgb(99, 102, 241);   /* 蓝色强调色 */
+    --accent-color-rgb: 99, 102, 241;    /* 蓝色强调色RGB值 */
+    --accent-hover: rgb(79, 70, 229);    /* 悬停状态 */
+
+    /* 状态色系 */
+    --success-color: rgb(34, 197, 94);   /* 绿色成功 */
+    --warning-color: rgb(245, 158, 11);  /* 黄色警告 */
+    --error-color: rgb(239, 68, 68);     /* 红色错误 */
+    --error-hover: rgb(220, 38, 38);     /* 红色错误悬停 */
+    --info-color: rgb(59, 130, 246);     /* 蓝色信息 */
+
+    /* 组件特定颜色 */
+    --titlebar-bg: var(--primary-light);
+    --card-bg: var(--bg-elevated);
+    --input-bg: var(--bg-elevated);
+    --input-border: var(--border-color);
+    --shadow-color: rgba(15, 23, 42, 0.08);
+    --player-bg: var(--primary-light);
+    --player-control-bg: var(--bg-elevated);
+    --player-progress-bg: var(--border-color);
+    --player-progress-fill: var(--accent-color);
+}
+
+/* 浅色主题下的按钮样式 - 扁平化设计 */
+[data-theme="light"] .titlebar-btn {
+    background: transparent;
+    color: var(--text-secondary);
+    border: none;
+    border-radius: 4px;
+    box-shadow: none; /* 确保没有阴影效果 */
+    text-shadow: none; /* 确保文字没有阴影 */
+}
+
+[data-theme="light"] .titlebar-btn:hover {
+    background: rgba(15, 23, 42, 0.08);
+    color: var(--text-primary);
+    transform: none; /* 移除悬停时的位移效果，避免阴影 */
+    box-shadow: none; /* 确保没有阴影效果 */
+}
+
+[data-theme="light"] .search-input {
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    color: var(--text-primary);
+}
+
+[data-theme="light"] .search-input::placeholder {
+    color: var(--text-tertiary);
+}
+
+[data-theme="light"] .search-icon {
+    color: var(--text-tertiary);
+}
+
+/* 浅色主题下的标题栏特殊样式 - 无边界感 */
+[data-theme="light"] .custom-titlebar {
+    box-shadow: none;
+    border-bottom: none;
+}
+
+[data-theme="light"] .titlebar-title {
+    color: var(--text-primary);
+    text-shadow: none; /* 移除标题文字阴影 */
+}
+
+/* 浅色主题下的标题美化 */
+[data-theme="light"] .title-wm {
+    color: var(--text-secondary);
+}
+
+[data-theme="light"] .title-player {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* 浅色主题下的播放器样式 - 减少分割线明显程度 */
+[data-theme="light"] .player-bar {
+    background: var(--player-bg);
+    border-top: 1px solid rgba(203, 213, 225, 0.2); /* 更微妙的分割线 */
+}
+
+[data-theme="light"] .player-control-btn {
+    background: transparent;
+    color: var(--text-secondary);
+    border: none;
+    border-radius: 50%;
+}
+
+[data-theme="light"] .player-control-btn:hover {
+    background: rgba(15, 23, 42, 0.08);
+    color: var(--text-primary);
+    transform: scale(1.1);
+}
+
+[data-theme="light"] .progress-bar {
+    background: var(--player-progress-bg);
+}
+
+[data-theme="light"] .progress-fill {
+    background: var(--player-progress-fill);
+}
+
+[data-theme="light"] .volume-slider {
+    background: var(--player-progress-bg);
+}
+
+[data-theme="light"] .volume-slider::-webkit-slider-thumb {
+    background: var(--player-progress-fill);
+}
+
+[data-theme="light"] .song-info {
+    color: var(--text-primary);
+}
+
+[data-theme="light"] .songname {
+    color: var(--text-primary);
+}
+
+[data-theme="light"] .author_name {
+    color: var(--text-secondary);
+}
+
+/* 浅色主题下的收藏按钮 */
+[data-theme="light"] .favorite-btn {
+    color: var(--text-tertiary);
+}
+
+[data-theme="light"] .favorite-btn:hover {
+    color: #ff6b6b;
+}
+
+[data-theme="light"] .favorite-btn.active {
+    color: #ff6b6b;
+}
+
+/* 浅色主题下的播放时间显示 */
+[data-theme="light"] .time-current,
+[data-theme="light"] .time-total {
+    color: var(--text-secondary);
+}
+
+/* 浅色主题下的登录弹窗 */
+[data-theme="light"] .modal-content {
+    background: var(--bg-elevated);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .modal-header {
+    border-bottom-color: var(--border-color);
+}
+
+[data-theme="light"] .form-input {
+    background: var(--input-bg);
+    border-color: var(--input-border);
+}
+
+[data-theme="light"] .form-input:focus {
+    border-color: rgb(59, 130, 246);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* 浅色主题下的左侧栏样式 - 微妙分割线 */
+[data-theme="light"] .sidebar {
+    background: var(--bg-color);
+    border-right: 1px solid rgba(203, 213, 225, 0.3);
+}
+
+[data-theme="light"] .sidebar-header {
+    border-bottom: 1px solid rgba(203, 213, 225, 0.2);
+}
+
+/* 浅色主题下的侧边栏分割线 */
+[data-theme="light"] .sidebar-divider {
+    background: rgba(203, 213, 225, 0.15);
+}
+
+/* 浅色主题下的右侧栏样式 */
+[data-theme="light"] .right-sidebar {
+    background: var(--bg-color);
+    border-left: 1px solid rgba(203, 213, 225, 0.3);
+}
+
+[data-theme="light"] .tab-btn:hover {
+    background: rgba(15, 23, 42, 0.05);
+}
+
+[data-theme="light"] .right-sidebar-close:hover {
+    background: rgba(15, 23, 42, 0.08);
+}
+
+[data-theme="light"] .lyrics-control-btn:hover {
+    background: rgba(15, 23, 42, 0.05);
+}
+
+[data-theme="light"] .sidebar-toggle-btn {
+    background: rgba(0, 0, 0, 0.08);
+    color: var(--text-primary);
+}
+
+[data-theme="light"] .sidebar-toggle-btn:hover {
+    background: rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="light"] .section-header {
+    color: var(--text-secondary);
+}
+
+[data-theme="light"] .list-item {
+    color: var(--text-secondary);
+}
+
+[data-theme="light"] .list-item:hover {
+    background: rgba(0, 0, 0, 0.04);
+    color: var(--text-primary);
+}
+
+[data-theme="light"] .list-item.active {
+    background: rgba(99, 102, 241, 0.1);
+    color: var(--accent-color);
+}
+
+[data-theme="light"] .playlist-header {
+    color: var(--text-tertiary);
+}
+
+[data-theme="light"] .playlist-item {
+    color: var(--text-secondary);
+}
+
+[data-theme="light"] .playlist-item:hover {
+    background: rgba(0, 0, 0, 0.04);
+    color: var(--text-primary);
+}
+
+/* 骨架屏动画变量 */
+:root[data-theme="light"] {
+    --skeleton-bg: rgb(226, 232, 240);
+    --skeleton-shimmer: rgb(241, 245, 249);
+}

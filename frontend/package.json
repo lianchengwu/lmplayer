@@ -1,0 +1,20 @@
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build --mode production",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  },
+  "dependencies": {
+    "@fortawesome/fontawesome-free": "^7.3.1"
+  },
+  "allowScripts": {
+    "esbuild@0.21.5": true
+  }
+}

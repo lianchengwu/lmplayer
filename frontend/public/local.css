@@ -1,0 +1,1219 @@
+/* 本地音乐页面样式 */
+
+/* 确保必要的CSS变量存在 */
+:root {
+    --success-color: #4caf50;
+    --error-color: #f44336;
+    --error-hover: #d32f2f;
+    --accent-hover: #1976d2;
+}
+
+/* 本地音乐页面容器 */
+.local-page {
+    padding: 20px;
+    height: 100%;
+    overflow-y: auto;
+}
+
+/* 页面头部 */
+.local-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.local-title {
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.local-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.local-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    min-width: 120px;
+    justify-content: center;
+}
+
+/* 浅色主题下的主按钮 */
+[data-theme="light"] .local-btn-primary {
+    background: var(--accent-color);
+    color: white;
+}
+
+[data-theme="light"] .local-btn-primary:hover {
+    background: var(--accent-hover);
+    transform: translateY(-1px);
+    color: white;
+}
+
+/* 暗色主题下的主按钮 */
+[data-theme="dark"] .local-btn-primary {
+    background: var(--accent-color);
+    color: white;
+}
+
+[data-theme="dark"] .local-btn-primary:hover {
+    background: var(--accent-hover);
+    transform: translateY(-1px);
+    color: white;
+}
+
+/* 浅色主题下的次按钮 */
+[data-theme="light"] .local-btn-secondary {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+[data-theme="light"] .local-btn-secondary:hover {
+    background: var(--bg-elevated);
+    border-color: var(--accent-color);
+}
+
+/* 暗色主题下的次按钮 */
+[data-theme="dark"] .local-btn-secondary {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+[data-theme="dark"] .local-btn-secondary:hover {
+    background: var(--bg-elevated);
+    border-color: var(--accent-color);
+}
+
+/* 浅色主题下的播放按钮 */
+[data-theme="light"] .local-btn-play {
+    background: linear-gradient(135deg, #4caf50, #66bb6a);
+    color: white;
+    border: none;
+}
+
+[data-theme="light"] .local-btn-play:hover {
+    background: linear-gradient(135deg, #43a047, #4caf50);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+/* 暗色主题下的播放按钮 */
+[data-theme="dark"] .local-btn-play {
+    background: linear-gradient(135deg, #4caf50, #66bb6a);
+    color: white;
+    border: none;
+}
+
+[data-theme="dark"] .local-btn-play:hover {
+    background: linear-gradient(135deg, #43a047, #4caf50);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+/* 统计信息卡片 */
+.local-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.local-stat-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.local-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* 浅色主题下的统计数字 */
+[data-theme="light"] .local-stat-number {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--accent-color);
+    margin-bottom: 8px;
+}
+
+/* 暗色主题下的统计数字 */
+[data-theme="dark"] .local-stat-number {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--accent-color);
+    margin-bottom: 8px;
+}
+
+.local-stat-label {
+    font-size: 14px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+/* 兼容旧的类名 */
+.stat-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.stat-number {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-bottom: 8px;
+}
+
+.stat-label {
+    font-size: 14px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+/* 文件夹路径管理器 */
+.folder-path-manager {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    margin-bottom: 30px;
+    overflow: hidden;
+}
+
+.path-manager-header {
+    display: flex;
+    align-items: center;
+    padding: 16px 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+    border-radius: 8px;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.path-manager-header:hover {
+    background: var(--bg-hover);
+}
+
+.path-manager-toggle {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+    color: var(--text-secondary);
+    transition: transform 0.2s ease;
+}
+
+.path-manager-icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 16px;
+    color: var(--accent-color);
+    font-size: 18px;
+}
+
+.path-manager-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    flex: 1;
+}
+
+.path-manager-count {
+    margin-left: 16px;
+}
+
+.path-count {
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid var(--border-color);
+}
+
+/* 浅色主题下的添加路径按钮 */
+[data-theme="light"] .add-path-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    min-width: auto;
+}
+
+[data-theme="light"] .add-path-btn:hover {
+    background: var(--accent-hover);
+    transform: translateY(-1px);
+}
+
+/* 暗色主题下的添加路径按钮 */
+[data-theme="dark"] .add-path-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    min-width: auto;
+}
+
+[data-theme="dark"] .add-path-btn:hover {
+    background: var(--accent-hover);
+    transform: translateY(-1px);
+}
+
+.path-list {
+    padding: 20px;
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.path-list.collapsed {
+    max-height: 0;
+    opacity: 0;
+    padding: 0 20px;
+}
+
+.path-list.expanded {
+    max-height: 1000px;
+    opacity: 1;
+    padding: 20px;
+}
+
+.empty-paths {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+}
+
+.empty-paths i {
+    font-size: 48px;
+    color: var(--text-tertiary);
+    margin-bottom: 16px;
+}
+
+.empty-paths p {
+    margin: 8px 0;
+    font-size: 16px;
+}
+
+.empty-paths .hint {
+    font-size: 14px;
+    color: var(--text-tertiary);
+}
+
+/* 路径项样式 */
+.path-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    transition: all 0.2s ease;
+}
+
+.path-item:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent-color);
+}
+
+.path-item:last-child {
+    margin-bottom: 0;
+}
+
+.path-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+}
+
+.path-info i {
+    color: var(--accent-color);
+    font-size: 16px;
+}
+
+.path-text {
+    font-size: 14px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.path-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.path-action-btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--text-secondary);
+}
+
+.path-action-btn:hover {
+    background: var(--accent-color);
+    color: white;
+    transform: translateY(-1px);
+}
+
+.path-delete-btn:hover {
+    background: var(--error-color);
+}
+
+.path-action-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--primary-color);
+}
+
+.path-delete-btn:hover {
+    background: var(--error-bg);
+    color: var(--error-color);
+}
+
+/* 浅色主题下的文件夹对话框 */
+[data-theme="light"] .folder-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+
+[data-theme="light"] .folder-dialog {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    width: 90%;
+    max-width: 500px;
+    overflow: hidden;
+}
+
+/* 暗色主题下的文件夹对话框 */
+[data-theme="dark"] .folder-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+
+[data-theme="dark"] .folder-dialog {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    width: 90%;
+    max-width: 500px;
+    overflow: hidden;
+}
+
+.dialog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.dialog-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.dialog-close {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--text-secondary);
+}
+
+.dialog-close:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.dialog-content {
+    padding: 20px;
+}
+
+.dialog-content label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.dialog-content input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 14px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    transition: border-color 0.2s ease;
+}
+
+.dialog-content input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.dialog-hint {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 12px;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.dialog-hint i {
+    color: var(--primary-color);
+}
+
+.dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 20px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+}
+
+.dialog-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    min-width: 80px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 浅色主题下的对话框按钮 */
+[data-theme="light"] .dialog-btn-cancel {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+[data-theme="light"] .dialog-btn-cancel:hover {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+}
+
+[data-theme="light"] .dialog-btn-confirm {
+    background: var(--accent-color);
+    color: white;
+}
+
+[data-theme="light"] .dialog-btn-confirm:hover {
+    background: var(--accent-hover);
+    transform: translateY(-1px);
+    color: white;
+}
+
+/* 暗色主题下的对话框按钮 */
+[data-theme="dark"] .dialog-btn-cancel {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+[data-theme="dark"] .dialog-btn-cancel:hover {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .dialog-btn-confirm {
+    background: var(--accent-color);
+    color: white;
+}
+
+[data-theme="dark"] .dialog-btn-confirm:hover {
+    background: var(--accent-hover);
+    transform: translateY(-1px);
+    color: white;
+}
+
+/* 音乐列表 */
+.local-music-list {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+}
+
+.local-music-header {
+    display: grid;
+    grid-template-columns: 24px 60px 1fr 200px 100px 160px;
+    gap: 16px;
+    padding: 16px 20px;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-color);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.local-song-item {
+    display: grid;
+    grid-template-columns: 24px 60px 1fr 200px 100px 160px;
+    gap: 16px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border-color);
+    transition: background 0.15s ease, border-color 0.15s ease;
+    cursor: pointer;
+    align-items: center;
+    content-visibility: auto;
+    contain-intrinsic-size: 56px;
+    contain: content;
+}
+
+.local-song-item:hover {
+    background: var(--bg-hover);
+}
+
+.local-song-item:last-child {
+    border-bottom: none;
+}
+
+.local-song-item.playing {
+    background: var(--primary-bg);
+    border-left: 3px solid var(--primary-color);
+}
+
+/* 歌曲封面 */
+.local-song-cover {
+    width: 48px;
+    height: 48px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--bg-tertiary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.local-song-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.local-song-cover .default-cover {
+    font-size: 20px;
+    color: var(--text-secondary);
+}
+
+/* 移除封面播放按钮覆盖层 */
+.local-song-cover .play-overlay {
+    display: none;
+}
+
+/* 序号样式 */
+.local-song-item .song-index {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+    text-align: center;
+    line-height: 1;
+}
+
+/* 歌曲信息 */
+.local-song-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+}
+
+.local-songname {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.local-author_name {
+    font-size: 13px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 专辑信息 */
+.local-song-album {
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 时长 */
+.local-song-duration {
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+/* 歌词弹窗样式 */
+.lyrics-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    backdrop-filter: blur(5px);
+}
+
+.lyrics-modal {
+    background: var(--bg-primary);
+    border-radius: 16px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-color);
+}
+
+.lyrics-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+}
+
+.lyrics-song-info {
+    flex: 1;
+}
+
+.lyrics-song-title {
+    margin: 0 0 4px 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.lyrics-song-artist {
+    margin: 0;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.lyrics-modal-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.lyrics-modal-close:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.lyrics-modal-content {
+    padding: 24px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.lyrics-text {
+    line-height: 1.8;
+    font-size: 16px;
+    color: var(--text-primary);
+}
+
+.lyrics-line {
+    margin: 0 0 12px 0;
+    padding: 4px 0;
+    transition: all 0.2s ease;
+}
+
+.lyrics-line:hover {
+    background: var(--bg-hover);
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.no-lyrics {
+    text-align: center;
+    color: var(--text-secondary);
+    font-style: italic;
+    margin: 40px 0;
+}
+
+/* 歌词弹窗滚动条样式 */
+.lyrics-modal-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.lyrics-modal-content::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+    border-radius: 3px;
+}
+
+.lyrics-modal-content::-webkit-scrollbar-thumb {
+    background: var(--text-secondary);
+    border-radius: 3px;
+}
+
+.lyrics-modal-content::-webkit-scrollbar-thumb:hover {
+    background: var(--text-primary);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .lyrics-modal {
+        width: 95%;
+        max-height: 85vh;
+    }
+    
+    .lyrics-modal-header {
+        padding: 16px 20px;
+    }
+    
+    .lyrics-modal-content {
+        padding: 20px;
+    }
+    
+    .lyrics-song-title {
+        font-size: 16px;
+    }
+    
+    .lyrics-text {
+        font-size: 15px;
+    }
+}
+
+/* 操作按钮 */
+.local-song-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    justify-content: flex-end;
+    min-width: 160px;
+}
+
+.local-song-item:hover .local-song-actions {
+    opacity: 1;
+}
+
+.local-action-btn {
+    width: 30px;
+    height: 30px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--text-secondary);
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
+.local-action-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--primary-color);
+    transform: scale(1.1);
+}
+
+.local-action-btn i {
+    font-size: 12px;
+}
+
+/* 加载状态 */
+.local-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    color: var(--text-secondary);
+}
+
+.local-loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border-color);
+    border-top: 3px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 16px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.local-loading-text {
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.local-loading-hint {
+    font-size: 12px;
+    color: var(--text-tertiary);
+}
+
+/* 空状态 */
+.local-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    color: var(--text-secondary);
+}
+
+.local-empty-icon {
+    font-size: 64px;
+    color: var(--text-tertiary);
+    margin-bottom: 20px;
+}
+
+.local-empty-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.local-empty-text {
+    font-size: 14px;
+    color: var(--text-secondary);
+    text-align: center;
+    line-height: 1.5;
+}
+
+/* 文件夹分组样式 */
+.local-music-list.folder-grouped {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+}
+
+.folder-section {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    margin-bottom: 16px;
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+.folder-header {
+    display: flex;
+    align-items: center;
+    padding: 16px 20px;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.folder-header:hover {
+    background: var(--bg-hover);
+}
+
+.folder-toggle {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+    color: var(--text-secondary);
+    transition: transform 0.2s ease;
+}
+
+.folder-icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 16px;
+    color: var(--accent-color);
+    font-size: 18px;
+}
+
+.folder-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.folder-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.folder-stats {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.folder-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: 16px;
+}
+
+.folder-action-btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 6px;
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    font-size: 14px;
+}
+
+.folder-action-btn:hover {
+    background: var(--accent-color);
+    color: white;
+    transform: translateY(-1px);
+}
+
+.folder-content {
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.folder-content.collapsed {
+    max-height: 0;
+    opacity: 0;
+}
+
+.folder-content.expanded {
+    max-height: 2000px;
+    opacity: 1;
+}
+
+.folder-music-header {
+    display: grid;
+    grid-template-columns: 24px 60px 1fr 200px 100px 160px;
+    gap: 16px;
+    padding: 12px 20px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.folder-music-list {
+    background: var(--bg-secondary);
+}
+
+.folder-song-item {
+    display: grid;
+    grid-template-columns: 24px 60px 1fr 200px 100px 160px;
+    gap: 16px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border-light);
+    transition: background 0.15s ease, border-color 0.15s ease;
+    cursor: pointer;
+    content-visibility: auto;
+    contain-intrinsic-size: 56px;
+    contain: content;
+}
+.folder-song-item:hover {
+    background: var(--bg-hover);
+}
+
+.folder-song-item:last-child {
+    border-bottom: none;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .local-music-header,
+    .local-song-item,
+    .folder-music-header,
+    .folder-song-item {
+        grid-template-columns: 20px 50px 1fr 80px;
+        gap: 12px;
+    }
+
+    .local-song-album,
+    .local-song-actions {
+        display: none;
+    }
+
+    .folder-header {
+        padding: 12px 16px;
+    }
+
+    .folder-name {
+        font-size: 15px;
+    }
+
+    .folder-stats {
+        font-size: 12px;
+    }
+
+    .folder-actions {
+        gap: 6px;
+    }
+
+    .folder-action-btn {
+        width: 28px;
+        height: 28px;
+        font-size: 12px;
+    }
+
+    .local-stats {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+    }
+
+    .local-stat-card {
+        padding: 15px;
+    }
+
+    .local-stat-number {
+        font-size: 24px;
+    }
+}

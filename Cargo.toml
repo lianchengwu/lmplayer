@@ -1,0 +1,29 @@
+[package]
+name = "wmplayer"
+version = "0.1.0"
+edition = "2021"
+description = "wmPlayer Rust backend — KuGou via kugou crate, Lite default"
+
+[[bin]]
+name = "wmplayer"
+path = "src/bin/wmplayer.rs"
+
+[dependencies]
+kugou = { path = "kugou" }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+thiserror = "2"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+dirs = "6"
+axum = { version = "0.8", features = ["macros"] }
+tower-http = { version = "0.6", features = ["fs", "cors"] }
+rust-embed = "8"
+mime_guess = "2"
+ksni = { version = "0.3", features = ["blocking"] }
+image = { version = "0.25", default-features = false, features = ["png", "ico"] }
+gtk4 = "0.9"
+webkit6 = "0.4"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

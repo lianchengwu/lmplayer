@@ -1,0 +1,539 @@
+/* 收藏的歌单页面样式 */
+
+/* 页面头部 */
+#playlistsPage .page-header {
+    margin-bottom: 2rem;
+    padding: 0 2rem 1.5rem 2rem;
+    position: relative;
+}
+
+/* 分割线应该延伸到页面边缘 */
+#playlistsPage .page-header::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: var(--border-color);
+}
+
+#playlistsPage .page-title {
+    font-size: 2rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--text-primary);
+}
+
+
+
+/* 过滤器区域 */
+#playlistsPage .playlists-filter {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background: var(--card-background);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+}
+
+#playlistsPage .filter-tabs {
+    display: flex !important;
+    gap: 0.5rem;
+    flex-wrap: nowrap;
+    align-items: center !important;
+}
+
+#playlistsPage .filter-tab {
+    padding: 0.5rem 1.2rem !important;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: fit-content !important;
+    flex-shrink: 0;
+    height: 36px !important;
+    width: auto !important;
+    margin: 0 !important;
+    line-height: normal !important;
+}
+
+#playlistsPage .filter-tab:hover {
+    background: var(--hover-background);
+    color: var(--text-primary);
+}
+
+#playlistsPage .filter-tab.active {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+}
+
+#playlistsPage .filter-controls {
+    display: flex !important;
+    align-items: center !important;
+    gap: 1rem;
+}
+
+#playlistsPage .search-box-small {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+#playlistsPage .search-box-small i {
+    position: absolute;
+    left: 0.75rem;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+#playlistsPage .search-box-small input {
+    padding: 0.5rem 0.75rem 0.5rem 2.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--input-background);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    width: 200px;
+    transition: all 0.2s ease;
+    height: 36px;
+    box-sizing: border-box;
+}
+
+#playlistsPage .search-box-small input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px var(--accent-color-alpha);
+}
+
+#playlistsPage .sort-select {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--input-background);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+#playlistsPage .sort-select:focus {
+    outline: none;
+    border-color: var(--accent-color);
+}
+
+/* 歌单网格 */
+#playlistsPage .playlists-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+    padding: 0;
+}
+
+/* 歌单卡片 */
+#playlistsPage .playlist-card-large {
+    background: var(--card-background);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.75rem;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+}
+
+#playlistsPage .playlist-card-large:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px var(--shadow-color);
+}
+
+#playlistsPage .playlist-cover-large {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+    background: var(--background-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#playlistsPage .playlist-cover-large img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+#playlistsPage .playlist-card-large:hover .playlist-cover-large img {
+    transform: scale(1.05);
+}
+
+#playlistsPage .playlist-cover-large i {
+    font-size: 3rem;
+    color: var(--text-secondary);
+}
+
+/* 播放按钮overlay已禁用 */
+/*
+#playlistsPage .playlist-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+#playlistsPage .playlist-card-large:hover .playlist-overlay {
+    opacity: 1;
+}
+*/
+
+/* 播放按钮样式已禁用 */
+/*
+#playlistsPage .playlist-overlay .play-btn {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: var(--accent-color);
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#playlistsPage .playlist-overlay .play-btn:hover {
+    background: var(--accent-hover);
+    transform: scale(1.1);
+}
+*/
+
+/* 歌单信息 */
+#playlistsPage .playlist-info-large {
+    margin-bottom: 0.75rem;
+}
+
+#playlistsPage .playlist-title-large {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.3rem;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+#playlistsPage .playlist-meta {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.2rem;
+}
+
+#playlistsPage .playlist-creator {
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    margin-bottom: 0.3rem;
+}
+
+#playlistsPage .playlist-description {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+
+
+/* 空状态 */
+#playlistsPage .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--text-secondary);
+}
+
+#playlistsPage .empty-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+#playlistsPage .empty-text {
+    font-size: 1.2rem;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+}
+
+#playlistsPage .empty-subtext {
+    font-size: 0.9rem;
+    color: var(--text-tertiary);
+}
+
+/* 加载状态 */
+#playlistsPage .loading-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--text-secondary);
+}
+
+#playlistsPage .loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border-color);
+    border-top: 3px solid var(--accent-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+#playlistsPage .loading-text {
+    font-size: 1rem;
+    color: var(--text-secondary);
+}
+
+/* 错误状态 */
+#playlistsPage .error-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--text-secondary);
+}
+
+#playlistsPage .error-icon {
+    font-size: 3rem;
+    color: var(--error-color);
+    margin-bottom: 1rem;
+}
+
+#playlistsPage .error-text {
+    font-size: 1.1rem;
+    color: var(--text-primary);
+    margin-bottom: 1.5rem;
+}
+
+
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 播放按钮样式 */
+#playlistsPage .playlist-cover-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    border-radius: 6px;
+}
+
+#playlistsPage .playlist-card-large:hover .playlist-cover-overlay {
+    opacity: 1;
+}
+
+/* 新的歌单卡片样式 - 与发现页新碟上架保持一致 */
+#playlistsPage .playlist-item {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 12px;
+    transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    cursor: pointer;
+    content-visibility: auto;
+    contain-intrinsic-size: 200px;
+}
+
+#playlistsPage .playlist-item:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent-color);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+#playlistsPage .playlist-item .album-cover {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 6px;
+    position: relative;
+}
+
+#playlistsPage .playlist-item .album-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+    will-change: transform;
+}
+
+#playlistsPage .playlist-item:hover .album-cover img {
+    transform: scale(1.05);
+}
+
+#playlistsPage .playlist-item .cover-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-tertiary);
+    color: var(--text-tertiary);
+    font-size: 24px;
+}
+
+#playlistsPage .playlist-item .album-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 1; /* ensure overlay is below count badge */
+    pointer-events: none; /* don't interfere with hover/click */
+}
+
+#playlistsPage .playlist-item:hover .album-overlay {
+    opacity: 1;
+}
+
+#playlistsPage .playlist-item .play-album-btn {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: var(--accent-color);
+    border: none;
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    pointer-events: auto; /* clickable even if overlay ignores events */
+}
+
+#playlistsPage .playlist-item .play-album-btn:hover {
+    background: var(--accent-hover);
+    transform: scale(1.1);
+}
+
+/* song count badge at bottom-left of cover */
+#playlistsPage .playlist-item .album-count-badge {
+    position: absolute;
+    left: 8px;
+    bottom: 8px;
+    z-index: 2; /* above overlay */
+    padding: 0;
+    font-size: 12px;
+    line-height: 1.2;
+    color: #fff;
+    background: transparent; /* remove background as requested */
+    border-radius: 0;
+    backdrop-filter: none;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.7); /* improve readability without bg */
+    pointer-events: none; /* do not block clicks */
+}
+
+#playlistsPage .playlist-item .album-info {
+    text-align: center;
+}
+
+#playlistsPage .playlist-item .album-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#playlistsPage .playlist-item .album-author_name {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-bottom: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#playlistsPage .playlist-item .album-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-tertiary);
+}
+
+
+
+#playlistsPage .play-btn-large {
+    width: 50px;
+    height: 50px;
+    border: none;
+    background: none;
+    color: white;
+    font-size: 2rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#playlistsPage .play-btn-large:hover {
+    transform: scale(1.2);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+#playlistsPage .play-btn-large i {
+    margin-left: 3px; /* 调整播放图标位置，使其居中 */
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+    position: relative;
+    z-index: 1;
+}
+
+/* 操作按钮中的播放按钮 */
+#playlistsPage .playlist-actions .play-btn {
+    background: var(--accent-color);
+    color: white;
+}
+
+#playlistsPage .playlist-actions .play-btn:hover {
+    background: var(--accent-hover);
+    transform: scale(1.05);
+}

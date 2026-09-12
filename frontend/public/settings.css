@@ -1,0 +1,304 @@
+/* 设置页面样式 */
+.settings-content {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+/* 设置分组 */
+.settings-group {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.settings-group-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 20px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.settings-group-title i {
+    color: var(--accent-color);
+    font-size: 16px;
+}
+
+/* 设置项 */
+.settings-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.settings-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.settings-item-info {
+    flex: 1;
+}
+
+.settings-item-title {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin: 0 0 4px 0;
+}
+
+.settings-item-description {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.4;
+}
+
+.settings-item-control {
+    flex-shrink: 0;
+    margin-left: 20px;
+}
+
+/* 开关控件 */
+.settings-switch {
+    position: relative;
+    display: inline-block;
+    width: 48px;
+    height: 24px;
+}
+
+.settings-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.settings-switch-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: 0.3s;
+    border-radius: 24px;
+}
+
+.settings-switch-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.3s;
+    border-radius: 50%;
+}
+
+.settings-switch input:checked + .settings-switch-slider {
+    background-color: var(--accent-color);
+}
+
+.settings-switch input:checked + .settings-switch-slider:before {
+    transform: translateX(24px);
+}
+
+/* 选择框 */
+.settings-select {
+    padding: 8px 12px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 6px;
+    background: var(--card-bg);
+    color: var(--text-primary);
+    font-size: 14px;
+    min-width: 120px;
+    cursor: pointer;
+}
+
+.settings-select:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(var(--accent-color-rgb), 0.1);
+}
+
+/* 滑块控件 */
+.settings-slider {
+    width: 120px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(0, 0, 0, 0.1);
+    outline: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+}
+
+.settings-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent-color);
+    cursor: pointer;
+}
+
+.settings-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent-color);
+    cursor: pointer;
+    border: none;
+}
+
+/* 按钮控件 */
+.settings-button {
+    padding: 8px 16px;
+    border: 1px solid var(--accent-color);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--accent-color);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    /* 确保文字水平显示，防止文字过长导致垂直显示 */
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 80px;
+    max-width: 150px;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.settings-button:hover {
+    background: var(--accent-color);
+    color: white;
+}
+
+.settings-button.primary {
+    background: var(--accent-color);
+    color: white;
+}
+
+.settings-button.primary:hover {
+    background: var(--accent-hover);
+}
+
+/* 输入框 */
+.settings-input {
+    padding: 8px 12px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 6px;
+    background: var(--card-bg);
+    color: var(--text-primary);
+    font-size: 14px;
+    min-width: 120px;
+}
+
+.settings-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(var(--accent-color-rgb), 0.1);
+}
+
+/* 数值显示 */
+.settings-value {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-left: 8px;
+    min-width: 40px;
+    text-align: right;
+}
+
+/* 文件夹路径显示 */
+.settings-path {
+    font-family: monospace;
+    font-size: 13px;
+    color: var(--text-secondary);
+    background: rgba(0, 0, 0, 0.05);
+    padding: 4px 8px;
+    border-radius: 4px;
+    margin-top: 8px;
+    word-break: break-all;
+}
+
+/* 快捷键显示 */
+.settings-hotkey {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    background: rgba(0, 0, 0, 0.05);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: monospace;
+}
+
+.settings-hotkey-key {
+    background: rgba(0, 0, 0, 0.1);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 500;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .settings-content {
+        padding: 0 16px;
+    }
+    
+    .settings-group {
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .settings-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+    
+    .settings-item-control {
+        margin-left: 0;
+        align-self: flex-end;
+    }
+}
+
+/* 空状态 */
+.settings-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-secondary);
+}
+
+.settings-empty i {
+    font-size: 48px;
+    color: var(--text-tertiary);
+    margin-bottom: 16px;
+}
+
+.settings-empty h3 {
+    font-size: 18px;
+    margin: 0 0 8px 0;
+    color: var(--text-secondary);
+}
+
+.settings-empty p {
+    font-size: 14px;
+    margin: 0;
+    color: var(--text-tertiary);
+}

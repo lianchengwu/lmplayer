@@ -1,0 +1,465 @@
+/* 暗色主题样式 - 与 248,250,252 主调色形成对比 */
+:root[data-theme="dark"] {
+    /* 主调色的反色系 - 深色调 */
+    --primary-base: rgb(15, 23, 42);      /* 248,250,252 的深色对应 */
+    --primary-color: rgb(30, 41, 59);     /* 稍浅的主色调 */
+    --primary-light: rgb(51, 65, 85);     /* 更浅的主色调 */
+    --primary-dark: rgb(15, 23, 42);      /* 最深的主色调 */
+
+    /* 背景色系 - 基于深色主调 */
+    --bg-color: rgb(15, 23, 42);          /* 深色主背景 */
+    --bg-secondary: rgb(30, 41, 59);      /* 稍浅的次背景 */
+    --bg-elevated: rgb(51, 65, 85);       /* 浮层背景 */
+    --bg-tertiary: rgb(71, 85, 105);      /* 第三层背景 */
+    --hover-bg: rgba(248, 250, 252, 0.05); /* 悬停背景 */
+
+    /* 文字色系 - 与深色背景形成对比 */
+    --text-primary: rgb(248, 250, 252);   /* 主调色作为主文字 */
+    --text-secondary: rgb(203, 213, 225); /* 稍深的次文字 */
+    --text-tertiary: rgb(148, 163, 184);  /* 更深的辅助文字 */
+    --text-inverse: rgb(15, 23, 42);      /* 反色文字 */
+
+    /* 边框和分割线 - 基于深色调的层次 */
+    --border-color: rgb(71, 85, 105);
+    --border-light: rgb(100, 116, 139);
+
+    /* 阴影 - 深色主题的阴影效果 */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+
+    /* 强调色 - 与浅色主题保持一致的交互色 */
+    --accent-color: rgb(139, 92, 246);    /* 紫色强调色 */
+    --accent-color-rgb: 139, 92, 246;     /* 紫色强调色RGB值 */
+    --accent-hover: rgb(124, 58, 237);    /* 悬停状态 */
+
+    /* 状态色系 */
+    --success-color: rgb(34, 197, 94);    /* 绿色成功 */
+    --warning-color: rgb(245, 158, 11);   /* 黄色警告 */
+    --error-color: rgb(239, 68, 68);      /* 红色错误 */
+    --error-hover: rgb(220, 38, 38);      /* 红色错误悬停 */
+    --info-color: rgb(59, 130, 246);      /* 蓝色信息 */
+
+    /* 组件特定颜色 */
+    --titlebar-bg: var(--primary-base);
+    --card-bg: var(--bg-elevated);
+    --input-bg: var(--bg-elevated);
+    --input-border: var(--border-color);
+    --shadow-color: rgba(0, 0, 0, 0.25);
+    --player-bg: var(--primary-base);
+    --player-control-bg: var(--bg-elevated);
+    --player-progress-bg: var(--border-color);
+    --player-progress-fill: var(--accent-color);
+}
+
+/* 暗色主题下的按钮样式 - 扁平化设计 */
+[data-theme="dark"] .titlebar-btn {
+    background: transparent;
+    color: var(--text-secondary);
+    border: none;
+    border-radius: 4px;
+    box-shadow: none; /* 确保没有阴影效果 */
+    text-shadow: none; /* 确保文字没有阴影 */
+}
+
+[data-theme="dark"] .titlebar-btn:hover {
+    background: rgba(248, 250, 252, 0.08);
+    color: var(--text-primary);
+    transform: none; /* 移除悬停时的位移效果，避免阴影 */
+    box-shadow: none; /* 确保没有阴影效果 */
+}
+
+[data-theme="dark"] .search-input {
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .search-input::placeholder {
+    color: var(--text-tertiary);
+}
+
+[data-theme="dark"] .search-icon {
+    color: var(--text-tertiary);
+}
+
+/* 暗色主题下的标题栏特殊样式 - 无边界感 */
+[data-theme="dark"] .custom-titlebar {
+    box-shadow: none;
+    border-bottom: none;
+}
+
+[data-theme="dark"] .titlebar-title {
+    color: var(--text-primary);
+    text-shadow: none; /* 移除标题文字阴影 */
+}
+
+/* 暗色主题下的标题美化 */
+[data-theme="dark"] .title-wm {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+[data-theme="dark"] .title-player {
+    background: linear-gradient(135deg, #818cf8 0%, #a855f7 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* 暗色主题下的播放器样式 - 减少分割线明显程度 */
+[data-theme="dark"] .player-bar {
+    background: var(--player-bg);
+    border-top: 1px solid rgba(51, 65, 85, 0.3); /* 更微妙的分割线 */
+}
+
+[data-theme="dark"] .player-control-btn {
+    background: transparent;
+    color: var(--text-secondary);
+    border: none;
+    border-radius: 50%;
+}
+
+[data-theme="dark"] .player-control-btn:hover {
+    background: rgba(248, 250, 252, 0.08);
+    color: var(--text-primary);
+    transform: scale(1.1);
+}
+
+[data-theme="dark"] .progress-bar {
+    background: var(--player-progress-bg);
+}
+
+[data-theme="dark"] .progress-fill {
+    background: var(--player-progress-fill);
+}
+
+[data-theme="dark"] .volume-slider {
+    background: var(--player-progress-bg);
+}
+
+[data-theme="dark"] .volume-slider::-webkit-slider-thumb {
+    background: var(--player-progress-fill);
+}
+
+[data-theme="dark"] .song-info {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .songname {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .author_name {
+    color: var(--text-secondary);
+}
+
+/* 暗色主题下的收藏按钮 */
+[data-theme="dark"] .favorite-btn {
+    color: var(--text-tertiary);
+}
+
+[data-theme="dark"] .favorite-btn:hover {
+    color: #ff6b6b;
+}
+
+[data-theme="dark"] .favorite-btn.active {
+    color: #ff6b6b;
+}
+
+/* 暗色主题下的播放时间显示 */
+[data-theme="dark"] .time-current,
+[data-theme="dark"] .time-total {
+    color: var(--text-secondary);
+}
+
+/* 暗色主题下的登录弹窗 */
+[data-theme="dark"] .modal-content {
+    background: var(--bg-elevated);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .modal-header {
+    border-bottom-color: var(--border-color);
+}
+
+[data-theme="dark"] .form-input {
+    background: var(--input-bg);
+    border-color: var(--input-border);
+}
+
+[data-theme="dark"] .form-input:focus {
+    border-color: rgb(59, 130, 246);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* 暗色主题下的左侧栏样式 - 微妙分割线 */
+[data-theme="dark"] .sidebar {
+    background: var(--bg-color);
+    border-right: 1px solid rgba(51, 65, 85, 0.4);
+}
+
+[data-theme="dark"] .sidebar-header {
+    border-bottom: 1px solid rgba(51, 65, 85, 0.3);
+}
+
+/* 暗色主题下的侧边栏分割线 */
+[data-theme="dark"] .sidebar-divider {
+    background: rgba(51, 65, 85, 0.25);
+}
+
+/* 暗色主题下的右侧栏样式 */
+[data-theme="dark"] .right-sidebar {
+    background: var(--bg-color);
+    border-left: 1px solid rgba(51, 65, 85, 0.4);
+}
+
+[data-theme="dark"] .tab-btn:hover {
+    background: rgba(248, 250, 252, 0.05);
+}
+
+[data-theme="dark"] .right-sidebar-close:hover {
+    background: rgba(248, 250, 252, 0.08);
+}
+
+[data-theme="dark"] .lyrics-control-btn:hover {
+    background: rgba(248, 250, 252, 0.05);
+}
+
+[data-theme="dark"] .sidebar-toggle-btn {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .sidebar-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+[data-theme="dark"] .section-header {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .list-item {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .list-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .list-item.active {
+    background: rgba(139, 92, 246, 0.15);
+    color: var(--accent-color);
+}
+
+[data-theme="dark"] .playlist-header {
+    color: var(--text-tertiary);
+}
+
+[data-theme="dark"] .playlist-item {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .playlist-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+}
+
+/* 骨架屏动画变量 */
+:root[data-theme="dark"] {
+    --skeleton-bg: rgb(51, 65, 85);
+    --skeleton-shimmer: rgb(71, 85, 105);
+}
+
+/* 每日推荐暗色主题适配 */
+[data-theme="dark"] .daily-song-item {
+    background: var(--card-bg);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .daily-song-item:hover {
+    background: var(--hover-bg);
+    border-color: var(--accent-color);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .daily-song-cover {
+    background: var(--bg-tertiary);
+}
+
+[data-theme="dark"] .daily-song-cover i {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .song-name {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .author_name {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .song-play-btn {
+    border-color: var(--border-color);
+    color: var(--text-secondary);
+    background: transparent;
+}
+
+[data-theme="dark"] .song-play-btn:hover {
+    background: var(--accent-color);
+    color: var(--text-inverse);
+    border-color: var(--accent-color);
+}
+
+[data-theme="dark"] .daily-songs-preview {
+    background: var(--bg-secondary);
+}
+
+[data-theme="dark"] .daily-songs-preview::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+}
+
+[data-theme="dark"] .daily-songs-preview::-webkit-scrollbar-thumb {
+    background: var(--accent-color);
+}
+
+[data-theme="dark"] .daily-songs-preview::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-hover);
+}
+
+/* 设置页面暗色主题适配 */
+[data-theme="dark"] .settings-group {
+    background: var(--card-bg);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .settings-group-title {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .settings-item-title {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .settings-item-description {
+    color: var(--text-secondary);
+}
+
+/* 设置页面下拉列表暗色主题 */
+[data-theme="dark"] .settings-select {
+    background: var(--input-bg) !important;
+    border: 1px solid var(--input-border) !important;
+    color: var(--text-primary) !important;
+    /* 确保下拉箭头在暗色主题下可见 */
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgb(203,213,225)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 16px;
+    padding-right: 32px;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}
+
+[data-theme="dark"] .settings-select:focus {
+    border-color: var(--accent-color) !important;
+    box-shadow: 0 0 0 2px rgba(var(--accent-color-rgb), 0.1) !important;
+    outline: none;
+}
+
+[data-theme="dark"] .settings-select:hover {
+    border-color: var(--accent-color);
+    background-color: var(--bg-tertiary);
+}
+
+/* 下拉选项样式 - 注意：某些浏览器对option样式支持有限 */
+[data-theme="dark"] .settings-select option {
+    background: var(--input-bg) !important;
+    color: var(--text-primary) !important;
+    padding: 8px 12px;
+}
+
+/* 针对WebKit浏览器的额外样式 */
+[data-theme="dark"] .settings-select option:checked {
+    background: var(--accent-color) !important;
+    color: var(--text-inverse) !important;
+}
+
+[data-theme="dark"] .settings-select option:hover {
+    background: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
+}
+
+/* 设置页面按钮暗色主题 */
+[data-theme="dark"] .settings-button {
+    background: transparent;
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+}
+
+[data-theme="dark"] .settings-button:hover {
+    background: var(--accent-color);
+    color: var(--text-inverse);
+}
+
+[data-theme="dark"] .settings-button.primary {
+    background: var(--accent-color);
+    color: var(--text-inverse);
+}
+
+[data-theme="dark"] .settings-button.primary:hover {
+    background: var(--accent-hover);
+}
+
+/* 设置页面输入框暗色主题 */
+[data-theme="dark"] .settings-input {
+    background: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .settings-input:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(var(--accent-color-rgb), 0.1);
+}
+
+/* 设置页面开关控件暗色主题 */
+[data-theme="dark"] .settings-switch-slider {
+    background-color: var(--border-color);
+}
+
+[data-theme="dark"] .settings-switch-slider:before {
+    background-color: var(--text-primary);
+}
+
+[data-theme="dark"] .settings-switch input:checked + .settings-switch-slider {
+    background-color: var(--accent-color);
+}
+
+[data-theme="dark"] .settings-switch input:checked + .settings-switch-slider:before {
+    background-color: white;
+}
+
+/* 设置页面滑块控件暗色主题 */
+[data-theme="dark"] .settings-slider {
+    background: var(--border-color);
+}
+
+[data-theme="dark"] .settings-slider::-webkit-slider-thumb {
+    background: var(--accent-color);
+}
+
+[data-theme="dark"] .settings-slider::-moz-range-thumb {
+    background: var(--accent-color);
+}
+
+/* 设置页面路径显示暗色主题 */
+[data-theme="dark"] .settings-path {
+    color: var(--text-secondary);
+    background: var(--bg-secondary);
+    border-color: var(--border-color);
+}
+
+/* 设置页面数值显示暗色主题 */
+[data-theme="dark"] .settings-value {
+    color: var(--text-secondary);
+}

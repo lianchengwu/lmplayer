@@ -1,0 +1,457 @@
+/* 磨砂黑主题样式 - 深色磨砂玻璃效果 */
+:root[data-theme="frosted-dark"] {
+    /* 主调色：深色磨砂玻璃效果的半透明色系 */
+    --primary-base: rgba(0, 0, 0, 0.1);
+    --primary-color: rgba(0, 0, 0, 0.15);
+    --primary-light: rgba(0, 0, 0, 0.2);
+    --primary-dark: rgba(0, 0, 0, 0.05);
+
+    /* 背景色系 - 深色磨砂玻璃效果 */
+    --bg-color: rgba(15, 15, 20, 0.9);
+    --bg-secondary: rgba(20, 20, 25, 0.95);
+    --bg-elevated: rgba(0, 0, 0, 0.3);
+    --bg-tertiary: rgba(10, 10, 15, 0.8);
+    --hover-bg: rgba(255, 255, 255, 0.1);
+
+    /* 文字色系 - 适配深色磨砂背景 */
+    --text-primary: rgba(240, 240, 245, 0.95);
+    --text-secondary: rgba(200, 200, 210, 0.85);
+    --text-tertiary: rgba(160, 160, 170, 0.75);
+    --text-inverse: rgba(20, 20, 25, 0.95);
+
+    /* 边框和分割线 - 深色磨砂效果，模糊边框 */
+    --border-color: rgba(255, 255, 255, 0.08);
+    --border-light: rgba(255, 255, 255, 0.04);
+
+    /* 阴影 - 深色磨砂玻璃阴影效果 */
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 16px 64px rgba(0, 0, 0, 0.5);
+
+    /* 强调色 - 磨砂黑主题专用 */
+    --accent-color: rgba(139, 92, 246, 0.9);
+    --accent-color-rgb: 139, 92, 246;
+    --accent-hover: rgba(124, 58, 237, 1);
+
+    /* 组件特定颜色 */
+    --titlebar-bg: rgba(0, 0, 0, 0.2);
+    --card-bg: rgba(0, 0, 0, 0.25);
+    --input-bg: rgba(0, 0, 0, 0.3);
+    --input-border: rgba(255, 255, 255, 0.2);
+    --shadow-color: rgba(0, 0, 0, 0.4);
+    --player-bg: rgba(0, 0, 0, 0.4);
+    --player-control-bg: rgba(0, 0, 0, 0.3);
+    --player-progress-bg: rgba(255, 255, 255, 0.2);
+    --player-progress-fill: var(--accent-color);
+
+    /* 磨砂玻璃特效变量 (优化模糊半径减少GPU渲染卡顿) */
+    --blur-strength: 12px;
+    --backdrop-opacity: 0.9;
+}
+
+/* 磨砂黑主题全局背景 (移除body上的无意义全局blur提升帧率) */
+[data-theme="frosted-dark"] body {
+    background: linear-gradient(135deg, 
+        rgba(10, 10, 15, 0.95) 0%, 
+        rgba(20, 15, 25, 0.95) 25%,
+        rgba(15, 20, 25, 0.95) 50%,
+        rgba(25, 15, 20, 0.95) 75%,
+        rgba(15, 25, 20, 0.95) 100%);
+}
+
+/* 磨砂黑主题标题栏 */
+[data-theme="frosted-dark"] .custom-titlebar {
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(var(--blur-strength));
+    -webkit-backdrop-filter: blur(var(--blur-strength));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    transform: translateZ(0);
+}
+
+/* 磨砂黑主题按钮样式 */
+[data-theme="frosted-dark"] .titlebar-btn {
+    background: rgba(0, 0, 0, 0.2);
+    color: var(--text-secondary);
+    border: 1px solid transparent;
+    border-radius: 8px;
+    transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+[data-theme="frosted-dark"] .titlebar-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+                0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* 磨砂黑主题标题文字 */
+[data-theme="frosted-dark"] .titlebar-title {
+    color: var(--text-primary);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* 磨砂黑主题侧边栏 */
+[data-theme="frosted-dark"] .sidebar {
+    background: rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(var(--blur-strength));
+    -webkit-backdrop-filter: blur(var(--blur-strength));
+    border-right: 1px solid transparent;
+    box-shadow: 1px 0 0 0 rgba(255, 255, 255, 0.05);
+    transform: translateZ(0);
+}
+
+/* 磨砂黑主题侧边栏文字和图标 */
+[data-theme="frosted-dark"] .list-item {
+    color: rgba(240, 240, 245, 0.9);
+}
+
+[data-theme="frosted-dark"] .list-item i {
+    color: rgba(240, 240, 245, 0.85);
+}
+
+[data-theme="frosted-dark"] .item-text {
+    color: rgba(245, 245, 250, 0.95);
+    font-weight: 500;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="frosted-dark"] .list-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(250, 250, 255, 1);
+}
+
+[data-theme="frosted-dark"] .list-item:hover i {
+    color: rgba(250, 250, 255, 0.95);
+}
+
+[data-theme="frosted-dark"] .list-item:hover .item-text {
+    color: rgba(255, 255, 255, 1);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="frosted-dark"] .list-item.active {
+    background: rgba(139, 92, 246, 0.2);
+    color: rgba(139, 92, 246, 1);
+}
+
+[data-theme="frosted-dark"] .list-item.active i {
+    color: rgba(139, 92, 246, 1);
+}
+
+/* 磨砂黑主题侧边栏头部 */
+[data-theme="frosted-dark"] .sidebar-header {
+    background: rgba(0, 0, 0, 0.25);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* 磨砂黑主题"我的"文字样式 */
+[data-theme="frosted-dark"] .my-music-text {
+    color: rgba(245, 245, 250, 0.95);
+    font-weight: 600;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* 磨砂黑主题卡片 (优化：移除每个子项的独立blur，保留半透明晶莹感) */
+[data-theme="frosted-dark"] .card,
+[data-theme="frosted-dark"] .song-item,
+[data-theme="frosted-dark"] .playlist-card,
+[data-theme="frosted-dark"] .artist-card {
+    background: rgba(20, 20, 28, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+[data-theme="frosted-dark"] .card:hover,
+[data-theme="frosted-dark"] .song-item:hover,
+[data-theme="frosted-dark"] .playlist-card:hover,
+[data-theme="frosted-dark"] .artist-card:hover {
+    background: rgba(35, 35, 48, 0.7);
+    border-color: rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+
+/* 磨砂黑主题播放器 */
+[data-theme="frosted-dark"] .player-container {
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(var(--blur-strength));
+    -webkit-backdrop-filter: blur(var(--blur-strength));
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    transform: translateZ(0);
+}
+
+/* 磨砂黑主题播放器底栏 */
+[data-theme="frosted-dark"] .player-bar {
+    background: rgba(12, 12, 18, 0.85);
+    backdrop-filter: blur(var(--blur-strength));
+    -webkit-backdrop-filter: blur(var(--blur-strength));
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+    transform: translateZ(0);
+}
+
+[data-theme="frosted-dark"] .player-controls button,
+[data-theme="frosted-dark"] .player-control-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+    color: var(--text-primary);
+}
+
+[data-theme="frosted-dark"] .player-controls button:hover,
+[data-theme="frosted-dark"] .player-control-btn:hover {
+    background: rgba(255, 255, 255, 0.18);
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* 磨砂黑主题输入框 */
+[data-theme="frosted-dark"] input,
+[data-theme="frosted-dark"] select,
+[data-theme="frosted-dark"] textarea {
+    background: rgba(15, 15, 22, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: var(--text-primary);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+[data-theme="frosted-dark"] input:focus,
+[data-theme="frosted-dark"] select:focus,
+[data-theme="frosted-dark"] textarea:focus {
+    background: rgba(22, 22, 32, 0.85);
+    box-shadow: 0 0 0 1px var(--accent-color),
+                0 0 0 3px rgba(139, 92, 246, 0.2);
+}
+
+/* 磨砂黑主题滚动条 */
+[data-theme="frosted-dark"] ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+[data-theme="frosted-dark"] ::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+[data-theme="frosted-dark"] ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
+
+[data-theme="frosted-dark"] ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.35);
+}
+
+/* 磨砂黑主题模态框 */
+[data-theme="frosted-dark"] .modal,
+[data-theme="frosted-dark"] .dialog,
+[data-theme="frosted-dark"] .modal-content,
+[data-theme="frosted-dark"] .close-confirm-content {
+    background: rgba(15, 15, 22, 0.92);
+    backdrop-filter: blur(var(--blur-strength));
+    -webkit-backdrop-filter: blur(var(--blur-strength));
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+    transform: translateZ(0);
+}
+
+/* 磨砂黑主题模态框遮罩层 */
+[data-theme="frosted-dark"] .modal-overlay {
+    background: rgba(0, 0, 0, 0.6);
+}
+
+/* 磨砂黑主题模态框标题 */
+[data-theme="frosted-dark"] .modal-title {
+    color: var(--text-primary);
+    font-weight: 600;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* 磨砂黑主题表单输入框 */
+[data-theme="frosted-dark"] .form-input {
+    background: rgba(20, 20, 30, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
+
+[data-theme="frosted-dark"] .form-input:focus {
+    background: rgba(28, 28, 42, 0.85);
+    border-color: rgba(139, 92, 246, 0.8);
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+}
+
+[data-theme="frosted-dark"] .form-input::placeholder {
+    color: var(--text-tertiary);
+}
+
+/* 磨砂黑主题按钮 */
+[data-theme="frosted-dark"] .login-btn,
+[data-theme="frosted-dark"] .send-code-btn {
+    background: rgba(139, 92, 246, 0.9);
+    border: 1px solid rgba(139, 92, 246, 0.4);
+    color: white;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+[data-theme="frosted-dark"] .login-btn:hover,
+[data-theme="frosted-dark"] .send-code-btn:hover {
+    background: rgba(124, 58, 237, 1);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(139, 92, 246, 0.4);
+}
+
+/* 磨砂黑主题进度条 */
+[data-theme="frosted-dark"] .progress-bar {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+[data-theme="frosted-dark"] .progress-fill {
+    background: linear-gradient(90deg,
+        rgba(139, 92, 246, 0.9) 0%,
+        rgba(124, 58, 237, 1) 100%);
+}
+
+/* 磨砂黑主题沉浸式播放器 */
+[data-theme="frosted-dark"] .immersive-player {
+    background: linear-gradient(135deg,
+        rgba(10, 10, 15, 0.98) 0%,
+        rgba(20, 15, 25, 0.98) 25%,
+        rgba(15, 20, 25, 0.98) 50%,
+        rgba(25, 15, 20, 0.98) 75%,
+        rgba(15, 25, 20, 0.98) 100%);
+    transform: translateZ(0);
+}
+
+[data-theme="frosted-dark"] .immersive-controls button {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 50%;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+[data-theme="frosted-dark"] .immersive-controls button:hover {
+    background: rgba(255, 255, 255, 0.18);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* 磨砂黑主题特殊效果 */
+[data-theme="frosted-dark"] .glass-effect {
+    background: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(var(--blur-strength));
+    -webkit-backdrop-filter: blur(var(--blur-strength));
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+}
+
+/* 骨架屏动画变量 */
+::root[data-theme="frosted-dark"] {
+    --skeleton-bg: rgba(0, 0, 0, 0.3);
+    --skeleton-shimmer: rgba(255, 255, 255, 0.1);
+}
+
+/* 磨砂黑主题骨架屏 */
+[data-theme="frosted-dark"] .skeleton {
+    background: linear-gradient(90deg,
+        var(--skeleton-bg) 25%,
+        var(--skeleton-shimmer) 50%,
+        var(--skeleton-bg) 75%);
+}
+
+/* 磨砂黑主题搜索框 */
+[data-theme="frosted-dark"] .search-input {
+    background: rgba(15, 15, 22, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
+
+[data-theme="frosted-dark"] .search-input:focus {
+    background: rgba(22, 22, 32, 0.85);
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+}
+
+[data-theme="frosted-dark"] .search-input::placeholder {
+    color: var(--text-tertiary);
+}
+
+/* 磨砂黑主题对话框按钮 */
+[data-theme="frosted-dark"] .btn-secondary {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+[data-theme="frosted-dark"] .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.18);
+    color: var(--text-primary);
+}
+
+[data-theme="frosted-dark"] .btn-primary {
+    background: rgba(139, 92, 246, 0.9);
+    border: 1px solid rgba(139, 92, 246, 0.4);
+    color: white;
+    transition: background 0.2s ease;
+}
+
+[data-theme="frosted-dark"] .btn-primary:hover {
+    background: rgba(124, 58, 237, 1);
+}
+
+/* 设置页面下拉列表磨砂暗色主题 */
+[data-theme="frosted-dark"] .settings-select {
+    background: rgba(0, 0, 0, 0.4) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.7)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 16px;
+    padding-right: 32px;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}
+[data-theme="frosted-dark"] .settings-select:focus {
+    background: rgba(0, 0, 0, 0.4) !important;
+    box-shadow: 0 0 0 1px var(--accent-color),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+                0 0 0 3px rgba(139, 92, 246, 0.2) !important;
+    outline: none;
+}
+
+[data-theme="frosted-dark"] .settings-select:hover {
+    background: rgba(0, 0, 0, 0.35) !important;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+/* 磨砂暗色主题下拉选项 */
+[data-theme="frosted-dark"] .settings-select option {
+    background: rgba(0, 0, 0, 0.8) !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+    padding: 8px 12px;
+}
+
+[data-theme="frosted-dark"] .settings-select option:checked {
+    background: rgba(139, 92, 246, 0.8) !important;
+    color: white !important;
+}
+
+[data-theme="frosted-dark"] .settings-select option:hover {
+    background: rgba(0, 0, 0, 0.6) !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+}

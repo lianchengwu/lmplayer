@@ -1,0 +1,889 @@
+/* 沉浸式播放页面样式 */
+
+/* 主容器 - 全屏覆盖 */
+.immersive-player {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #0b0d14;
+    z-index: 9999;
+    display: flex;
+    overflow: hidden;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+    cursor: none;
+}
+
+.immersive-player.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* 鼠标活动时显示指针 */
+.immersive-player.show-cursor {
+    cursor: default;
+}
+
+/* 控制元素上始终显示指针 */
+.immersive-player button,
+.immersive-player input[type="range"],
+.immersive-player .volume-icon {
+    cursor: pointer !important;
+}
+
+/* 背景：不用 CSS blur/filter 动画（WebKitGTK 无合成时会整屏软件绘制） */
+.immersive-background {
+    position: absolute;
+    inset: -8%;
+    background-size: cover;
+    background-position: center;
+    opacity: 0.28;
+    pointer-events: none;
+}
+
+.immersive-background::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, rgba(8, 10, 18, 0.35) 0%, rgba(8, 10, 18, 0.82) 70%);
+}
+
+/* 左侧垂直音量控制 */
+.immersive-volume-control {
+    position: absolute;
+    left: -60px; /* 初始隐藏在左侧 */
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 10;
+    padding: 10px 8px;
+    opacity: 0;
+    transition: all 0.3s ease;
+}
+
+/* 与播放控制一致的显示逻辑 */
+.immersive-player.show-controls .immersive-volume-control {
+    opacity: 1;
+    left: 20px; /* 滑出到可见位置 */
+}
+
+.immersive-volume-control .volume-icon {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 12px;
+    margin-top: 12px;
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.2s ease;
+}
+
+.immersive-volume-control:hover .volume-icon {
+    color: #fff;
+}
+
+.volume-slider-container {
+    position: relative;
+    height: 100px;
+    width: 4px;
+}
+
+.volume-slider.vertical {
+    position: absolute;
+    width: 100px;
+    height: 4px;
+    left: 50%;
+    top: 50%;
+    transform: translateX(-50%) translateY(-50%) rotate(-90deg);
+    transform-origin: center;
+    background: transparent;
+    outline: none;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.volume-slider.vertical::-webkit-slider-track {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+    border: none;
+}
+
+.volume-slider.vertical::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    background: #fff;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s ease;
+}
+
+.volume-slider.vertical::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+}
+
+/* Firefox适配已移除 */
+
+/* 音量填充条样式已移除，使用浏览器原生进度显示 */
+
+/* 百分比显示已移除 */
+
+/* 全屏模式下的音量控制调整 */
+.immersive-player:fullscreen.show-controls .immersive-volume-control {
+    left: 30px; /* 全屏时的显示位置 */
+}
+
+.immersive-player:fullscreen .immersive-volume-control .volume-icon {
+    font-size: 14px;
+}
+
+.immersive-player:fullscreen .volume-slider-container {
+    height: 120px;
+}
+
+/* 音量控制的响应式设计 */
+@media (max-height: 600px) {
+    .immersive-volume-control {
+        padding: 8px 6px;
+    }
+
+    .volume-slider-container {
+        height: 80px;
+    }
+
+    .immersive-volume-control .volume-icon {
+        font-size: 10px;
+        margin-top: 10px;
+    }
+}
+
+/* 音量控制的动画效果 */
+@keyframes volumeControlSlideIn {
+    from {
+        opacity: 0;
+        left: -100px;
+    }
+    to {
+        opacity: 1;
+        left: 20px;
+    }
+}
+
+/* 音量滑块的焦点样式 */
+.volume-slider.vertical:focus {
+    outline: none;
+}
+
+.volume-slider.vertical:focus::-webkit-slider-thumb {
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* 音量图标的点击效果 */
+.immersive-volume-control .volume-icon {
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.2s ease;
+}
+
+.immersive-volume-control .volume-icon:hover {
+    transform: scale(1.1);
+}
+
+.immersive-volume-control .volume-icon:active {
+    transform: scale(0.95);
+}
+
+/* 左侧封面区域 */
+.immersive-left {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 60px;
+    position: relative;
+    margin-left: 80px; /* 为音量控制留出空间 */
+}
+
+.immersive-cover-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 500px;
+    width: 100%;
+}
+
+.immersive-cover {
+    width: 400px;
+    height: 400px;
+    border-radius: 50%;
+    overflow: hidden;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    margin-bottom: 40px;
+    position: relative;
+}
+
+.immersive-cover:hover {
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+
+/* 封面中心点装饰 */
+.immersive-cover::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60px;
+    height: 60px;
+    background: radial-gradient(circle, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.6) 40%, transparent 70%);
+    border-radius: 50%;
+    z-index: 2;
+}
+
+.immersive-cover::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 20px;
+    height: 20px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 50%;
+    z-index: 3;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.immersive-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.immersive-cover .cover-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-size: 80px;
+}
+
+/* 歌曲信息 */
+.immersive-song-info {
+    text-align: center;
+    color: white;
+}
+
+.immersive-songname {
+    font-size: 32px;
+    font-weight: 700;
+    margin: 0 0 12px 0;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    line-height: 1.2;
+}
+
+.immersive-author {
+    font-size: 20px;
+    font-weight: 400;
+    margin: 0 0 8px 0;
+    color: rgba(255, 255, 255, 0.8);
+    text-shadow: 0 1px 5px rgba(0, 0, 0, 0.3);
+}
+
+.immersive-album {
+    font-size: 16px;
+    font-weight: 300;
+    margin: 0;
+    color: rgba(255, 255, 255, 0.6);
+    text-shadow: 0 1px 5px rgba(0, 0, 0, 0.3);
+}
+
+/* 右侧歌词区域 */
+.immersive-right {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    padding: 60px 80px 60px 40px;
+    position: relative;
+    overflow: hidden;
+}
+
+.immersive-lyrics-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+/* 沉浸式模式下的歌词样式 - 添加滚动条和合适的间距 */
+.immersive-lyrics-style {
+    width: 100%;
+    max-width: 700px;
+    height: calc(100vh - 40px); /* 减去上下边距 */
+    overflow-y: auto; /* 启用垂直滚动 */
+    overflow-x: hidden;
+    padding: 35vh 20px; /* 减少上下padding，为边距留空间 */
+    margin: 20px 0; /* 添加上下边距 */
+    background: transparent;
+    backdrop-filter: none;
+    border-radius: 0;
+    border: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    position: relative;
+    /* 保留平滑滚动行为，但减少频率避免卡顿 */
+    scroll-behavior: auto; /* 改为auto，通过JS控制平滑滚动 */
+}
+
+/* 隐藏沉浸式歌词滚动条 */
+.immersive-lyrics-style::-webkit-scrollbar {
+    display: none;
+}
+
+.immersive-lyrics-style {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+}
+
+/* 沉浸式模式下的歌词行样式 */
+.immersive-lyrics-style .lyrics-line {
+    font-size: 28px; /* 稍微减小字体 */
+    line-height: 1.5; /* 减小行高 */
+    color: rgba(255, 255, 255, 0.6);
+    text-align: center;
+    margin: 8px 0; /* 减小上下间距 */
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    padding: 6px 20px; /* 减小上下padding */
+    border-radius: 0;
+    background: transparent;
+    font-weight: 300;
+    letter-spacing: 0.5px;
+    position: relative;
+    transform: translateY(0);
+    opacity: 0.6;
+}
+
+.immersive-lyrics-style .lyrics-line:hover {
+    background: transparent;
+    color: rgba(255, 255, 255, 0.7);
+    transform: translateY(-2px);
+}
+
+.immersive-lyrics-style .lyrics-line.active {
+    color: #ffffff;
+    font-weight: 500;
+    font-size: 32px; /* 减小活跃歌词字体，避免过大 */
+    background: transparent;
+    transform: translateY(0) scale(1);
+    text-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+    opacity: 1;
+    letter-spacing: 0.8px;
+    position: relative;
+    z-index: 2;
+    margin: 12px 0; /* 减小活跃歌词的间距 */
+    /* GPU加速优化 */
+    will-change: transform, color, text-shadow;
+    backface-visibility: hidden;
+    transform-origin: center center;
+}
+
+/* 这些样式已移动到正确的选择器 .immersive-player .lyrics-display */
+
+
+
+.immersive-lyrics-display .lyrics-line.no-lyrics {
+    color: rgba(255, 255, 255, 0.3);
+    font-style: italic;
+    font-size: 28px;
+}
+
+/* 沉浸式播放器中的KRC格式歌词样式 */
+.immersive-player .lyrics-display .lyrics-line.krc-line {
+    letter-spacing: 1px;
+}
+
+.immersive-player .lyrics-display .lyrics-word {
+    display: inline;
+    transition: color 0.12s linear, opacity 0.12s linear;
+}
+
+/* 渐进式播放：已播放的字符（保持默认亮白色效果） */
+.immersive-player .lyrics-display .lyrics-word.played {
+    /* 已播放字符使用默认的亮白色、粗体、发光效果，无需额外样式 */
+    color: inherit;
+    font-weight: inherit;
+    text-shadow: inherit;
+    opacity: 1;
+    transition: color 0.12s ease-out, text-shadow 0.12s ease-out, opacity 0.12s ease-out !important;
+    /* GPU加速优化 */
+    will-change: color, text-shadow, opacity;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+}
+
+/* 渐进式播放：未播放的字符（暗淡显示） */
+.immersive-player .lyrics-display .lyrics-word.unplayed {
+    color: rgba(255, 255, 255, 0.42) !important;
+    font-weight: inherit !important;
+    text-shadow: none !important;
+    opacity: 0.72;
+    transition: color 0.12s ease-out, text-shadow 0.12s ease-out, opacity 0.12s ease-out !important;
+    /* GPU加速优化 */
+    will-change: color, text-shadow, opacity;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+}
+
+/* 渐进式高亮容器的特殊效果（简化版本） */
+.immersive-player .lyrics-display .lyrics-line.progressive-highlight {
+    /* 移除边框和背景效果，保持简洁 */
+}
+
+/* 渐进式高亮动画已替代逐字高亮动画 */
+
+/* KRC格式歌词行在沉浸式模式下的特殊效果（已移除，避免冲突） */
+/* 现在使用统一的 .immersive-player .lyrics-display .lyrics-line 样式 */
+
+/* 当前播放行的特殊样式（用于LRC格式整行高亮） */
+.immersive-player .lyrics-display .lyrics-line.current-playing {
+    /* 移除背景和边框效果，保持简洁 */
+}
+
+/* 沉浸式播放器歌词字体大小控制（无跳跃版本） */
+.immersive-player .lyrics-display .lyrics-line {
+    font-size: 31px !important; /* 统一字体大小，避免跳跃 */
+    color: rgba(255, 255, 255, 0.6) !important;
+    font-weight: 400 !important;
+    margin: 14px 0 !important; /* 统一边距 */
+    transition: color 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+                font-weight 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+                text-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    /* GPU加速优化 */
+    will-change: color, font-weight, text-shadow;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+}
+
+.immersive-player .lyrics-display .lyrics-line.active {
+    font-size: 31px !important; /* 与非当前行相同大小，避免跳跃 */
+    color: rgba(255, 255, 255, 1.0) !important;
+    font-weight: 700 !important;
+    margin: 14px 0 !important; /* 统一边距，避免布局跳跃 */
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.5),
+                 0 0 40px rgba(255, 255, 255, 0.2) !important;
+    transition: color 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+                font-weight 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+                text-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    /* GPU加速优化 */
+    will-change: color, font-weight, text-shadow;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+}
+
+/* KRC逐字高亮时，关闭整行光晕，避免行级亮度闪烁 */
+.immersive-player .lyrics-display .lyrics-line.active.progressive-highlight {
+    text-shadow: none !important;
+}
+
+
+
+/* 移除滚动条样式，因为现在使用自动滚动 */
+.immersive-lyrics-display::-webkit-scrollbar {
+    display: none;
+}
+
+/* 移除不再需要的歌词滚动容器样式，因为现在直接使用主页面的歌词组件 */
+
+/* 歌词渐变遮罩效果 */
+.immersive-lyrics-display::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 150px;
+    background: linear-gradient(to bottom,
+        rgba(26, 26, 46, 1) 0%,
+        rgba(26, 26, 46, 0.8) 30%,
+        transparent 100%);
+    z-index: 1;
+    pointer-events: none;
+}
+
+.immersive-lyrics-display::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 150px;
+    background: linear-gradient(to top,
+        rgba(26, 26, 46, 1) 0%,
+        rgba(26, 26, 46, 0.8) 30%,
+        transparent 100%);
+    z-index: 1;
+    pointer-events: none;
+}
+
+/* 控制区域 - 默认隐藏 */
+.immersive-controls {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+}
+
+/* 鼠标活动时显示控制区域 */
+.immersive-player.show-controls .immersive-controls {
+    opacity: 1;
+    pointer-events: all;
+}
+
+/* 右上角按钮组 */
+.immersive-top-controls {
+    position: absolute;
+    top: 30px;
+    right: 30px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    z-index: 10;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: all 0.4s ease;
+}
+
+/* 全屏按钮 */
+.immersive-fullscreen-btn {
+    width: 40px;
+    height: 40px;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    transition: all 0.4s ease;
+}
+
+.immersive-fullscreen-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+}
+
+.immersive-fullscreen-btn:active {
+    transform: scale(0.95);
+}
+
+/* 退出按钮 */
+.immersive-exit-btn {
+    width: 40px;
+    height: 40px;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    transition: all 0.4s ease;
+}
+
+/* 左上角数字时钟样式 */
+.immersive-digital-clock {
+    position: absolute;
+    top: 30px;
+    left: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: none;
+}
+
+.clock-time {
+    color: white;
+    font-size: 22px;
+    font-weight: 700;
+    font-family: 'Courier New', 'Monaco', 'Menlo', monospace;
+    line-height: 1;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8), 0 0 4px rgba(0, 0, 0, 0.6);
+    letter-spacing: 1px;
+}
+
+
+
+/* 鼠标活动时显示按钮组 */
+.immersive-player.show-controls .immersive-top-controls {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: all;
+}
+
+.immersive-exit-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: scale(1.1);
+}
+
+.immersive-exit-btn:active {
+    transform: scale(0.95);
+}
+
+/* 底部控制栏 */
+.immersive-bottom-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: linear-gradient(0deg, rgba(0, 0, 0, 0.8) 0%, transparent 100%);
+    padding: 30px;
+    pointer-events: all;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.4s ease;
+}
+
+/* 鼠标活动时显示底部控制栏 */
+.immersive-player.show-controls .immersive-bottom-bar {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* 永久显示的时间 - 底部左侧，无背景 */
+.immersive-datetime-display {
+    position: absolute;
+    bottom: 30px;
+    left: 30px;
+    display: flex;
+    align-items: center;
+    z-index: 11;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: none;
+}
+
+/* 进度条 */
+.immersive-progress-container {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.immersive-time-current,
+.immersive-time-total {
+    color: white;
+    font-size: 14px;
+    font-weight: 500;
+    min-width: 45px;
+    text-align: center;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* 永久显示时间的样式 */
+.datetime-text {
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+    font-family: 'Courier New', 'Monaco', 'Menlo', monospace;
+    letter-spacing: 0.5px;
+}
+
+.immersive-progress-bar {
+    flex: 1;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+    cursor: pointer;
+    position: relative;
+    transition: height 0.2s ease;
+}
+
+.immersive-progress-bar:hover {
+    height: 8px;
+}
+
+.immersive-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    border-radius: 3px;
+    width: 0%;
+    transition: width 0.1s ease;
+    position: relative;
+}
+
+.immersive-progress-fill::after {
+    content: '';
+    position: absolute;
+    right: -6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 12px;
+    height: 12px;
+    background: white;
+    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.immersive-progress-bar:hover .immersive-progress-fill::after {
+    opacity: 1;
+}
+
+/* 播放控制按钮 */
+.immersive-player-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+}
+
+.immersive-control-btn {
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.immersive-control-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: scale(1.1);
+}
+
+.immersive-control-btn:active {
+    transform: scale(0.95);
+}
+
+/* 不同大小的控制按钮 - 缩小版本 */
+.immersive-control-btn.play-pause-btn {
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
+}
+
+.immersive-control-btn.favorite-btn,
+.immersive-control-btn.prev-btn,
+.immersive-control-btn.next-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+}
+
+/* 响应式设计 */
+@media (max-width: 1200px) {
+    .immersive-left {
+        padding: 40px;
+    }
+
+    .immersive-right {
+        padding: 40px 60px 40px 20px;
+    }
+
+    .immersive-cover {
+        width: 300px;
+        height: 300px;
+        border-radius: 50%;
+    }
+
+    .immersive-songname {
+        font-size: 28px;
+    }
+
+    .immersive-lyrics-display .lyrics-line {
+        font-size: 28px; /* 统一字体大小，避免跳跃 */
+        margin: 12px 0;
+    }
+
+    .immersive-lyrics-display .lyrics-line.active {
+        font-size: 28px; /* 与非当前行相同大小 */
+        margin: 12px 0;
+    }
+}
+
+@media (max-width: 768px) {
+    .immersive-player {
+        flex-direction: column;
+    }
+
+    .immersive-left {
+        flex: none;
+        height: 45vh;
+        padding: 20px;
+    }
+
+    .immersive-right {
+        flex: none;
+        height: 55vh;
+        padding: 20px 40px 20px 20px;
+    }
+
+    .immersive-cover {
+        width: 200px;
+        height: 200px;
+        margin-bottom: 20px;
+        border-radius: 50%;
+    }
+
+    .immersive-songname {
+        font-size: 24px;
+    }
+
+    .immersive-author {
+        font-size: 16px;
+    }
+
+    .immersive-lyrics-display {
+        height: 100%;
+    }
+
+    .immersive-lyrics-display .lyrics-line {
+        font-size: 25px; /* 统一字体大小，避免跳跃 */
+        margin: 10px 0;
+    }
+
+    .immersive-lyrics-display .lyrics-line.active {
+        font-size: 25px; /* 与非当前行相同大小 */
+        margin: 10px 0;
+    }
+}
+
+/* 歌词行：只过渡透明度，避免 will-change 常驻 */
+.lyrics-line.lyric-animated {
+    opacity: var(--lyric-opacity, 1);
+    transform: scale(var(--lyric-scale, 1));
+    transition: opacity 0.25s ease;
+}

@@ -1,0 +1,6 @@
+/target
+/frontend/node_modules
+/frontend/dist
+/.task
+*.session
+*.session.*

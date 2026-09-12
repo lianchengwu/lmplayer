@@ -1,0 +1,351 @@
+/* 发现页面专用样式 */
+
+/* 确保CSS变量兼容性 */
+:root {
+    --bg-hover: var(--bg-secondary, rgba(0, 0, 0, 0.05));
+    --bg-primary: var(--bg-color, rgb(248, 250, 252));
+    --bg-secondary: var(--bg-secondary, rgb(241, 245, 249));
+    --bg-tertiary: var(--bg-elevated, rgb(255, 255, 255));
+    --text-primary: var(--text-primary, rgb(15, 23, 42));
+    --text-secondary: var(--text-secondary, rgb(71, 85, 105));
+    --text-tertiary: var(--text-tertiary, rgb(148, 163, 184));
+    --text-inverse: var(--text-inverse, rgb(255, 255, 255));
+    --border-color: var(--border-color, rgb(226, 232, 240));
+    --accent-color: var(--accent-color, rgb(99, 102, 241));
+    --accent-hover: var(--accent-hover, rgb(79, 70, 229));
+    --shadow-md: var(--shadow-md, 0 4px 6px -1px rgba(15, 23, 42, 0.1));
+}
+
+/* 发现页面内容样式 - 移除了容器，直接使用page-content */
+
+/* 发现页面头部 - 使用与其他页面一致的样式 */
+.discover-header {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 32px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.discover-header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 8px 0;
+}
+
+.discover-header p {
+    font-size: 16px;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+/* 发现页面栏目 */
+.discover-section {
+    margin-bottom: 50px;
+}
+
+.discover-section:last-child {
+    margin-bottom: 20px;
+}
+
+/* 栏目标题 */
+.discover-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.discover-section-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.discover-section-title i {
+    font-size: 20px;
+    color: var(--accent-color);
+}
+
+/* 栏目播放按钮 */
+.section-play-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    min-width: 120px;
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 25px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    white-space: nowrap;
+}
+
+.section-play-btn:hover {
+    background: var(--accent-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.section-play-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.section-play-btn i {
+    font-size: 12px;
+}
+
+/* 新歌速递样式 - 继承通用 .song-list 样式 */
+.new-songs-list {
+    /* 通用样式已在 .song-list 中定义 */
+}
+
+
+
+/* 新碟上架样式 */
+.new-albums-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+}
+
+.new-album-item {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    padding: 12px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.new-album-item:hover {
+    background: var(--bg-hover);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.new-album-item .album-cover {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 10px;
+    position: relative;
+}
+
+.new-album-item .album-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.new-album-item:hover .album-cover img {
+    transform: scale(1.05);
+}
+
+.new-album-item .cover-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-tertiary);
+    color: var(--text-tertiary);
+    font-size: 24px;
+}
+
+.new-album-item .album-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.new-album-item:hover .album-overlay {
+    opacity: 1;
+}
+
+.play-album-btn {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: var(--accent-color);
+    border: none;
+    color: var(--text-inverse);
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.play-album-btn:hover {
+    background: var(--accent-hover);
+    transform: scale(1.1);
+}
+
+.new-album-item .album-info {
+    text-align: center;
+}
+
+.new-album-item .album-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.new-album-item .album-author_name {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.new-album-item .album-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-tertiary);
+}
+
+/* 歌曲推荐样式 */
+.recommendations-container {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    padding: 20px;
+}
+
+/* 推荐tab标签 */
+.recommend-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 25px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 15px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.recommend-tab-btn {
+    padding: 10px 14px;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 18px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    min-width: fit-content;
+    text-align: center;
+    line-height: 1.2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.recommend-tab-btn:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+}
+
+.recommend-tab-btn.active {
+    background: var(--accent-color);
+    border-color: var(--accent-color);
+    color: var(--text-inverse);
+    font-weight: 600;
+}
+
+/* 推荐歌曲列表 - 继承通用 .song-list 样式 */
+.recommendations-list {
+    /* 通用样式已在 .song-list 中定义 */
+}
+
+
+
+
+
+
+
+
+
+/* 加载和错误状态 */
+.loading-placeholder,
+.error-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+    font-size: 14px;
+    text-align: center;
+}
+
+.error-placeholder {
+    color: rgb(239, 68, 68);
+}
+
+/* 响应式设计 */
+/* 桌面端专用 - 移除小屏幕适配，保持桌面体验 */
+@media (min-width: 1024px) {
+
+    /* 新歌速递在桌面端继承通用样式 */
+    .new-songs-list {
+        /* 继承通用 .song-list 的桌面端样式 */
+    }
+
+    .new-albums-list {
+        grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+        gap: 18px;
+    }
+
+    .recommendations-list {
+        grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+    }
+
+    /* 每日推荐在桌面端使用稍大的布局 */
+    .daily-songs-preview {
+        grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    }
+}
+
+/* 移除小屏幕适配 - 专注桌面端体验 */
+
+/* 主题适配 - 使用通用CSS变量 */
+/* 统一边框样式 */
+.new-album-item {
+    border: 1px solid var(--border-color);
+}
+
+/* 新专辑悬停效果（保持独立，因为有特殊的transform效果） */
+.new-album-item:hover {
+    border-color: var(--accent-color);
+    box-shadow: var(--shadow-md);
+}

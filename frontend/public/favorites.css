@@ -1,0 +1,552 @@
+/* 我喜欢的页面样式 */
+
+/* 确保favorites-content可以滚动 */
+.favorites-content {
+    height: 100%;
+    overflow-y: auto;
+    padding-bottom: 20px;
+    /* 移除padding-right和margin-right，改用scrollbar-gutter */
+    scrollbar-gutter: stable; /* 为滚动条预留稳定的空间 */
+}
+
+/* 自定义滚动条样式 - 滚动条不压在内容上 */
+.favorites-content::-webkit-scrollbar {
+    width: 8px; /* 稍微增加宽度，更容易操作 */
+    background: transparent;
+}
+
+.favorites-content::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    margin: 4px 0; /* 上下留一点间距 */
+}
+
+.favorites-content::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+    border: 1px solid var(--bg-primary); /* 添加边框，让滚动条更明显 */
+}
+
+.favorites-content::-webkit-scrollbar-thumb:hover {
+    background: var(--text-tertiary);
+    border-color: var(--bg-secondary);
+}
+
+/* 确保滚动条角落样式 */
+.favorites-content::-webkit-scrollbar-corner {
+    background: var(--bg-secondary);
+}
+
+/* 筛选控制区域样式 */
+.filter-controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    justify-content: space-between;
+}
+
+/* 播放全部按钮样式 */
+.play-all-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.play-all-btn:hover {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.play-all-btn:active {
+    transform: translateY(0);
+}
+
+.play-all-btn i {
+    font-size: 12px;
+}
+
+.play-all-btn:disabled {
+    background: var(--text-tertiary);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* 空状态样式 */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 20px;
+    text-align: center;
+}
+
+.empty-icon {
+    font-size: 64px;
+    color: var(--text-tertiary);
+    margin-bottom: 24px;
+    opacity: 0.6;
+}
+
+.empty-text {
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.empty-subtext {
+    font-size: 14px;
+    color: var(--text-tertiary);
+}
+
+/* 加载状态样式 */
+.loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 20px;
+    text-align: center;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border-color);
+    border-top: 3px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 16px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading-text {
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+/* 错误状态样式 */
+.error-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 20px;
+    text-align: center;
+}
+
+.error-icon {
+    font-size: 48px;
+    color: #ef4444;
+    margin-bottom: 16px;
+}
+
+.error-text {
+    font-size: 16px;
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+}
+
+/* 加载更多指示器 */
+.load-more-indicator {
+    padding: 20px;
+    text-align: center;
+    grid-column: 1 / -1; /* 占满整行 */
+}
+
+.loading-more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.loading-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border-color);
+    border-top: 2px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.load-more-hint {
+    color: var(--text-secondary);
+    font-size: 14px;
+    padding: 10px;
+}
+
+.load-more-end {
+    color: var(--text-secondary);
+    font-size: 14px;
+    padding: 10px;
+    border-top: 1px solid var(--border-color);
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 我喜欢的歌曲列表容器 - 与推荐歌曲保持一致的布局 */
+.favorites-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 12px;
+    padding: 0 4px 0 8px; /* 左边8px，右边4px，为滚动条留空间 */
+}
+
+
+
+/* 两列布局下的操作按钮样式 */
+.favorites-list .song-actions {
+    display: flex;
+    gap: 4px;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.favorites-list .action-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 12px;
+    flex-shrink: 0;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.favorites-list .action-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+/* 我喜欢的页面功能按钮一直显示 */
+.favorites-list .song-actions {
+    opacity: 1 !important;
+}
+
+
+
+/* 加载更多相关样式 - 两列布局下跨列显示 */
+.load-more-indicator {
+    grid-column: 1 / -1; /* 跨越所有列 */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    margin-top: 16px;
+}
+
+.load-more-btn {
+    padding: 10px 24px;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.load-more-btn:hover {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.load-more-btn:active {
+    transform: translateY(0);
+}
+
+.loading-more {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.loading-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border-color);
+    border-top: 2px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.no-more-data {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-tertiary);
+    font-size: 14px;
+}
+
+.no-more-data i {
+    color: var(--success-color, #10b981);
+}
+
+/* 统计信息样式增强 */
+.favorites-stats {
+    background: linear-gradient(135deg, var(--bg-elevated) 0%, var(--bg-secondary) 100%);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 32px;
+    margin-bottom: 32px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.stats-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    position: relative;
+}
+
+.stats-info:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    right: -16px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1px;
+    height: 40px;
+    background: var(--border-color);
+}
+
+.stats-number {
+    font-size: 24px; /* 从28px缩小到24px */
+    font-weight: 700;
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 8px;
+}
+
+.stats-label {
+    font-size: 12px; /* 从14px缩小到12px */
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+/* 虚拟滚动相关样式 - 保持网格布局 */
+.favorites-list.virtual-scroll {
+    position: relative;
+    overflow: hidden;
+}
+
+/* 确保歌曲项有固定高度，适应网格布局 */
+.favorites-list .song-list-item {
+    height: 60px;
+    min-height: 60px;
+    max-height: 60px;
+    box-sizing: border-box;
+}
+
+/* 过滤器样式增强 */
+.favorites-filter {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+}
+
+.filter-controls {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.control-buttons {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.control-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.control-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--primary-color);
+}
+
+.control-btn i {
+    font-size: 12px;
+}
+
+.control-btn .btn-text {
+    font-weight: 500;
+}
+
+.search-box-small {
+    position: relative;
+    flex: 1;
+    max-width: 300px;
+}
+
+.search-box-small i {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-tertiary);
+    font-size: 14px;
+}
+
+.search-box-small input {
+    width: 100%;
+    padding: 10px 12px 10px 36px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 14px;
+    transition: border-color 0.2s;
+}
+
+.search-box-small input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+
+
+/* 响应式设计 */
+/* 桌面端专用 - 与推荐歌曲保持一致的布局 */
+@media (min-width: 1024px) {
+    .favorites-list {
+        grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .favorites-stats {
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+
+    .stats-info {
+        margin-bottom: 16px;
+    }
+
+    .stats-info:not(:last-child)::after {
+        display: none;
+    }
+
+    .filter-controls {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .search-box-small {
+        max-width: none;
+    }
+}
+
+
+
+/* 深色主题适配 */
+[data-theme="dark"] .favorites-stats {
+    background: linear-gradient(135deg, var(--bg-elevated) 0%, rgba(255, 255, 255, 0.02) 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .loading-spinner {
+    border-color: rgba(255, 255, 255, 0.1);
+    border-top-color: var(--primary-color);
+}
+
+/* Toast 提示样式 */
+.toast {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 10000;
+    transform: translateX(100%);
+    opacity: 0;
+    transition: all 0.3s ease;
+    max-width: 300px;
+}
+
+.toast.show {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.toast.success {
+    border-left: 4px solid #10b981;
+}
+
+.toast.success i {
+    color: #10b981;
+}
+
+.toast span {
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+

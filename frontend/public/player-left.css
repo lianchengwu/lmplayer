@@ -1,0 +1,97 @@
+/* 播放器左侧样式 - 确保正常显示 */
+.player-bar {
+    display: flex !important;
+    height: 10vh !important;
+    min-height: 80px !important;
+    background: var(--titlebar-bg);
+    border-top: 1px solid var(--border-light);
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+}
+
+.player-content {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    width: 100%;
+    gap: 20px;
+}
+
+.player-left {
+    display: flex !important;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 200px;
+    max-width: 300px;
+}
+
+.song-cover {
+    width: 56px !important;
+    height: 56px !important;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--bg-secondary);
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.song-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+.cover-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    color: var(--text-secondary);
+    font-size: 20px;
+}
+
+.song-info {
+    display: flex !important;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    gap: 2px;
+}
+
+.player-bar .songname {
+    font-weight: 600 !important;
+    color: var(--text-primary) !important;
+    font-size: 14px !important;
+    line-height: 1.4 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block !important;
+    height: auto !important;
+    width: auto !important;
+}
+
+.player-bar .author_name {
+    color: var(--text-secondary) !important;
+    font-size: 12px !important;
+    line-height: 1.3 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block !important;
+    height: auto !important;
+    width: auto !important;
+}
