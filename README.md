@@ -1,17 +1,18 @@
-# wmPlayer - 基于 Wails3 的现代化跨平台音乐播放器
+# wmPlayer (lmPlayer) - 基于 Rust + GTK4 / WebKitGTK 的现代化音乐播放器
 
 <div align="center">
 
 ![wmPlayer Logo](icon.ico)
 
-一个基于 **Wails v3** (Go 1.25+) 与 **原生 Web 前端** 构建的高性能现代化音乐播放器。支持在线音乐流媒体、本地音乐库智能管理、OSD 桌面悬浮歌词与 KDE Plasma 桌面集成。
+一个基于 **Rust** 与 **GTK4 + WebKitGTK 6.0** 构建的高性能现代化音乐播放器。内置纯 Rust 实现的酷狗协议引擎（免除任何外部 Node.js 依赖），支持在线音乐流媒体、高音质无损播放、本地音乐管理、状态栏托盘 (ksni / SNI)、OSD 桌面悬浮歌词与 Linux 桌面环境深度集成。
 
-[![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8.svg?style=flat-square&logo=go)](https://golang.org/)
-[![Wails](https://img.shields.io/badge/Wails-v3.0.0--beta.16-DF0000.svg?style=flat-square&logo=wails)](https://wails.io/)
-[![GitHub Actions](https://img.shields.io/github/actions/workflow/status/lianchengwu/lmplayer/build-and-release.yml?branch=main&style=flat-square&logo=github-actions)](https://github.com/lianchengwu/lmplayer/actions)
-[![License](https://img.shields.io/badge/License-GPL--3.0-blue.svg?style=flat-square)](LICENSE)
+[![Rust Version](https://img.shields.io/badge/Rust-2021_Edition-DEA584.svg?style=flat-square&logo=rust)](https://www.rust-lang.org/)
+[![UI Shell](https://img.shields.io/badge/UI-GTK4%20%2B%20WebKitGTK%206.0-4A90E2.svg?style=flat-square&logo=gnome)](https://gtk.org/)
+[![Release](https://img.shields.io/badge/Release-v0.7.0-blue.svg?style=flat-square)](https://github.com/lianchengwu/lmplayer/releases)
+[![GitHub Actions](https://img.shields.io/github/actions/workflow/status/lianchengwu/lmplayer/build.yml?branch=rust&style=flat-square&logo=github-actions)](https://github.com/lianchengwu/lmplayer/actions)
+[![License](https://img.shields.io/badge/License-GPL--3.0-green.svg?style=flat-square)](LICENSE)
 
-[功能特性](#-主要特性) • [应用截图](#-应用截图) • [歌词扩展](#-歌词系统与外部扩展) • [快速开始](#-快速开始) • [CI 与发布](#-持续集成与跨平台发布) • [目录结构](#-目录结构) • [免责声明](#-免责声明)
+[功能特性](#-主要特性) • [应用截图](#-应用截图) • [架构设计](#-架构设计) • [快速开始](#-快速开始) • [构建打包](#-构建与打包) • [CI 与发布](#-持续集成与自动化发布) • [目录结构](#-目录结构) • [歌词扩展](#-歌词系统与外部扩展) • [免责声明](#-免责声明)
 
 </div>
 
@@ -43,69 +44,119 @@
 
 ## ✨ 主要特性
 
-### 🎵 音乐播放与在线生态
-- **在线音乐检索**：支持海量歌曲、专辑、歌手、精选歌单搜索与推荐（每日推荐、个性化 FM、AI 推荐）。
-- **开箱即用 & 自动后台管理**：内置 API 服务进程管理器，应用启动时自动拉起并守护 `KuGouMusicApi`，应用退出时自动回收，免除手动部署的繁琐。
-- **高性能 HTTP 连接池**：内置全局 Keep-Alive 与 TCP 连接复用池，大幅降低切歌、搜索与歌词加载延迟。
-- **高音质流媒体播放**：支持多种音频品质流式播放，集成断点自动重试与防盗链代理。
+### 🦀 纯 Rust 原生协议引擎 (`kugou` crate)
+- **零外部服务依赖**：核心加签算法、设备参数模拟、AES / RSA 加解密与歌词解码完全由纯 Rust 实现，**彻底告别外部 Node.js 进程守护与端口冲突**。
+- **开箱即用 & 极速响应**：原生支持酷狗 Lite 协议，包含音质解析（标准 / 高品 / 无损 / Hi-Fi）、关键词联想搜索、新歌/飙升榜单、歌单详情、个性化 FM、青年专区推荐以及扫码登录与会话持久化。
+- **单二进制自包含**：Release 编译时前端静态资源由 `rust-embed` 编译进单一可执行文件，开箱运行，无多余散落依赖。
 
-### 📂 本地音乐智能库
-- **系统原生目录选择**：接入 Wails v3 原生系统文件夹对话框，直接选择物理磁盘目录，无需手动输入绝对路径。
-- **元数据与封面自动提取**：支持 MP3、FLAC、WAV 等格式的 ID3 标签读取，秒级解析流派、比特率，自动提取并缓存内嵌专辑高清封面与本地 `.lrc` 歌词。
-- **毫秒级拖拽跳转**：本地内置轻量级 HTTP 服务支持 `HTTP 206 Partial Content` 分段请求，播放大型无损音频时零内存堆积、进度拖拽秒响应。
+### 🎨 现代化界面与沉浸式体验
+- **现代化无边框设计**：GTK4 原生无边框窗口，支持平滑拖拽移动、双击最大化与多屏自适应。
+- **离线化资产打包**：全量 FontAwesome 图标及 WebFonts 字体资产实现本地化打包，在断网及离线环境下界面图标 100% 正常渲染。
+- **沉浸式黑胶唱片模式**：支持黑胶唱片旋转动效、动态封面模糊背景，以及流畅平滑滚动的逐字变色高亮歌词。
+- **四套精心打磨的主题**：浅色、深色、毛玻璃浅色、磨砂深色，一键无缝即时切换。
 
-### 🎨 现代化界面与离线化设计
-- **完全离线可用**：全部 FontAwesome 图标及 WebFonts 字体资产实现本地化打包，在断网/离线环境下界面图标 100% 正常渲染。
-- **沉浸式全屏播放**：支持黑胶碟片动效、逐字平滑变色歌词展示。
-- **多套高颜值主题**：浅色、深色、毛玻璃浅色、磨砂深色一键即时切换。
+### 📂 本地音乐管理与智能音频缓存
+- **本地音乐管理**：支持本地音频文件快速扫描、解析与直接播放，提供本地播放列表、收藏夹与播放历史记录管理。
+- **本地音频缓存池**：内置本地音频文件缓存管理（`~/.cache/wmplayer/cache/`），已播放音频智能缓存复用，大幅减少带宽开销，实现毫秒级拖拽快进与即刻起播。
+
+### 🐧 Linux 桌面生态深度集成
+- **GTK4 + WebKitGTK 6.0**：采用现代 Linux 桌面图形栈，支持原生硬件加速策略切换；针对 NVIDIA 驱动环境自动规避 WebKitGTK DMA-BUF 渲染卡顿。
+- **StatusNotifierItem 系统托盘 (ksni)**：无缝适配 KDE Plasma、GNOME 等桌面环境的托盘规范，支持后台常驻、托盘播放/暂停、上一曲/下一曲、歌曲收藏与 OSD 歌词开关。
+- **MPRIS 与多媒体按键**：支持 Linux MPRIS 多媒体控制规范与键盘全局多媒体快捷键响应。
 
 ### 🎤 独立歌词系统 (OSD & Plasma)
-- **多格式歌词解析**：支持标准 LRC 歌词与卡拉OK逐字高亮 KRC 格式。
-- **SSE 跨进程广播**：通过内置端口实时向外部独立进程分发歌词流。
-- **独立 OSD 桌面悬浮歌词**：支持透明度调节 (0.01~0.90)、字体缩放 (12~48px)、自定义色彩与窗口锁定。
-- **KDE Plasma 桌面小部件**：深度适配 Linux KDE Plasma 桌面环境。
+- **多格式歌词解析**：支持标准 LRC 歌词与逐字高亮 KRC 歌词解码。
+- **跨进程歌词广播**：支持将实时歌词流广播给外部独立歌词进程。
+- **独立 OSD 桌面歌词**：配套支持透明度调节 (`0.01` ~ `0.90`)、字体缩放 (`12px` ~ `48px`)、卡拉 OK 逐字高亮色彩自定义与窗口锁定。
+- **KDE Plasma 桌面挂件**：深度适配 Linux KDE Plasma 桌面环境。
 
-### 🔧 桌面系统深度集成
-- **Linux MPRIS 规范**：实现 `org.mpris.MediaPlayer2` D-Bus 接口，无缝接入系统多媒体托盘与锁屏控制中心。
-- **多媒体按键支持**：支持键盘播放/暂停、上一曲、下一曲全局快捷键。
-- **系统托盘控制**：后台最小化运行、托盘菜单控制切歌与收藏。
-- **智能缓存配额**：内置 2GB 缓存配额监控与 LRU 自动淘汰机制，防止磁盘空间无节制增长。
-- **独立歌词扩展仓库**：配套开源 [wmplayer-lyric](https://github.com/lianchengwu/wmplayer-lyric) 桌面歌词与 KDE Plasma 插件。
+---
+
+## 🏛️ 架构设计
+
+wmPlayer 采用 **GTK4/WebKitGTK 桌面外壳 + Axum 回环服务端 + 纯 Rust 协议引擎** 的分层架构：
+
+```mermaid
+flowchart TD
+    subgraph DesktopShell["桌面外壳 (GTK4 + WebKitGTK)"]
+        UI["Web 前端 UI\n(HTML5 Audio / Vite / FontAwesome)"]
+        WebView["WebKitGTK 6.0 WebView\n(无边框 / 硬件加速 / 窗口操作)"]
+        UI -->|HTTP IPC 请求| Axum
+        WebView --- UI
+    end
+
+    subgraph RustBackend["Rust 后端核心 (wmplayer)"]
+        Axum["Axum Loopback HTTP 服务\n(127.0.0.1:动态端口)"]
+        Dispatch["IPC 统一命令分发 (ipc::dispatch)"]
+        Axum -->|/__ipc| Dispatch
+        Axum -->|/__cache| AudioCache["本地音频缓存池\n(audio_cache)"]
+        Axum -.->|内嵌资源| EmbeddedUI["rust-embed 静态前端"]
+        
+        subgraph Subsystems["系统集成与状态"]
+            Tray["系统托盘 (ksni / SNI)"]
+            Config["配置与持久化\n(~/.config/wmplayer)"]
+            Tray -.->|窗口操作 / 播放控制| Dispatch
+        end
+    end
+
+    subgraph KugouCrate["纯 Rust 协议引擎 (kugou crate)"]
+        KgClient["kugou::Client (Lite 模式)"]
+        Crypto["AES / RSA / MD5 签名"]
+        Proto["设备模拟 / Token / 会话持久化"]
+        Dispatch --> KgClient
+        KgClient --> Crypto
+        KgClient --> Proto
+    end
+
+    subgraph External["外部服务与扩展"]
+        KgGateway["酷狗开放网关 (gateway.kugou.com)"]
+        LyricExt["wmplayer-lyric 歌词扩展\n(OSD 悬浮歌词 / Plasma 挂件)"]
+        KgClient -->|HTTPS| KgGateway
+        Axum -.->|歌词流| LyricExt
+    end
+```
+
 ---
 
 ## 🚀 快速开始
 
 ### 📋 环境要求
 
-- **Go**: `1.25.0` 或更高版本
-- **Node.js**: `v18.0.0` 或更高版本（推荐 v20+）
-- **Wails 3 CLI**: `v3.0.0-beta.16`（通过 `go install github.com/wailsapp/wails/v3/cmd/wails3@latest` 安装）
-- **操作系统**：
-  - **Linux**: Ubuntu 22.04+ / Debian 12+ / openSUSE / Arch Linux（需安装 `libgtk-4-dev`、`libwebkitgtk-6.0-dev`、`libsoup-3.0-dev`）
-  - **Windows**: Windows 10 / 11（内置 WebView2）
-  - **macOS**: macOS 10.15+ (Catalina 或更高)
+- **Rust**: `1.75.0` 或更高版本（Rust 2021 Edition）
+- **Node.js**: `v18.0.0` 或更高版本（推荐 `v20+`）
+- **操作系统与系统依赖**：
+  - **Ubuntu / Debian**:
+    ```bash
+    sudo apt update
+    sudo apt install -y pkg-config libgtk-4-dev libwebkitgtk-6.0-dev libsoup-3.0-dev
+    ```
+  - **Arch Linux / Manjaro**:
+    ```bash
+    sudo pacman -S gtk4 webkit6gtk libsoup3 pkgconf
+    ```
+  - **Fedora**:
+    ```bash
+    sudo dnf install gtk4-devel webkit6gtk-devel libsoup3-devel pkgconf
+    ```
+  - **openSUSE**:
+    ```bash
+    sudo zypper in gtk4-devel webkit2gtk-6.0-devel libsoup-devel pkg-config
+    ```
 
 ---
 
 ### 💻 本地开发
 
 ```bash
-# 1. 克隆项目
+# 1. 克隆项目仓库
 git clone https://github.com/lianchengwu/lmplayer.git
 cd lmplayer
 
-# 2. 安装 Wails3 CLI (若尚未安装)
-go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+# 2. 安装前端依赖并构建前端产物
+cd frontend && npm install && npm run build && cd ..
 
-# 3. 安装 Go 依赖与前端依赖
-go mod tidy
-cd frontend && npm install && cd ..
-
-# 4. 生成服务绑定
-wails3 generate bindings .
-
-# 5. 启动开发模式 (热重载)
-wails3 dev
+# 3. 启动开发模式
+cargo run --bin wmplayer
 ```
 
 ---
@@ -113,42 +164,44 @@ wails3 dev
 ### 📦 构建与打包
 
 ```bash
-# 构建前端
+# 方式一：直接运行项目提供的一键构建脚本
+./build.sh
+
+# 方式二：手动构建
 cd frontend && npm run build && cd ..
+cargo build --release --bin wmplayer
 
-# 生成 Wails 绑定
-wails3 generate bindings .
-
-# 编译应用二进制
-wails3 build
-# 产物输出在 bin/ 目录下
+# 构建产物位于：
+target/release/wmplayer
 ```
+
+> [!NOTE]
+> 在 Release 构建模式下，`build.rs` 会自动检查并在缺少时触发前端构建，通过 `rust-embed` 将 `frontend/dist` 资源直接嵌入最终的独立二进制文件中。
 
 ---
 
-## 🤖 持续集成与跨平台发布
+## 🤖 持续集成与自动化发布
 
-本项目已配置完整的 **GitHub Actions CI/CD 流水线** (`.github/workflows/build-and-release.yml`)，支持自动打包 Linux、Windows 和 macOS：
+本项目配置了 **GitHub Actions CI 流水线** (`.github/workflows/build.yml`)：
 
-### 自动发布流程
-只需向仓库推送以 `v` 开头的版本标签，CI 将全自动完成三端编译打包，并创建带有完整资产的 GitHub Release：
+### 自动化发布流程
+只需向仓库推送以 `v` 开头的版本标签（例如 `v0.7.0`），CI 将自动完成编译、打包并创建 GitHub Release 发布：
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v0.7.0
+git push origin v0.7.0
 ```
 
-| 平台 | 架构 | 生成的安装包 |
-| :--- | :--- | :--- |
-| **Linux** | x86_64 | `wmplayer-linux-amd64.tar.gz` (内置应用 + API 服务) |
-| **Windows** | x86_64 | `wmplayer-windows-amd64.zip` (内置 `wmplayer.exe` + `KuGouMusicApi.exe`) |
-| **macOS** | Universal (Intel / Apple Silicon) | `wmplayer-darwin-universal.zip` (`wmplayer.app` Bundle) |
+| 平台 | 架构 | 生成产物 | 说明 |
+| :--- | :--- | :--- | :--- |
+| **Linux** | x86_64 | `wmplayer-linux-amd64.tar.gz` | 单一自包含可执行程序（内嵌 WebUI 与纯 Rust 协议引擎） |
+| **Windows** | x86_64 | `kugou` crate 单元测试与库构建 | 纯 Rust 协议库跨平台编译验证 |
 
 ---
 
 ## 🎵 歌词系统与外部扩展
 
-wmPlayer 通过内置的 SSE (Server-Sent Events) 服务器向外部歌词进程实时广播歌词流，并提供了独立的桌面歌词与桌面插件扩展：
+wmPlayer 提供了与外部独立歌词进程进行联动的扩展能力，并配套开源了独立的桌面悬浮歌词与 KDE 桌面插件：
 
 * **歌词扩展开源仓库**：👉 [wmplayer-lyric](https://github.com/lianchengwu/wmplayer-lyric)
 
@@ -156,7 +209,7 @@ wmPlayer 通过内置的 SSE (Server-Sent Events) 服务器向外部歌词进程
 独立的桌面透明悬浮歌词程序，支持：
 - 透明度调节 (`0.01` ~ `0.90`)
 - 字体缩放 (`12px` ~ `48px`)
-- 文字颜色、卡拉OK逐字高亮色彩自定义
+- 文字颜色、卡拉 OK 逐字高亮色彩自定义
 - 窗口锁定/解锁、自由拖拽移动和调整尺寸
 
 ```bash
@@ -168,10 +221,10 @@ make
 ```
 
 ### 🎨 KDE Plasma 桌面歌词挂件
-专为 Linux KDE Plasma 桌面环境深度打造的桌面小部件：
+专为 Linux KDE Plasma 桌面环境打造的桌面小部件：
 - 无缝嵌入 Plasma 任务栏或桌面
-- 支持卡拉OK动态变色与自适应桌面主题
-- 超低资源占用与丝滑平移动画
+- 支持卡拉 OK 动态变色与自适应桌面主题
+- 超低系统资源占用与丝滑平移动画
 
 ```bash
 # 安装 KDE Plasma 桌面歌词插件
@@ -179,60 +232,66 @@ cd wmplayer-lyric/plasma-lyrics
 ./install.sh
 ```
 
-### 📡 歌词通信协议
-- **SSE 端点**：`http://127.0.0.1:18911/api/osd-lyrics/sse`
-- **数据格式**：实时分发经过解析的 LRC / KRC JSON 格式数据流
+---
 
 ## 📁 目录结构
 
 ```text
-wmplayer/
+lmplayer/
 ├── .github/
 │   └── workflows/
-│       └── build-and-release.yml    # GitHub Actions 跨平台全自动构建与发布流
-├── build/                           # 平台构建配置与图标
-│   ├── config.yml                   # Wails 3 项目元配置
-│   ├── linux/                       # Linux 打包模板 (Desktop, AppImage, nfpm)
-│   ├── windows/                     # Windows 打包模板 (NSIS, Syso, Manifest)
-│   └── darwin/                      # macOS 打包模板 (Info.plist, Icons)
-├── frontend/                        # 前端 Web 源码
+│       └── build.yml                # GitHub Actions 跨平台 CI 构建流水线
+├── archify/                         # 运行时架构说明与可视化检查文件
+│   └── wmplayer-runtime.architecture.json
+├── frontend/                        # 现代 Web 前端源码
 │   ├── index.html                   # 主界面骨架
-│   ├── app.js / main.js             # 界面逻辑与模块分发
+│   ├── app.js / main.js             # 界面业务逻辑与模块分发
+│   ├── homepage.js / search.js ...  # 首页推荐、全能搜索等各交互模块
 │   ├── unified-player-controller.js # 统一播放状态控制器
 │   ├── html5-audio-player-unified.js# HTML5 音频引擎核心
-│   ├── local.js / search.js ...     # 各页面交互模块
-│   └── bindings/                    # Wails 3 自动生成的 Go-JS 服务绑定
-├── main.go                          # 应用入口与生命周期管理
-├── apiservice.go                    # KuGouMusicApi 子进程自动管理与守护
-├── config.go                        # 全局配置、HTTP 连接池与跨平台路径管理
-├── cacheservice.go                  # 本地 HTTP 代理、LRU 缓存淘汰与 SSE 歌词服务
-├── localmusicservice.go             # 本地音乐扫描、ID3 标签解析与封面提取
-├── mprisservice.go                  # Linux D-Bus MPRIS 规范实现
-├── mediakeyservice.go               # 硬件多媒体按键支持
-├── loginservice.go                  # 登录认证与用户状态服务
-├── searchservice.go                 # 音乐搜索与关键词联想服务
-├── homepageservice.go               # 推荐、FM 与歌曲 URL 解析服务
-├── discoverservice.go               # 发现音乐与榜单服务
-├── albumservice.go                  # 专辑与歌单详情服务
-├── playlistservice.go               # 播放列表与循环模式服务
-├── favoritesservice.go              # 用户收藏夹服务
-├── playhistoryservice.go            # 播放历史记录服务
-├── downloadservice.go               # 音乐下载管理服务
-├── cookiemanager.go                 # 跨平台 Cookie 安全持久化
-└── README.md                        # 项目文档
+│   ├── bindings/                    # 前端与 Rust 后端 HTTP IPC 适配层
+│   └── public/                      # 主题样式表、本地化离线字体与图标资源
+├── kugou/                           # 纯 Rust 酷狗音乐协议引擎 (Path Crate)
+│   ├── Cargo.toml
+│   └── src/
+│       ├── api/                     # 歌曲 URL、搜索、歌词、榜单、歌单、登录接口
+│       ├── proto/                   # AES、RSA、加签、设备参数模拟、歌词解码
+│       ├── client.rs                # 高性能 Lite 客户端实现
+│       └── session.rs               # Token 与会话状态持久化
+├── src/                             # wmPlayer 桌面应用后端
+│   ├── bin/
+│   │   └── wmplayer.rs              # GTK4 + WebKitGTK 桌面外壳、Axum 回环服务与系统托盘
+│   ├── app.rs                       # 播放器核心状态机
+│   ├── audio_cache.rs               # 本地音频缓存池管理
+│   ├── home.rs                      # 推荐流、个性化 FM 与音质 URL 调度
+│   ├── ipc.rs                       # IPC 统一命令分发与配置持久化
+│   ├── login.rs                     # 扫码登录与用户状态服务
+│   ├── search.rs                    # 音乐搜索与关键词联想
+│   └── lib.rs                       # 核心模块导出与统一错误类型
+├── Cargo.toml                       # Rust 主包与依赖配置
+├── build.rs                         # 自动化触发前端编译与资源嵌入
+├── build.sh                         # 一键编译脚本 (前端 + Rust Release)
+├── icon.ico                         # 应用图标
+├── image/                           # 文档截图资源
+└── README.md                        # 项目说明文档
 ```
 
 ---
 
 ## 🔧 运行与配置说明
 
-### 配置文件位置
-应用遵循跨平台标准规范自动选择存储目录（并自动向前兼容历史配置）：
-* **Linux / macOS**: `~/.config/wmplayer/` (缓存位于 `~/.cache/wmplayer/`)
-* **Windows**: `%APPDATA%\wmplayer\` (缓存位于 `%LOCALAPPDATA%\wmplayer\`)
+### 数据与配置存储路径
+应用遵循 XDG 跨平台规范自动管理存储目录：
+* **配置文件及状态**：`~/.config/wmplayer/`
+  - `settings.json`：全局偏好设置（如硬件加速开关等）
+  - `cookies.json`：登录认证状态与安全凭据
+  - `favorites.json`：我喜欢的音乐
+  - `play-history.json`：播放历史记录
+  - `local-playlists.json`：本地播放列表
+* **音频缓存目录**：`~/.cache/wmplayer/cache/`
 
-### 环境变量覆盖
-* `WMPLAYER_API_URL`：自定义后端 API 地址（默认：`http://127.0.0.1:40000`）
+### 环境变量说明
+* `WEBKIT_DISABLE_DMABUF_RENDERER`：默认在启动时设为 `1`，规避部分 NVIDIA 专有驱动下 WebKitGTK 窗口输入卡死问题。若需自定义可显式覆盖设置。
 
 ---
 
@@ -245,8 +304,8 @@ wmplayer/
 ## ⚠️ 免责声明
 
 ### 关于本项目
-- 本程序是基于公开 API 接口开发的第三方跨平台客户端，**并非官方客户端**；
-- 如需更完善的功能与官方支持，请下载[酷狗音乐官方客户端](https://www.kugou.com/)体验。
+- 本程序是基于公开接口与协议研究开发的第三方跨平台客户端，**并非官方客户端**；
+- 如需更完善的功能与官方技术支持，请下载[酷狗音乐官方客户端](https://www.kugou.com/)体验。
 
 ### 使用声明
 - 本项目**仅供个人学习与编程技术研究使用**，请尊重音乐版权；
@@ -265,10 +324,11 @@ wmplayer/
 
 ## 🙏 致谢
 
-- [Wails](https://wails.io/) - 极简高性能的 Go 跨平台桌面框架
-- [KuGouMusicApi](https://github.com/MakcRe/KuGouMusicApi) - 优质的 Node.js 音乐数据接口服务
+- [Rust](https://www.rust-lang.org/) - 兼具高性能与内存安全的系统编程语言
+- [GTK4](https://gtk.org/) & [WebKitGTK](https://webkitgtk.org/) - 现代 Linux 桌面 UI 与 Web 引擎
+- [Axum](https://github.com/tokio-rs/axum) & [Tokio](https://tokio.rs/) - 快速轻量的异步网络运行时与框架
 - [Font Awesome](https://fontawesome.com/) - 丰富完备的矢量图标库
-- [wmplayer-lyric](https://github.com/lianchengwu/wmplayer-lyric) - 配套桌面歌词与 Plasma 插件系统
+- [wmplayer-lyric](https://github.com/lianchengwu/wmplayer-lyric) - 配套桌面悬浮歌词与 Plasma 插件系统
 
 ---
 
