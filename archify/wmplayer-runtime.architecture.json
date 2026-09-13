@@ -1,0 +1,203 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "wmPlayer 高层运行时架构",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/lianchengwu/lmplayer",
+      "provider": "github",
+      "revision": "6fecba40bb20a2b401a7201b03bd721bb6408643"
+    }
+  },
+  "components": [
+    {
+      "id": "webview",
+      "type": "frontend",
+      "label": "GTK4 WebView 壳",
+      "sublabel": "webkit6",
+      "pos": [40, 72],
+      "size": [150, 60],
+      "sources": [
+        { "path": "src/bin/wmplayer.rs", "line": 301, "end_line": 362, "label": "start_webview" }
+      ]
+    },
+    {
+      "id": "webui",
+      "type": "frontend",
+      "label": "前端 UI + HTML5 Audio",
+      "sublabel": "homepage.js",
+      "pos": [40, 280],
+      "size": [150, 60],
+      "sources": [
+        { "path": "frontend/homepage.js", "line": 259, "end_line": 307, "label": "GetSongUrl" },
+        { "path": "frontend/bindings/invoke.js", "line": 59, "end_line": 70, "label": "cmd()" }
+      ]
+    },
+    {
+      "id": "axum",
+      "type": "backend",
+      "label": "Axum 回环 HTTP",
+      "sublabel": "127.0.0.1:0",
+      "tag": "loopback",
+      "pos": [300, 280],
+      "size": [150, 60],
+      "sources": [
+        { "path": "src/bin/wmplayer.rs", "line": 269, "end_line": 298, "label": "Router" }
+      ]
+    },
+    {
+      "id": "dispatch",
+      "type": "backend",
+      "label": "ipc::dispatch",
+      "sublabel": "cmd 路由",
+      "pos": [560, 280],
+      "size": [150, 60],
+      "sources": [
+        { "path": "src/ipc.rs", "line": 95, "end_line": 108, "label": "get_song_url" }
+      ]
+    },
+    {
+      "id": "homeapi",
+      "type": "backend",
+      "label": "HomeApi",
+      "sublabel": "Player.kg",
+      "pos": [820, 280],
+      "size": [150, 60],
+      "sources": [
+        { "path": "src/home.rs", "line": 18, "end_line": 41, "label": "song_url" },
+        { "path": "src/app.rs", "line": 8, "end_line": 18, "label": "Player" }
+      ]
+    },
+    {
+      "id": "kgclient",
+      "type": "backend",
+      "label": "kugou::Client",
+      "sublabel": "Lite 签名",
+      "pos": [820, 500],
+      "size": [150, 60],
+      "sources": [
+        { "path": "kugou/src/client.rs", "line": 24, "end_line": 26, "label": "lite()" },
+        { "path": "kugou/src/api/song.rs", "line": 18, "end_line": 86, "label": "song_url" }
+      ]
+    },
+    {
+      "id": "kugouapi",
+      "type": "external",
+      "label": "酷狗 API",
+      "sublabel": "gateway.kugou.com",
+      "tag": "外部",
+      "pos": [1080, 500],
+      "size": [160, 60],
+      "sources": [
+        { "path": "kugou/src/platform.rs", "line": 33, "end_line": 33, "label": "DEFAULT_BASE_URL" }
+      ]
+    },
+    {
+      "id": "audiocache",
+      "type": "database",
+      "label": "本地音频缓存",
+      "sublabel": "cache/audio",
+      "pos": [560, 500],
+      "size": [150, 60],
+      "sources": [
+        { "path": "src/audio_cache.rs", "line": 39, "end_line": 66, "label": "store" },
+        { "path": "src/bin/wmplayer.rs", "line": 184, "end_line": 199, "label": "/__cache" }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "本机 wmplayer 进程",
+      "wraps": ["webview", "webui", "axum", "dispatch", "homeapi", "kgclient", "audiocache"]
+    },
+    {
+      "kind": "security-group",
+      "label": "回环信任域 127.0.0.1",
+      "wraps": ["webui", "axum"]
+    }
+  ],
+  "connections": [
+    {
+      "id": "shell-loads-ui",
+      "from": "webview",
+      "to": "webui",
+      "label": "load origin",
+      "labelDy": 24
+    },
+    {
+      "id": "ui-to-ipc",
+      "from": "webui",
+      "to": "axum",
+      "label": "POST /__ipc",
+      "variant": "emphasis"
+    },
+    {
+      "id": "axum-to-dispatch",
+      "from": "axum",
+      "to": "dispatch",
+      "label": "cmd JSON",
+      "variant": "emphasis"
+    },
+    {
+      "id": "dispatch-to-home",
+      "from": "dispatch",
+      "to": "homeapi",
+      "label": "get_song_url",
+      "variant": "emphasis"
+    },
+    {
+      "id": "home-to-client",
+      "from": "homeapi",
+      "to": "kgclient",
+      "label": "song_url()",
+      "variant": "emphasis",
+      "labelDy": 24
+    },
+    {
+      "id": "client-to-kugou",
+      "from": "kgclient",
+      "to": "kugouapi",
+      "label": "签名 HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "id": "dispatch-to-cache",
+      "from": "dispatch",
+      "to": "audiocache",
+      "label": "cache_audio_file",
+      "variant": "dashed",
+      "labelDy": 24
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "主路径：在线点播",
+      "items": [
+        "前端 GetSongUrl → POST /__ipc { cmd: get_song_url, hash }",
+        "HomeApi 调 kugou::Client.song_url()；tracker.kugou.com /v6/priv_url 回播放 URL",
+        "HTML5 Audio 直连 CDN；命中缓存则改为 GET /__cache/{hash}"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "信任边界",
+      "items": [
+        "HTTP 只绑 127.0.0.1:0，WebView 同源加载；CorsLayer::permissive 不出本机",
+        "酷狗在进程外。协议签名 / AES / RSA 留在 kugou crate 私有，不进前端",
+        "登录 token 存在 ~/.config/wmplayer/cookies.txt，启动时注入 Client；图上不连线以免穿越主路径"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "未画连线",
+      "items": [
+        "登录 QR / 短信、搜索、歌单、FM、设置、托盘 ksni 都走同一条 dispatch",
+        "cookies.txt 是本机会话，不是酷狗云上的节点"
+      ]
+    }
+  ]
+}
