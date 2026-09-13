@@ -801,15 +801,33 @@ function mapHomeSongs(list) {
     })).filter(s => s.hash);
 }
 
+const FM_REMAIN_FETCH_THRESHOLD = 4;
+
 let endlessFetchLock = false;
+let fmFetchLock = false;
+let fmFetchedForIndex = -1;
+
+function fmRemainCount() {
+    const pl = window.PlaylistManager ? window.PlaylistManager.getCurrentPlaylist() : null;
+    const songs = (pl && pl.name === '私人FM' && pl.songs) ? pl.songs : fmPlaylist;
+    const idx = pl && pl.name === '私人FM'
+        ? (pl.current_index ?? pl.CurrentIndex ?? fmCurrentIndex)
+        : fmCurrentIndex;
+    if (typeof idx === 'number' && idx >= 0) {
+        fmCurrentIndex = idx;
+    }
+    return Math.max(0, songs.length - fmCurrentIndex - 1);
+}
 
 async function extendEndlessPlaylist(name) {
+    if (name === '私人FM') {
+        await preloadMoreFmSongs(true);
+        return;
+    }
     if (endlessFetchLock) return;
     endlessFetchLock = true;
     try {
-        if (name === '私人FM') {
-            await preloadMoreFmSongs();
-        } else if (name === 'AI推荐') {
+        if (name === 'AI推荐') {
             await appendMoreAiSongs();
         }
     } finally {
@@ -817,12 +835,21 @@ async function extendEndlessPlaylist(name) {
     }
 }
 
-async function preloadMoreFmSongs() {
+async function preloadMoreFmSongs(force = false) {
+    if (fmFetchLock) return;
+
+    const remain = fmRemainCount();
+    if (remain > FM_REMAIN_FETCH_THRESHOLD) return;
+    if (!force && fmFetchedForIndex === fmCurrentIndex) return;
+
     const current = window.PlayerController ? window.PlayerController.getCurrentSong() : currentFmSong;
     if (current) {
         updateFmPlayParams(current, true);
     }
-    currentFmRemainSongCnt = 0;
+    currentFmRemainSongCnt = remain;
+
+    fmFetchLock = true;
+    fmFetchedForIndex = fmCurrentIndex;
     try {
         const response = await HomepageService.GetPersonalFMAdvanced(
             currentFmHash,
@@ -831,7 +858,7 @@ async function preloadMoreFmSongs() {
             currentFmMode,
             currentFmSongPoolId,
             true,
-            0
+            remain
         );
         if (!(response.success && response.data && response.data.length > 0)) {
             console.warn('预加载FM无数据', response);
@@ -849,6 +876,8 @@ async function preloadMoreFmSongs() {
         }
     } catch (error) {
         console.error('预加载FM失败:', error);
+    } finally {
+        fmFetchLock = false;
     }
 }
 
@@ -858,7 +887,8 @@ function resetFmParams() {
     currentFmSongId = '';
     currentFmIsOverplay = false;
     currentFmRemainSongCnt = 0;
-    
+    fmFetchedForIndex = -1;
+
     // 清空播放列表，重新开始
     fmPlaylist = [];
     fmCurrentIndex = 0;
@@ -944,66 +974,19 @@ function isAiPlaying() {
     return currentPlaylist && currentPlaylist.name === 'AI推荐';
 }
 
-// 检查FM播放状态并处理预加载
 function checkFmPlaybackStatus() {
     if (!isFmPlaying()) return;
-
-    const currentSong = window.PlayerController ? window.PlayerController.getCurrentSong() : null;
-    if (!currentSong) return;
-
-    // 获取当前播放列表状态
-    const currentPlaylist = window.PlaylistManager.getCurrentPlaylist();
-    if (!currentPlaylist || !currentPlaylist.songs) return;
-
-    const currentIndex = currentPlaylist.current_index ?? currentPlaylist.CurrentIndex ?? -1;
-    const totalSongs = currentPlaylist.songs.length;
-
-    // 同步FM索引
-    if (currentIndex >= 0 && currentIndex < fmPlaylist.length) {
-        fmCurrentIndex = currentIndex;
-    }
-
-    // 检查是否需要预加载更多歌曲（播放到倒数第2首时）
-    if (currentIndex >= totalSongs - 2 && !currentSong._preloadTriggered) {
-        currentSong._preloadTriggered = true;
-        console.log(`🔄 FM播放到倒数第2首 (${currentIndex + 1}/${totalSongs})，预加载更多歌曲...`);
-        setTimeout(() => {
-            preloadMoreFmSongs();
-        }, 2000);
-    }
-
-    // 检查是否播放完4首歌曲（或更多）需要获取新歌曲
-    if (currentIndex >= 3 && (currentIndex + 1) % 4 === 0 && !currentSong._batchPreloadTriggered) {
-        currentSong._batchPreloadTriggered = true;
-        console.log(`🔄 FM已播放完${currentIndex + 1}首歌曲，获取新的推荐歌曲...`);
-        setTimeout(() => {
-            preloadMoreFmSongs();
-        }, 1000);
+    if (fmRemainCount() <= FM_REMAIN_FETCH_THRESHOLD) {
+        preloadMoreFmSongs();
     }
 }
 
-// 处理FM播放完成后的逻辑
 async function handleFmSongEnded() {
     if (!isFmPlaying()) return;
-
-    const currentPlaylist = window.PlaylistManager.getCurrentPlaylist();
-    if (!currentPlaylist || !currentPlaylist.songs) return;
-
-    const currentIndex = currentPlaylist.current_index ?? currentPlaylist.CurrentIndex ?? -1;
-    const totalSongs = currentPlaylist.songs.length;
-
-    console.log(`🎵 FM歌曲播放完成，当前索引: ${currentIndex + 1}/${totalSongs}`);
-
-    // 检查是否播放完4首歌曲的倍数，需要获取新歌曲
-    if ((currentIndex + 1) % 4 === 0 && currentIndex >= 3) {
-        console.log(`🔄 FM已播放完${currentIndex + 1}首歌曲，主动获取新的推荐歌曲...`);
-        await preloadMoreFmSongs();
-    }
-
-    // 检查是否接近播放列表末尾
-    if (currentIndex >= totalSongs - 2) {
-        console.log(`🔄 FM播放列表即将用完 (${currentIndex + 1}/${totalSongs})，预加载更多歌曲...`);
-        await preloadMoreFmSongs();
+    const remain = fmRemainCount();
+    console.log(`🎵 FM歌曲播放完成，剩余 ${remain} 首`);
+    if (remain <= FM_REMAIN_FETCH_THRESHOLD) {
+        await preloadMoreFmSongs(true);
     }
 }
 
