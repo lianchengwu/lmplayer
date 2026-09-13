@@ -299,9 +299,13 @@ async function getSongPlayUrls(hash) {
                 return [];
             }
 
-            CacheAudioFile(hash, urls).catch((err) => {
-                console.warn('⚠️ 写入音频缓存失败:', err);
-            });
+            // 延迟3秒启动后台音频缓存下载，避免在歌曲刚起播时与 <audio> 争抢带宽导致起播卡顿
+            const activeHash = hash;
+            setTimeout(() => {
+                CacheAudioFile(activeHash, urls).catch((err) => {
+                    console.warn('⚠️ 写入音频缓存失败:', err);
+                });
+            }, 3000);
 
             console.log('🎵 获取播放地址成功，共', urls.length, '个');
             return urls;
@@ -951,6 +955,11 @@ function initFmPlaybackTracking() {
                 audioElement.addEventListener('ended', () => {
                     const currentSong = window.PlayerController ? window.PlayerController.getCurrentSong() : null;
                     if (currentSong && isFmPlaying()) {
+                        const currentTime = audioElement.currentTime || 0;
+                        const duration = audioElement.duration || currentSong.time_length || 0;
+                        if (duration > 10 && currentTime < duration - 5) {
+                            return;
+                        }
                         updateFmPlayParams(currentSong, true);
                     }
                 });

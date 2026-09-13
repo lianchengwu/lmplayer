@@ -91,7 +91,27 @@
 /* 磨砂黑主题标题文字 */
 [data-theme="frosted-dark"] .titlebar-title {
     color: var(--text-primary);
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    text-shadow: none;
+}
+
+[data-theme="frosted-dark"] .titlebar-title:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="frosted-dark"] .title-wm,
+[data-theme="frosted-dark"] .title-lm {
+    background: linear-gradient(135deg, #818cf8 0%, #c084fc 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    filter: drop-shadow(0 0 12px rgba(129, 140, 248, 0.35));
+}
+
+[data-theme="frosted-dark"] .title-player {
+    background: linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
 /* 磨砂黑主题侧边栏 */

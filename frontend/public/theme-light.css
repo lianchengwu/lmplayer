@@ -88,16 +88,24 @@
 
 [data-theme="light"] .titlebar-title {
     color: var(--text-primary);
-    text-shadow: none; /* 移除标题文字阴影 */
+    text-shadow: none;
+}
+
+[data-theme="light"] .titlebar-title:hover {
+    background: rgba(99, 102, 241, 0.08);
 }
 
 /* 浅色主题下的标题美化 */
-[data-theme="light"] .title-wm {
-    color: var(--text-secondary);
+[data-theme="light"] .title-wm,
+[data-theme="light"] .title-lm {
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
 [data-theme="light"] .title-player {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #1e293b 0%, #475569 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;

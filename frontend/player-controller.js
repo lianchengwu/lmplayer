@@ -83,8 +83,19 @@ async function updatePlaylist(songs, currentIndex, playlistName) {
     return window.PlaylistManager.setPlaylist(songs, currentIndex, name, true, mode);
 }
 
+// 播放器错误跳歌定时器追踪，防止陈旧错误回调导致误切歌
+let autoNextErrorTimer = null;
+
+function clearAutoNextErrorTimer() {
+    if (autoNextErrorTimer) {
+        clearTimeout(autoNextErrorTimer);
+        autoNextErrorTimer = null;
+    }
+}
+
 // 播放当前歌曲
 async function playCurrentSong() {
+    clearAutoNextErrorTimer();
     console.log('🎵 获取当前歌曲...');
     const song = window.PlaylistManager.getCurrentSong();
     if (!song) {
@@ -162,7 +173,18 @@ async function playCurrentSong() {
 
             // 等待30秒后自动播放下一首
             console.log('🎵 播放地址获取失败，30秒后自动播放下一首');
-            setTimeout(async () => {
+            const targetHash = legacySong.hash;
+            autoNextErrorTimer = setTimeout(async () => {
+                const current = window.PlaylistManager?.getCurrentSong?.();
+                if (current && current.hash !== targetHash) {
+                    console.log('🎵 歌曲已切换，取消旧的自动下一首');
+                    return;
+                }
+                const player = window.audioPlayer && typeof window.audioPlayer === 'function' ? window.audioPlayer() : null;
+                if (player && player.isPlaying && player.isPlaying()) {
+                    console.log('🎵 当前正在播放，取消错误自动下一首');
+                    return;
+                }
                 console.log('🎵 开始自动播放下一首（播放地址获取失败）');
                 try {
                     const success = await playNextSong();
@@ -187,6 +209,7 @@ async function playCurrentSong() {
                     success = await player.play(legacySong, playUrls);
                     if (success) {
                         console.log('✅ HTML5 音频播放器播放成功');
+                        clearAutoNextErrorTimer();
                     }
                 } catch (error) {
                     console.error('❌ HTML5 音频播放器播放失败:', error);
@@ -226,7 +249,18 @@ async function playCurrentSong() {
 
             // 等待30秒后自动播放下一首
             console.log('🎵 播放器播放失败，30秒后自动播放下一首');
-            setTimeout(async () => {
+            const targetHash = legacySong.hash;
+            autoNextErrorTimer = setTimeout(async () => {
+                const current = window.PlaylistManager?.getCurrentSong?.();
+                if (current && current.hash !== targetHash) {
+                    console.log('🎵 歌曲已切换，取消旧的自动下一首');
+                    return;
+                }
+                const player = window.audioPlayer && typeof window.audioPlayer === 'function' ? window.audioPlayer() : null;
+                if (player && player.isPlaying && player.isPlaying()) {
+                    console.log('🎵 当前正在播放，取消错误自动下一首');
+                    return;
+                }
                 console.log('🎵 开始自动播放下一首（播放器播放失败）');
                 try {
                     const success = await playNextSong();
@@ -242,6 +276,7 @@ async function playCurrentSong() {
         if (!success) {
             // 播放状态现在由 PlaylistManager 管理
         } else {
+            clearAutoNextErrorTimer();
             // 播放成功后，通知后端记录播放历史（后端处理所有逻辑）
             console.log('✅ 播放成功，通知后端记录播放历史');
             await window.addPlayHistory(legacySong);

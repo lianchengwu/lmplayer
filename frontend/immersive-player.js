@@ -619,15 +619,21 @@ class ImmersivePlayer {
             if (hasRealLyrics || mainLyricsHtml.trim()) {
                 if (this.lyricsDisplay.innerHTML !== mainLyricsHtml) {
                     this.lyricsDisplay.innerHTML = mainLyricsHtml;
+                    this.currentActiveLyricsIndex = -1;
+                    this.lastActiveWordIndex = -1;
+                    this.lastActiveWordLine = null;
                     console.log('🎵 沉浸式播放器歌词已同步，内容长度:', mainLyricsHtml.length);
                 }
 
-                setTimeout(() => {
+                requestAnimationFrame(() => {
                     this.syncLyricsHighlight();
-                }, 100);
+                });
             } else {
                 if (this.lyricsDisplay.innerHTML !== mainLyricsHtml) {
                     this.lyricsDisplay.innerHTML = mainLyricsHtml;
+                    this.currentActiveLyricsIndex = -1;
+                    this.lastActiveWordIndex = -1;
+                    this.lastActiveWordLine = null;
                 }
                 console.log('🎵 沉浸式播放器：同步了"聆听音乐"状态');
             }
@@ -651,55 +657,42 @@ class ImmersivePlayer {
         if (!activeLine) {
             activeLine = this.lyricsDisplay.querySelector('.lyrics-line.active');
         }
-
         if (!activeLine) return;
 
-        // 防抖处理，避免频繁滚动导致卡顿
-        if (this.scrollTimeout) {
-            clearTimeout(this.scrollTimeout);
+        // 使用 offsetTop 与 clientHeight 精准高效计算，彻底消除 getBoundingClientRect 造成的强制重排
+        const containerHeight = this.lyricsDisplay.clientHeight;
+        const lineOffsetTop = activeLine.offsetTop;
+        const lineHeight = activeLine.offsetHeight || 44;
+
+        // 计算目标滚动位置（让当前行位于容器黄金视觉区 42%~45% 高度处）
+        const targetScrollTop = Math.max(0, lineOffsetTop - (containerHeight * 0.42) + (lineHeight / 2));
+        const currentScrollTop = this.lyricsDisplay.scrollTop;
+        const scrollDifference = Math.abs(targetScrollTop - currentScrollTop);
+
+        // 只要距离有微小差异（> 1px）即平滑滚动，彻底解决原 > 30px 导致的卡顿漏滚与阶梯跳帧
+        if (scrollDifference > 1) {
+            this.smoothScrollTo(targetScrollTop);
         }
-
-        this.scrollTimeout = setTimeout(() => {
-            console.log(`🎵 沉浸式播放器滚动到活跃歌词`);
-
-            // 使用原生滚动，借鉴主页面的scrollToActiveLyrics方法
-            const containerRect = this.lyricsDisplay.getBoundingClientRect();
-            const lineRect = activeLine.getBoundingClientRect();
-
-            // 计算当前行相对于容器的位置
-            const lineRelativeTop = lineRect.top - containerRect.top + this.lyricsDisplay.scrollTop;
-            const containerHeight = this.lyricsDisplay.clientHeight;
-            const lineHeight = lineRect.height;
-
-            // 计算目标滚动位置（让当前行显示在容器中央）
-            const targetScrollTop = lineRelativeTop - (containerHeight * 0.5) + (lineHeight / 2);
-
-            // 检查是否需要滚动（避免不必要的滚动）
-            const currentScrollTop = this.lyricsDisplay.scrollTop;
-            const scrollDifference = Math.abs(targetScrollTop - currentScrollTop);
-
-            // 只有当滚动距离超过阈值时才进行滚动
-            if (scrollDifference > 30) { // 降低阈值，提高响应性
-                // 使用自定义平滑滚动，避免浏览器原生smooth滚动的性能问题
-                this.smoothScrollTo(Math.max(0, targetScrollTop));
-            }
-        }, 50); // 50ms防抖，提高滚动响应速度
     }
 
-    // 优化的平滑滚动方法，更流畅的60fps动画
+    // 丝滑 60fps 平滑滚动，采用 easeOutCubic 自然减速曲线
     smoothScrollTo(targetScrollTop) {
         if (!this.lyricsDisplay) return;
 
-        // 如果已经有滚动动画在进行，取消它
         if (this.scrollAnimationId) {
             cancelAnimationFrame(this.scrollAnimationId);
+            this.scrollAnimationId = null;
         }
 
         const startScrollTop = this.lyricsDisplay.scrollTop;
         const distance = targetScrollTop - startScrollTop;
+        if (Math.abs(distance) < 1) {
+            this.lyricsDisplay.scrollTop = targetScrollTop;
+            return;
+        }
 
-        // 根据距离调整动画时间，短距离用更短时间
-        const duration = Math.min(400, Math.max(200, Math.abs(distance) * 0.5));
+        // 自然流畅的滚动时长（320ms ~ 460ms）
+        const duration = Math.min(460, Math.max(300, Math.abs(distance) * 0.7));
         let startTime = null;
 
         const animateScroll = (currentTime) => {
@@ -707,9 +700,9 @@ class ImmersivePlayer {
             const timeElapsed = currentTime - startTime;
             const progress = Math.min(timeElapsed / duration, 1);
 
-            // 使用更平滑的easeOutQuart缓动函数
-            const easeOutQuart = 1 - Math.pow(1 - progress, 4);
-            this.lyricsDisplay.scrollTop = startScrollTop + distance * easeOutQuart;
+            // easeOutCubic: 平滑且自然的减速曲线，完全消灭急刹断层感
+            const ease = 1 - Math.pow(1 - progress, 3);
+            this.lyricsDisplay.scrollTop = startScrollTop + (distance * ease);
 
             if (progress < 1) {
                 this.scrollAnimationId = requestAnimationFrame(animateScroll);
@@ -724,114 +717,103 @@ class ImmersivePlayer {
     syncLyricsHighlight() {
         if (!this.isActive || !this.lyricsDisplay) return;
 
-        // 防抖处理，避免频繁同步导致卡顿
-        if (this.syncHighlightTimeout) {
-            clearTimeout(this.syncHighlightTimeout);
-        }
+        // 获取主页面的歌词显示组件
+        const mainLyricsDisplay = document.querySelector('#lyricsTab .lyrics-display');
+        if (!mainLyricsDisplay) return;
 
-        this.syncHighlightTimeout = setTimeout(() => {
-            if (!this.isActive) return;
+        // 直接通过 querySelector 找到主界面当前高亮行，O(1) 效率，无需遍历全量 DOM
+        const mainActiveLine = mainLyricsDisplay.querySelector('.lyrics-line.active');
+        const activeIndex = mainActiveLine && mainActiveLine.dataset.index !== undefined
+            ? parseInt(mainActiveLine.dataset.index, 10)
+            : -1;
 
-            // 获取主页面的歌词显示组件
-            const mainLyricsDisplay = document.querySelector('#lyricsTab .lyrics-display');
-            if (!mainLyricsDisplay) return;
-
-            // 获取主页面和沉浸式播放器的所有歌词行
-            const mainLyricsLines = mainLyricsDisplay.querySelectorAll('.lyrics-line');
-            const immersiveLyricsLines = this.lyricsDisplay.querySelectorAll('.lyrics-line');
-
-            // 确保两边的歌词行数量一致
-            if (mainLyricsLines.length !== immersiveLyricsLines.length) {
-                this.syncLyrics();
-                return;
-            }
-
-            // 寻找主页面当前激活的歌词行
-            let activeIndex = -1;
-            for (let i = 0; i < mainLyricsLines.length; i++) {
-                if (mainLyricsLines[i].classList.contains('active')) {
-                    activeIndex = i;
-                    break;
-                }
-            }
-
-            // 仅在激活行变更或当前行需要逐字同步时更新
-            if (activeIndex !== this.currentActiveLyricsIndex) {
-                // 清除上一行的状态
-                if (this.currentActiveLyricsIndex >= 0 && immersiveLyricsLines[this.currentActiveLyricsIndex]) {
-                    const prevLine = immersiveLyricsLines[this.currentActiveLyricsIndex];
+        // 仅在激活行变更或当前行需要逐字同步时更新
+        if (activeIndex !== this.currentActiveLyricsIndex) {
+            // 1. 清除上一行的状态
+            if (this.currentActiveLyricsIndex >= 0) {
+                const prevLine = this.lyricsDisplay.querySelector(`.lyrics-line[data-index="${this.currentActiveLyricsIndex}"]`);
+                if (prevLine) {
                     prevLine.classList.remove('active', 'jelly-active', 'current-playing', 'progressive-highlight');
                     const words = prevLine.querySelectorAll('.lyrics-word');
-                    words.forEach(w => w.classList.remove('played', 'unplayed'));
+                    for (let i = 0; i < words.length; i++) {
+                        words[i].classList.remove('played', 'unplayed', 'active-word');
+                    }
                 }
+            }
 
-                // 设置新行的状态
-                if (activeIndex >= 0 && immersiveLyricsLines[activeIndex]) {
-                    const newLine = immersiveLyricsLines[activeIndex];
+            // 2. 设置新行的状态并立即平滑滚动
+            if (activeIndex >= 0) {
+                const newLine = this.lyricsDisplay.querySelector(`.lyrics-line[data-index="${activeIndex}"]`);
+                if (newLine) {
                     newLine.classList.add('active');
-                    this.syncWordHighlight(mainLyricsLines[activeIndex], newLine);
+                    this.syncWordHighlight(mainActiveLine, newLine);
                     this.scrollToActiveLyric(newLine);
                 }
-
-                this.currentActiveLyricsIndex = activeIndex;
-            } else if (activeIndex >= 0 && immersiveLyricsLines[activeIndex]) {
-                // 同一行内的逐字高亮更新
-                this.syncWordHighlight(mainLyricsLines[activeIndex], immersiveLyricsLines[activeIndex]);
             }
-        }, 16);
+
+            this.currentActiveLyricsIndex = activeIndex;
+        } else if (activeIndex >= 0 && mainActiveLine) {
+            // 同一行内的逐字高亮更新（KRC格式）
+            const currentLine = this.lyricsDisplay.querySelector(`.lyrics-line[data-index="${activeIndex}"]`);
+            if (currentLine) {
+                this.syncWordHighlight(mainActiveLine, currentLine);
+            }
+        }
     }
 
-    // 同步渐进式高亮（KRC格式）- 高亮当前字符之前的所有字符
+    // 同步逐字高亮（KRC格式）- 高性能增量更新
     syncWordHighlight(mainLine, immersiveLine) {
         if (!mainLine || !immersiveLine) return;
 
-        // 检查是否是当前播放行
         const isCurrentLine = mainLine.classList.contains('active');
-
-        if (isCurrentLine) {
-            // 当前播放行：实现渐进式高亮效果
-            const mainWords = mainLine.querySelectorAll('.lyrics-word');
+        if (!isCurrentLine) {
+            immersiveLine.classList.remove('current-playing', 'progressive-highlight');
             const immersiveWords = immersiveLine.querySelectorAll('.lyrics-word');
+            for (let i = 0; i < immersiveWords.length; i++) {
+                immersiveWords[i].classList.remove('played', 'unplayed');
+            }
+            return;
+        }
 
-            // 确保字符数量一致
-            if (mainWords.length === immersiveWords.length && mainWords.length > 0) {
-                // KRC格式：找到当前正在播放的字符位置
-                let currentActiveIndex = -1;
-                mainWords.forEach((mainWord, index) => {
-                    if (mainWord.classList.contains('active-word')) {
-                        currentActiveIndex = index;
-                    }
-                });
+        const isKRC = mainLine.classList.contains('krc-line');
+        if (isKRC) {
+            immersiveLine.classList.add('progressive-highlight');
+            immersiveLine.classList.remove('current-playing');
 
-                // 高亮当前字符及之前的所有字符
-                // 移除频繁的日志输出以减少CPU占用
+            const mainActiveWord = mainLine.querySelector('.lyrics-word.active-word');
+            const currentActiveIndex = mainActiveWord && mainActiveWord.dataset.wordIndex !== undefined
+                ? parseInt(mainActiveWord.dataset.wordIndex, 10)
+                : -1;
 
-                immersiveWords.forEach((immersiveWord, index) => {
-                    if (currentActiveIndex >= 0 && index <= currentActiveIndex) {
-                        // 当前字符及之前的字符：已播放状态（默认样式已经是亮白色、粗体、发光）
-                        immersiveWord.classList.add('played');
-                        immersiveWord.classList.remove('unplayed');
+            // 索引未发生变化，跳过重复的 DOM 操作
+            if (currentActiveIndex === this.lastActiveWordIndex && immersiveLine === this.lastActiveWordLine) {
+                return;
+            }
+            this.lastActiveWordIndex = currentActiveIndex;
+            this.lastActiveWordLine = immersiveLine;
+
+            const immersiveWords = immersiveLine.querySelectorAll('.lyrics-word');
+            const len = immersiveWords.length;
+            if (len > 0) {
+                for (let i = 0; i < len; i++) {
+                    const word = immersiveWords[i];
+                    if (currentActiveIndex >= 0 && i <= currentActiveIndex) {
+                        if (!word.classList.contains('played')) {
+                            word.classList.add('played');
+                            word.classList.remove('unplayed');
+                        }
                     } else {
-                        // 之后的字符：未播放状态
-                        immersiveWord.classList.remove('played');
-                        immersiveWord.classList.add('unplayed');
+                        if (!word.classList.contains('unplayed')) {
+                            word.classList.remove('played');
+                            word.classList.add('unplayed');
+                        }
                     }
-                });
-
-                // 添加渐进式高亮的容器类
-                immersiveLine.classList.add('progressive-highlight');
-            } else {
-                // LRC格式或无逐字数据：整行高亮
-                immersiveLine.classList.add('current-playing');
-                immersiveLine.classList.remove('progressive-highlight');
+                }
             }
         } else {
-            // 非当前播放行：移除所有播放状态
-            const immersiveWords = immersiveLine.querySelectorAll('.lyrics-word');
-            immersiveWords.forEach(word => {
-                word.classList.remove('played', 'unplayed');
-            });
-            immersiveLine.classList.remove('current-playing', 'progressive-highlight');
+            // LRC格式或无逐字数据：整行高亮
+            immersiveLine.classList.add('current-playing');
+            immersiveLine.classList.remove('progressive-highlight');
         }
     }
 
@@ -956,19 +938,23 @@ class ImmersivePlayer {
             if (player && player.audio && !isNaN(player.audio.currentTime)) {
                 const currentTime = player.audio.currentTime;
                 const duration = player.audio.duration;
-                if (Math.abs(currentTime - this.lastCurrentTime) > 0.08) {
+                if (Math.abs(currentTime - this.lastCurrentTime) > 0.05) {
                     this.updateProgress(currentTime, duration);
                     this.lastCurrentTime = currentTime;
                 }
             }
             this.syncLyricsHighlight();
-        }, 100);
+        }, 50);
     }
 
     stopTimeUpdateListener() {
         if (this.timeUpdateInterval) {
             clearInterval(this.timeUpdateInterval);
             this.timeUpdateInterval = null;
+        }
+        if (this.scrollAnimationId) {
+            cancelAnimationFrame(this.scrollAnimationId);
+            this.scrollAnimationId = null;
         }
         if (this.animationFrameId) {
             cancelAnimationFrame(this.animationFrameId);
@@ -1147,6 +1133,7 @@ const immersivePlayer = new ImmersivePlayer();
 
 // 暴露到全局作用域
 window.ImmersivePlayer = immersivePlayer;
+window.immersivePlayer = immersivePlayer;
 
 // 监听播放器状态变化
 if (window.addEventListener) {
@@ -1262,26 +1249,39 @@ function extendAudioPlayerForImmersive() {
 
 // 扩展歌词更新函数
 function extendLyricsForImmersive() {
+    if (!window.updateLyricsDisplay || !window.updateLyricsHighlight) {
+        setTimeout(extendLyricsForImmersive, 100);
+        return;
+    }
+
     const originalUpdateLyricsDisplay = window.updateLyricsDisplay;
-    if (originalUpdateLyricsDisplay) {
+    if (originalUpdateLyricsDisplay && !originalUpdateLyricsDisplay._immersiveExtended) {
         window.updateLyricsDisplay = function(lyricsContent) {
-            // 调用原始函数
             originalUpdateLyricsDisplay(lyricsContent);
 
             // 同步到沉浸式播放器
             if (immersivePlayer.isActive) {
-                setTimeout(() => {
+                requestAnimationFrame(() => {
                     immersivePlayer.syncLyrics();
-                }, 50); // 减少延迟，提高响应速度
+                });
             }
         };
+        window.updateLyricsDisplay._immersiveExtended = true;
         console.log('🎵 已扩展 updateLyricsDisplay 函数');
-    } else {
-        console.warn('🎵 updateLyricsDisplay 函数不存在，无法扩展');
     }
 
-    // 移除对 updateLyricsHighlight 的扩展，因为现在沉浸式播放器直接复用主页面歌词
-    // 歌词高亮由主页面处理，沉浸式播放器通过 MutationObserver 监听变化并同步滚动
+    // 实时联动：音频驱动主页面歌词时，零延迟直接驱动沉浸式播放器高亮与滚动
+    const originalUpdateLyricsHighlight = window.updateLyricsHighlight;
+    if (originalUpdateLyricsHighlight && !originalUpdateLyricsHighlight._immersiveExtended) {
+        window.updateLyricsHighlight = function(currentTime) {
+            originalUpdateLyricsHighlight(currentTime);
+            if (immersivePlayer && immersivePlayer.isActive) {
+                immersivePlayer.syncLyricsHighlight();
+            }
+        };
+        window.updateLyricsHighlight._immersiveExtended = true;
+        console.log('🎵 已扩展 updateLyricsHighlight 函数');
+    }
 }
 
 // 初始化扩展

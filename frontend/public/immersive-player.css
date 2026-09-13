@@ -359,143 +359,82 @@
     -ms-overflow-style: none; /* IE and Edge */
 }
 
-/* 沉浸式模式下的歌词行样式 */
-.immersive-lyrics-style .lyrics-line {
-    font-size: 28px; /* 稍微减小字体 */
-    line-height: 1.5; /* 减小行高 */
-    color: rgba(255, 255, 255, 0.6);
+/* 沉浸式模式下的歌词行基础样式：统一尺寸与边距，杜绝重排抖动 */
+.immersive-lyrics-style .lyrics-line,
+.immersive-player .lyrics-display .lyrics-line {
+    font-size: 30px !important;
+    line-height: 1.6 !important;
+    color: rgba(255, 255, 255, 0.45) !important;
     text-align: center;
-    margin: 8px 0; /* 减小上下间距 */
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    margin: 12px 0 !important;
+    padding: 6px 20px !important;
     cursor: pointer;
-    padding: 6px 20px; /* 减小上下padding */
-    border-radius: 0;
-    background: transparent;
-    font-weight: 300;
+    font-weight: 400 !important;
     letter-spacing: 0.5px;
-    position: relative;
-    transform: translateY(0);
-    opacity: 0.6;
-}
-
-.immersive-lyrics-style .lyrics-line:hover {
-    background: transparent;
-    color: rgba(255, 255, 255, 0.7);
-    transform: translateY(-2px);
-}
-
-.immersive-lyrics-style .lyrics-line.active {
-    color: #ffffff;
-    font-weight: 500;
-    font-size: 32px; /* 减小活跃歌词字体，避免过大 */
-    background: transparent;
-    transform: translateY(0) scale(1);
-    text-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
-    opacity: 1;
-    letter-spacing: 0.8px;
-    position: relative;
-    z-index: 2;
-    margin: 12px 0; /* 减小活跃歌词的间距 */
-    /* GPU加速优化 */
-    will-change: transform, color, text-shadow;
-    backface-visibility: hidden;
+    opacity: 0.55;
+    transform: scale(0.96) translateZ(0);
     transform-origin: center center;
+    transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1),
+                opacity 0.35s cubic-bezier(0.25, 1, 0.5, 1),
+                color 0.3s ease,
+                text-shadow 0.3s ease !important;
+    will-change: transform, opacity;
+    backface-visibility: hidden;
 }
 
-/* 这些样式已移动到正确的选择器 .immersive-player .lyrics-display */
+.immersive-lyrics-style .lyrics-line:hover,
+.immersive-player .lyrics-display .lyrics-line:hover {
+    color: rgba(255, 255, 255, 0.75) !important;
+    opacity: 0.85;
+    transform: scale(0.98) translateZ(0);
+}
 
-
+/* 活跃歌词行：GPU 合成 scale 与 opacity 变化，平滑放大高亮 */
+.immersive-lyrics-style .lyrics-line.active,
+.immersive-player .lyrics-display .lyrics-line.active {
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    opacity: 1 !important;
+    transform: scale(1.06) translateZ(0);
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.5),
+                 0 0 40px rgba(255, 255, 255, 0.2) !important;
+    z-index: 2;
+}
 
 .immersive-lyrics-display .lyrics-line.no-lyrics {
-    color: rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.35) !important;
     font-style: italic;
-    font-size: 28px;
+    font-size: 28px !important;
 }
 
-/* 沉浸式播放器中的KRC格式歌词样式 */
+/* KRC格式歌词行 */
 .immersive-player .lyrics-display .lyrics-line.krc-line {
     letter-spacing: 1px;
 }
 
 .immersive-player .lyrics-display .lyrics-word {
     display: inline;
-    transition: color 0.12s linear, opacity 0.12s linear;
+    transition: color 0.1s ease, opacity 0.1s ease, text-shadow 0.1s ease;
+    will-change: color, opacity;
+    transform: translateZ(0);
 }
 
-/* 渐进式播放：已播放的字符（保持默认亮白色效果） */
+/* 逐字播放：已播放字符 */
 .immersive-player .lyrics-display .lyrics-word.played {
-    /* 已播放字符使用默认的亮白色、粗体、发光效果，无需额外样式 */
-    color: inherit;
-    font-weight: inherit;
-    text-shadow: inherit;
-    opacity: 1;
-    transition: color 0.12s ease-out, text-shadow 0.12s ease-out, opacity 0.12s ease-out !important;
-    /* GPU加速优化 */
-    will-change: color, text-shadow, opacity;
-    backface-visibility: hidden;
-    transform: translateZ(0);
+    color: #ffffff !important;
+    opacity: 1 !important;
+    text-shadow: 0 0 14px rgba(255, 255, 255, 0.6) !important;
 }
 
-/* 渐进式播放：未播放的字符（暗淡显示） */
+/* 逐字播放：未播放字符 */
 .immersive-player .lyrics-display .lyrics-word.unplayed {
-    color: rgba(255, 255, 255, 0.42) !important;
-    font-weight: inherit !important;
+    color: rgba(255, 255, 255, 0.4) !important;
+    opacity: 0.6 !important;
     text-shadow: none !important;
-    opacity: 0.72;
-    transition: color 0.12s ease-out, text-shadow 0.12s ease-out, opacity 0.12s ease-out !important;
-    /* GPU加速优化 */
-    will-change: color, text-shadow, opacity;
-    backface-visibility: hidden;
-    transform: translateZ(0);
 }
 
-/* 渐进式高亮容器的特殊效果（简化版本） */
-.immersive-player .lyrics-display .lyrics-line.progressive-highlight {
-    /* 移除边框和背景效果，保持简洁 */
-}
-
-/* 渐进式高亮动画已替代逐字高亮动画 */
-
-/* KRC格式歌词行在沉浸式模式下的特殊效果（已移除，避免冲突） */
-/* 现在使用统一的 .immersive-player .lyrics-display .lyrics-line 样式 */
-
-/* 当前播放行的特殊样式（用于LRC格式整行高亮） */
-.immersive-player .lyrics-display .lyrics-line.current-playing {
-    /* 移除背景和边框效果，保持简洁 */
-}
-
-/* 沉浸式播放器歌词字体大小控制（无跳跃版本） */
-.immersive-player .lyrics-display .lyrics-line {
-    font-size: 31px !important; /* 统一字体大小，避免跳跃 */
-    color: rgba(255, 255, 255, 0.6) !important;
-    font-weight: 400 !important;
-    margin: 14px 0 !important; /* 统一边距 */
-    transition: color 0.15s cubic-bezier(0.4, 0, 0.2, 1),
-                font-weight 0.15s cubic-bezier(0.4, 0, 0.2, 1),
-                text-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1) !important;
-    /* GPU加速优化 */
-    will-change: color, font-weight, text-shadow;
-    backface-visibility: hidden;
-    transform: translateZ(0);
-}
-
-.immersive-player .lyrics-display .lyrics-line.active {
-    font-size: 31px !important; /* 与非当前行相同大小，避免跳跃 */
-    color: rgba(255, 255, 255, 1.0) !important;
-    font-weight: 700 !important;
-    margin: 14px 0 !important; /* 统一边距，避免布局跳跃 */
-    text-shadow: 0 0 20px rgba(255, 255, 255, 0.5),
-                 0 0 40px rgba(255, 255, 255, 0.2) !important;
-    transition: color 0.15s cubic-bezier(0.4, 0, 0.2, 1),
-                font-weight 0.15s cubic-bezier(0.4, 0, 0.2, 1),
-                text-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1) !important;
-    /* GPU加速优化 */
-    will-change: color, font-weight, text-shadow;
-    backface-visibility: hidden;
-    transform: translateZ(0);
-}
-
-/* KRC逐字高亮时，关闭整行光晕，避免行级亮度闪烁 */
+/* KRC逐字高亮时，关闭整行光晕，避免整行闪烁 */
+.immersive-lyrics-style .lyrics-line.active.progressive-highlight,
 .immersive-player .lyrics-display .lyrics-line.active.progressive-highlight {
     text-shadow: none !important;
 }

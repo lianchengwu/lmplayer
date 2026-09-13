@@ -48,6 +48,14 @@ class HTML5AudioPlayer {
     this.playbackMetrics = null;
     this.lastPlaybackBlockReason = null;
 
+    // 播放进度与过早结束恢复控制
+    this.prematureEndCount = 0;
+    this.maxPrematureRetries = 3;
+    this.lastPlaybackPosition = 0;
+    this.isBuffering = false;
+    this.isManuallyStopped = false;
+    this.isRecovering = false;
+
     // 调试变量
     this.lastLoggedCurrentTime = 0;
     this.durationLogged = false;
@@ -207,10 +215,78 @@ class HTML5AudioPlayer {
       if (this.onPauseCallback) this.onPauseCallback();
     });
 
+    // 缓冲中（卡顿）
+    addListener("waiting", () => {
+      this.isBuffering = true;
+      console.log("⏳ 音频正在缓冲中 (waiting)... 当前位置:", this.audio ? this.audio.currentTime.toFixed(1) : 0);
+    });
+
+    // 缓冲恢复，继续播放
+    addListener("playing", () => {
+      this.isBuffering = false;
+      this._isPlaying = true;
+      console.log("▶️ 音频恢复播放 (playing)");
+    });
+
+    // 下载停滞
+    addListener("stalled", () => {
+      console.warn("⚠️ 音频下载停滞 (stalled)，等待数据恢复或网络响应...");
+    });
+
     // 播放结束
-    addListener("ended", () => {
+    addListener("ended", async () => {
+      // 如果处于手动停止中，忽略
+      if (this.isManuallyStopped) {
+        console.log("⏹️ 播放已手动停止，忽略 ended 事件");
+        return;
+      }
+
+      // 如果正在自动恢复中，忽略
+      if (this.isRecovering) {
+        console.log("🔄 正在恢复播放中，忽略 ended 事件");
+        return;
+      }
+
+      const currentTime = (this.audio && this.audio.currentTime > 0)
+        ? this.audio.currentTime
+        : (this.lastPlaybackPosition || 0);
+      const audioDuration = (this.audio && Number.isFinite(this.audio.duration) && this.audio.duration > 0)
+        ? this.audio.duration
+        : 0;
+      const songDuration = Number(this.currentSong?.time_length || this.currentSong?.duration || 0) || 0;
+
+      // 计算预期总时长：若元数据有时长（如240s）且 audio.duration 异常偏小（网络断开导致WebKit折叠duration），以元数据为准
+      let expectedDuration = audioDuration;
+      if (songDuration > 10) {
+        if (expectedDuration <= 0 || expectedDuration < songDuration - 10) {
+          expectedDuration = songDuration;
+        }
+      }
+
+      // 判断是否是异常过早结束（起播卡顿、流中断、网络断开等导致提前触发 EOS）
+      // 1. 如果总长大于 10 秒，当前进度离结尾大于 5 秒，且播放比例不足 95%
+      // 2. 或总长未知但已播放进度小于 10 秒
+      const isPremature = (expectedDuration > 10 && currentTime < (expectedDuration - 5) && (currentTime / expectedDuration < 0.95)) ||
+                          (expectedDuration <= 0 && currentTime < 10);
+
+      if (isPremature) {
+        console.warn(`⚠️ 捕获到音频过早结束异常: 当前进度 ${currentTime.toFixed(1)}s / 总时长 ${expectedDuration.toFixed(1)}s，非正常播完！尝试恢复播放...`);
+
+        const recovered = await this.recoverPrematurePlayback(currentTime);
+        if (recovered) {
+          return;
+        }
+
+        // 尝试恢复失败，进入错误重试流程，绝不能作为自然结束切歌！
+        console.error("❌ 音频过早结束且无法自动恢复，转入错误重试");
+        await this.handlePlaybackError();
+        return;
+      }
+
       this._isPlaying = false;
-      console.log("🎵 播放结束");
+      this.prematureEndCount = 0;
+      this.lastPlaybackPosition = 0;
+      console.log("🎵 播放正常结束");
       if (this.onEndCallback) this.onEndCallback();
     });
 
@@ -220,10 +296,11 @@ class HTML5AudioPlayer {
       let errorMessage = "未知错误";
 
       if (error) {
+        if (error.code === error.MEDIA_ERR_ABORTED) {
+          console.log("🎵 播放加载被中止 (MEDIA_ERR_ABORTED)，忽略");
+          return;
+        }
         switch (error.code) {
-          case error.MEDIA_ERR_ABORTED:
-            errorMessage = "播放被中止";
-            break;
           case error.MEDIA_ERR_NETWORK:
             errorMessage = "网络错误";
             break;
@@ -258,6 +335,9 @@ class HTML5AudioPlayer {
 
     // 时间更新
     addListener("timeupdate", () => {
+      if (this.audio && this.audio.currentTime > 0) {
+        this.lastPlaybackPosition = this.audio.currentTime;
+      }
       if (this.onTimeUpdateCallback) {
         this.onTimeUpdateCallback(this.audio.currentTime, this.audio.duration);
       }
@@ -318,6 +398,10 @@ class HTML5AudioPlayer {
     this.playUrls = urlArray;
     this.currentUrlIndex = 0;
     this.retryCount = 0;
+    this.prematureEndCount = 0;
+    this.lastPlaybackPosition = 0;
+    this.isManuallyStopped = false;
+    this.isRecovering = false;
 
     console.log("🎵 开始播放歌曲:", song);
 
@@ -368,14 +452,86 @@ class HTML5AudioPlayer {
     this.playUrls = [];
     this.currentUrlIndex = 0;
     this.retryCount = 0;
+    this.prematureEndCount = 0;
+    this.lastPlaybackPosition = 0;
+    this.isRecovering = false;
 
     console.log("✅ HTML5播放器实例已销毁");
   }
 
   /**
+   * 恢复异常过早结束的音频播放
+   */
+  async recoverPrematurePlayback(savedTime) {
+    if (this.isRecovering) return false;
+    this.isRecovering = true;
+    this.prematureEndCount = (this.prematureEndCount || 0) + 1;
+
+    console.log(`🔄 正在尝试恢复播放 (第 ${this.prematureEndCount}/${this.maxPrematureRetries} 次)，保存进度: ${savedTime.toFixed(1)}s`);
+
+    if (this.prematureEndCount > this.maxPrematureRetries) {
+      console.warn("⚠️ 已达到过早结束最大重试次数");
+      // 如果还有备用播放地址，尝试切换到下一个播放地址
+      if (this.currentUrlIndex + 1 < this.playUrls.length) {
+        this.currentUrlIndex++;
+        this.prematureEndCount = 0;
+        console.log(`🔄 切换到备用播放地址恢复 (${this.currentUrlIndex + 1}/${this.playUrls.length})`);
+        const success = await this.tryPlayUrl(savedTime);
+        this.isRecovering = false;
+        return success;
+      }
+      this.isRecovering = false;
+      return false;
+    }
+
+    try {
+      // 1. 优先检查本地缓存是否已经下载完毕
+      if (this.currentSong?.hash) {
+        try {
+          const { GetCachedURL } = await import("./bindings/wmplayer/cacheservice.js");
+          const cached = await GetCachedURL(this.currentSong.hash);
+          if (cached?.success && cached?.data) {
+            console.log("✅ 发现已完成的本地音频缓存，切换到本地缓存恢复播放:", cached.data);
+            if (!this.playUrls.includes(cached.data)) {
+              this.playUrls.unshift(cached.data);
+              this.currentUrlIndex = 0;
+            }
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      // 2. 稍作等待缓冲（800ms），避免立即重连造成的连续失败
+      await new Promise((resolve) => setTimeout(resolve, 800));
+
+      if (this.isManuallyStopped) {
+        this.isRecovering = false;
+        return false;
+      }
+
+      // 3. 从 savedTime 恢复播放
+      const currentUrl = this.playUrls[this.currentUrlIndex];
+      if (!currentUrl) {
+        this.isRecovering = false;
+        return false;
+      }
+
+      console.log(`🔄 重新连接播放流并恢复至 ${savedTime.toFixed(1)}s:`, currentUrl);
+      const success = await this.tryPlayUrl(savedTime);
+      this.isRecovering = false;
+      return success;
+    } catch (error) {
+      console.error("❌ 恢复播放失败:", error);
+      this.isRecovering = false;
+      return false;
+    }
+  }
+
+  /**
    * 尝试播放URL
    */
-  async tryPlayUrl() {
+  async tryPlayUrl(targetTime = 0) {
     if (this.currentUrlIndex >= this.playUrls.length) {
       console.error("🎵 所有播放地址都失败了");
       return false;
@@ -403,10 +559,25 @@ class HTML5AudioPlayer {
       this.resetPlaybackMetrics(this.currentSong, url);
       this.audio.src = url;
       this.markPlaybackMetric("srcAssigned");
+
+      if (targetTime > 0.5) {
+        const resumePos = Math.max(0, targetTime - 0.5);
+        const setTimeHandler = () => {
+          try {
+            this.audio.currentTime = resumePos;
+            console.log(`⏱️ 恢复播放进度已设置到: ${resumePos.toFixed(1)}s`);
+          } catch (e) {
+            console.warn("⚠️ 设置音频当前时间失败:", e);
+          }
+        };
+        this.audio.addEventListener("loadedmetadata", setTimeHandler, { once: true });
+        this.audio.addEventListener("canplay", setTimeHandler, { once: true });
+      }
+
       await this.audio.play();
       this.markPlaybackMetric("playResolved");
       this.logPlaybackMetricsSummary("play-resolved");
-      console.log("✅ 播放成功");
+      console.log("✅ 播放成功" + (targetTime > 0 ? ` (恢复进度: ${targetTime.toFixed(1)}s)` : ""));
       return true;
     } catch (error) {
       this.logPlaybackMetricsSummary("play-failed");
@@ -446,7 +617,7 @@ class HTML5AudioPlayer {
         };
         addTimer(resolve, 1000);
       });
-      return await this.tryPlayUrl();
+      return await this.tryPlayUrl(this.lastPlaybackPosition || 0);
     } else {
       // 尝试下一个URL
       this.currentUrlIndex++;
@@ -454,12 +625,13 @@ class HTML5AudioPlayer {
 
       if (this.currentUrlIndex < this.playUrls.length) {
         console.log("🔄 尝试下一个播放地址");
-        return await this.tryPlayUrl();
+        return await this.tryPlayUrl(this.lastPlaybackPosition || 0);
       } else {
         console.error("❌ 所有播放地址都失败了");
 
         // 等待30秒后自动播放下一首
         console.log("🎵 所有播放地址都失败，30秒后自动播放下一首");
+        const failedSongHash = this.currentSong?.hash;
         // 🔧 内存泄漏修复：使用资源管理器管理定时器
         const addTimer = (callback, delay) => {
           if (this.resourceManager) {
@@ -472,6 +644,16 @@ class HTML5AudioPlayer {
         };
 
         addTimer(async () => {
+          // 如果当前已经在播放或切了其他歌，取消自动切歌
+          if (this.isPlaying()) {
+            console.log("🎵 播放器当前正在正常播放，取消错误自动切歌");
+            return;
+          }
+          const current = this.getCurrentSong?.() || (window.PlayerController ? window.PlayerController.getCurrentSong() : null);
+          if (current && failedSongHash && current.hash !== failedSongHash) {
+            console.log("🎵 当前歌曲已变更，取消旧错误的自动切歌");
+            return;
+          }
           console.log("🎵 开始自动播放下一首（所有播放地址失败）");
           try {
             if (window.PlayerController && window.PlayerController.playNext) {
@@ -525,6 +707,10 @@ class HTML5AudioPlayer {
    * 停止播放
    */
   stop() {
+    this.isManuallyStopped = true;
+    this.isRecovering = false;
+    this.prematureEndCount = 0;
+    this.lastPlaybackPosition = 0;
     if (this.audio) {
       this.audio.pause();
       this.audio.currentTime = 0;
@@ -834,6 +1020,33 @@ function setupPlayerEventListeners() {
 async function handlePlaybackEnd() {
   console.log("🎵 处理播放结束逻辑");
 
+  // 终极安全守护：严格检查当前播放进度与歌曲时长
+  const player = window.audioPlayer ? window.audioPlayer() : null;
+  if (player && player.audio) {
+    const currentTime = (player.audio.currentTime > 0)
+      ? player.audio.currentTime
+      : (player.lastPlaybackPosition || 0);
+    const audioDuration = (player.audio.duration > 0 && Number.isFinite(player.audio.duration))
+      ? player.audio.duration
+      : 0;
+    const song = player.currentSong || (window.PlayerController ? window.PlayerController.getCurrentSong() : null);
+    const songDuration = Number(song?.time_length || song?.duration || 0) || 0;
+
+    let expectedDuration = audioDuration;
+    if (songDuration > 10) {
+      if (expectedDuration <= 0 || expectedDuration < songDuration - 10) {
+        expectedDuration = songDuration;
+      }
+    }
+
+    // 关键拦截：如果歌曲预期总时长大于10秒，但当前播放进度距离末尾超过5秒，且不足95%，
+    // 说明是网络抖动、流中断等原因导致的虚假结束，绝不能自动切下一首！
+    if (expectedDuration > 10 && currentTime < (expectedDuration - 5) && (currentTime / expectedDuration < 0.95)) {
+      console.warn(`⚠️ handlePlaybackEnd 拦截虚假结束: 当前进度 ${currentTime.toFixed(1)}s 远小于总时长 ${expectedDuration.toFixed(1)}s，忽略切歌请求`);
+      return;
+    }
+  }
+
   const currentPlaylist = window.PlaylistManager
     ? window.PlaylistManager.getCurrentPlaylist()
     : null;
@@ -967,6 +1180,7 @@ function setupPlayerCallbacks() {
 
     // 等待30秒后自动播放下一首
     console.log("🎵 播放器错误，30秒后自动播放下一首");
+    const failedSongHash = audioPlayer.getCurrentSong?.()?.hash;
     // 🔧 内存泄漏修复：使用全局资源管理器管理定时器
     const addTimer = (callback, delay) => {
       if (window.GlobalResourceManager) {
@@ -976,6 +1190,15 @@ function setupPlayerCallbacks() {
       }
     };
     addTimer(async () => {
+      if (audioPlayer.isPlaying && audioPlayer.isPlaying()) {
+        console.log("🎵 播放器当前正在正常播放，取消错误自动切歌");
+        return;
+      }
+      const current = audioPlayer.getCurrentSong?.() || (window.PlayerController ? window.PlayerController.getCurrentSong() : null);
+      if (current && failedSongHash && current.hash !== failedSongHash) {
+        console.log("🎵 当前歌曲已变更，取消旧错误的自动切歌");
+        return;
+      }
       console.log("🎵 开始自动播放下一首（播放器错误）");
       try {
         if (window.PlayerController && window.PlayerController.playNext) {

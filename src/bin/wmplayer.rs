@@ -313,7 +313,7 @@ fn start_webview(addr: SocketAddr) {
         }
         let win = gtk4::ApplicationWindow::builder()
             .application(app)
-            .title("wmPlayer")
+            .title("lmPlayer")
             .default_width(1200)
             .default_height(800)
             .decorated(false)
@@ -372,7 +372,7 @@ impl ksni::Tray for PlayerTray {
     }
 
     fn title(&self) -> String {
-        "wmPlayer".into()
+        "lmPlayer".into()
     }
 
     fn icon_name(&self) -> String {

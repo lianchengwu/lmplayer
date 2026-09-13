@@ -436,7 +436,7 @@ function renderSettingsPage() {
 
             <div class="settings-item">
                     <div class="settings-item-title">当前版本</div>
-                    <div class="settings-item-description">wmPlayer 桌面音乐播放器</div>
+                    <div class="settings-item-description">lmPlayer 桌面音乐播放器</div>
                     <div class="settings-path" id="appVersionDisplay">v0.6.0</div>
                 <div class="settings-item-control">
                     <button class="settings-button" id="checkUpdateBtn" onclick="checkForAppUpdates()">检查更新</button>
