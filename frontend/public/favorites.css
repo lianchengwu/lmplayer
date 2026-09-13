@@ -265,7 +265,18 @@
 }
 
 .load-more-btn {
-    padding: 10px 24px;
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: auto;
+    min-width: max-content;
+    height: auto;
+    min-height: 40px;
+    line-height: 1;
+    padding: 10px 22px;
+    margin: 0;
     background: var(--primary-color);
     color: white;
     border: none;
@@ -274,7 +285,18 @@
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
+    white-space: nowrap;
+    word-break: keep-all;
+    flex-wrap: nowrap;
+    flex-shrink: 0;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.load-more-btn i,
+.load-more-btn span {
+    white-space: nowrap;
+    word-break: keep-all;
+    flex-shrink: 0;
 }
 
 .load-more-btn:hover {

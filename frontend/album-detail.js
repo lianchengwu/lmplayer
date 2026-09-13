@@ -665,6 +665,7 @@ class AlbumDetailManager {
             const buttonHTML = `
                 <div class="load-more-section">
                     <button class="load-more-btn"
+                            type="button"
                             onclick="window.AlbumDetailManager.loadMoreSongs()"
                             ${isLoading ? 'disabled' : ''}>
                         <i class="fas ${isLoading ? 'fa-spinner fa-spin' : 'fa-plus'}"></i>
