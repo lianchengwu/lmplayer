@@ -43,6 +43,8 @@ function argsObject(name, args) {
         add_download_record: ['request'],
         delete_download_record: ['request'],
         open_file_folder: ['filePath'],
+        select_music_folder: [],
+        get_cached_music_files: [],
         scan_music_folder: ['folderPath'],
         scan_music_folders: ['folderPaths'],
         get_local_audio_url: ['file_path'],

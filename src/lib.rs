@@ -5,6 +5,7 @@
 
 mod app;
 pub mod audio_cache;
+pub mod local_music;
 mod home;
 mod ipc;
 mod login;

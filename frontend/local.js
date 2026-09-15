@@ -198,6 +198,9 @@ window.addFolderPath = function() {
 
     // 保存到本地存储
     saveFolderPaths();
+
+    // 自动扫描新添加的路径
+    scanMusicFolders();
 };
 
 // 更新路径列表显示

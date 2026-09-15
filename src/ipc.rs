@@ -248,10 +248,22 @@ pub async fn dispatch(player: &Player, cmd: &str, args: Value) -> Value {
             let s = config_dir().join("settings.json").to_string_lossy().to_string();
             json!({ "success": true, "Success": true, "data": s, "Data": s })
         }
-        "get_cached_url" => match crate::audio_cache::lookup_url(&arg_str(&args, "songHash")) {
-            Some(u) => ok(json!(u)),
-            None => json!({ "success": false, "message": "no cache" }),
-        },
+        "get_cached_url" => {
+            let hash = arg_str(&args, "songHash");
+            if hash.starts_with("local-") {
+                let clean = hash.trim_start_matches("local-");
+                if crate::local_music::lookup_path(clean).is_some() {
+                    ok(json!(format!("/__local/{clean}")))
+                } else {
+                    json!({ "success": false, "message": "local music not found" })
+                }
+            } else {
+                match crate::audio_cache::lookup_url(&hash) {
+                    Some(u) => ok(json!(u)),
+                    None => json!({ "success": false, "message": "no cache" }),
+                }
+            }
+        }
         "cache_audio_file" => {
             let hash = arg_str(&args, "songHash");
             let urls = args
@@ -276,16 +288,53 @@ pub async fn dispatch(player: &Player, cmd: &str, args: Value) -> Value {
         "get_download_records" => ok(json!({ "records": [], "total_count": 0 })),
         "add_download_record" | "delete_download_record" | "clear_download_records" => ok(json!({})),
         "open_file_folder" => {
-            let _ = std::process::Command::new("xdg-open").arg(arg_str(&args, "filePath")).spawn();
+            let fp = arg_str(&args, "filePath");
+            let p = std::path::Path::new(&fp);
+            let dir = if p.is_dir() { p } else { p.parent().unwrap_or(p) };
+            let _ = std::process::Command::new("xdg-open").arg(dir).spawn();
             ok(json!("ok"))
         }
-        "get_cached_music_files" => ok(json!([])),
-        "get_local_audio_url" => ok(json!(format!("file://{}", arg_str(&args, "file_path")))),
+        "select_music_folder" => match crate::local_music::select_folder().await {
+            Ok(Some(path)) => json!({ "success": true, "message": "ok", "path": path }),
+            Ok(None) => json!({ "success": false, "message": "用户取消了选择", "path": "" }),
+            Err(e) => fail(e),
+        },
+        "scan_music_folders" => {
+            let folder_paths: Vec<String> = args
+                .get("folderPaths")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+            let resp = crate::local_music::scan_folders(&folder_paths);
+            serde_json::to_value(resp).unwrap_or_else(|_| fail("serialize"))
+        }
+        "scan_music_folder" => {
+            let folder_path = arg_str(&args, "folderPath");
+            let resp = crate::local_music::scan_folder(&folder_path);
+            serde_json::to_value(resp).unwrap_or_else(|_| fail("serialize"))
+        }
+        "get_cached_music_files" => {
+            let resp = crate::local_music::get_cached_music();
+            serde_json::to_value(resp).unwrap_or_else(|_| fail("serialize"))
+        }
+        "get_local_audio_url" => {
+            let fp = arg_str(&args, "file_path");
+            if let Some(hash) = crate::local_music::lookup_hash_by_path(&fp) {
+                ok(json!(format!("/__local/{hash}")))
+            } else {
+                let p = std::path::Path::new(&fp);
+                if p.exists() {
+                    let hash = crate::local_music::register_file(p);
+                    ok(json!(format!("/__local/{hash}")))
+                } else {
+                    fail("file not found")
+                }
+            }
+        }
         "get_local_music_lyrics" => {
-            let lrc = std::path::Path::new(&arg_str(&args, "file_path")).with_extension("lrc");
-            match fs::read_to_string(lrc) {
-                Ok(s) => ok(json!(s)),
-                Err(_) => fail("no lyrics"),
+            let fp = arg_str(&args, "file_path");
+            match crate::local_music::get_lyrics(&fp) {
+                Some(s) if !s.is_empty() => ok(json!(s)),
+                _ => fail("no lyrics"),
             }
         }
         other => fail(format!("unknown cmd {other}")),

@@ -6,7 +6,7 @@ use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use axum::extract::{Path, State};
-use axum::http::{header, StatusCode};
+use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::Json;
@@ -181,20 +181,22 @@ async fn open_url(Json(body): Json<Value>) -> Json<Value> {
     Json(json!({ "ok": true }))
 }
 
-async fn serve_cache(Path(hash): Path<String>) -> Response {
+async fn serve_cache(Path(hash): Path<String>, req: axum::extract::Request) -> Response {
+    if hash.starts_with("local-") {
+        return wmplayer::local_music::serve_audio(axum::extract::Path(hash), req).await;
+    }
     let Some(path) = wmplayer::audio_cache::file_path(&hash) else {
         return StatusCode::NOT_FOUND.into_response();
     };
-    match std::fs::read(&path) {
-        Ok(bytes) if bytes.len() > 1024 => (
-            [
-                (header::CONTENT_TYPE, "audio/mpeg"),
-                (header::CACHE_CONTROL, "public, max-age=31536000, immutable"),
-            ],
-            bytes,
-        )
-            .into_response(),
-        _ => StatusCode::NOT_FOUND.into_response(),
+    if !path.is_file() {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    use tower_http::services::ServeFile;
+    use tower_service::Service;
+    let mut svc = ServeFile::new(path);
+    match svc.call(req).await {
+        Ok(res) => res.into_response(),
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
 }
 
@@ -271,6 +273,8 @@ fn main() {
         .route("/__window", post(window_op).get(window_q))
         .route("/__open", post(open_url))
         .route("/__cache/{hash}", get(serve_cache))
+        .route("/__local/{hash}", get(wmplayer::local_music::serve_audio))
+        .route("/__local_cover/{hash}", get(wmplayer::local_music::serve_cover))
         .layer(CorsLayer::permissive())
         .with_state(state);
 
