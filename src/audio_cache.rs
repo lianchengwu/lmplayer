@@ -36,6 +36,28 @@ pub fn lookup_url(hash: &str) -> Option<String> {
     }
 }
 
+pub fn detect_audio_mime(path: &std::path::Path) -> mime_guess::mime::Mime {
+    if let Ok(mut f) = std::fs::File::open(path) {
+        use std::io::Read;
+        let mut magic = [0u8; 12];
+        if let Ok(n) = f.read(&mut magic) {
+            if n >= 4 && &magic[0..4] == b"fLaC" {
+                return "audio/flac".parse().unwrap();
+            }
+            if n >= 4 && &magic[0..4] == b"OggS" {
+                return "audio/ogg".parse().unwrap();
+            }
+            if n >= 8 && (&magic[4..8] == b"ftyp" || &magic[4..8] == b"M4A ") {
+                return "audio/mp4".parse().unwrap();
+            }
+            if n >= 4 && &magic[0..4] == b"RIFF" {
+                return "audio/wav".parse().unwrap();
+            }
+        }
+    }
+    "audio/mpeg".parse().unwrap()
+}
+
 pub async fn store(hash: &str, urls: &[String]) -> Result<String, String> {
     if let Some(u) = lookup_url(hash) {
         return Ok(u);

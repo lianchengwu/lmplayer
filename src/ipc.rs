@@ -280,8 +280,22 @@ pub async fn dispatch(player: &Player, cmd: &str, args: Value) -> Value {
                 Err(e) => fail(e),
             }
         }
-        "update_current_lyrics" | "set_osd_enabled" => json!({ "success": true, "message": "ok" }),
-        "is_osd_enabled" => json!(false),
+        "update_current_lyrics" => {
+            let text = arg_str(&args, "text");
+            let song = arg_str(&args, "song");
+            let artist = arg_str(&args, "artist");
+            crate::osd::update_lyrics(&text, &song, &artist);
+            ok(json!("ok"))
+        }
+        "set_osd_enabled" => {
+            let enabled = arg_bool(&args, "enabled");
+            crate::osd::set_osd_enabled(enabled);
+            json!({
+                "success": true,
+                "message": if enabled { "桌面歌词已开启" } else { "桌面歌词已关闭" }
+            })
+        }
+        "is_osd_enabled" => json!(crate::osd::is_osd_enabled()),
         "get_media_key_status" => json!({ "registered": false }),
         "check_for_updates" => json!({ "success": true, "hasUpdate": false }),
         "get_current_version" => json!("0.1.0"),

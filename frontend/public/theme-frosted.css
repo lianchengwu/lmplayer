@@ -115,7 +115,7 @@
     background: rgba(255, 255, 255, 0.25);
     backdrop-filter: blur(var(--blur-strength));
     -webkit-backdrop-filter: blur(var(--blur-strength));
-    border-right: 1px solid rgba(255, 255, 255, 0.3);
+    border-right: 1px solid rgba(255, 255, 255, 0.12);
     transform: translateZ(0);
 }
 
@@ -160,12 +160,12 @@
 /* 磨砂主题侧边栏头部 */
 [data-theme="frosted"] .sidebar-header {
     background: rgba(255, 255, 255, 0.2);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* 磨砂主题侧边栏分割线 */
 [data-theme="frosted"] .sidebar-divider {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.08);
 }
 
 /* 磨砂主题侧边栏切换按钮 */

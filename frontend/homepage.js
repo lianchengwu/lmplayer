@@ -299,13 +299,23 @@ async function getSongPlayUrls(hash) {
                 return [];
             }
 
-            // 延迟3秒启动后台音频缓存下载，避免在歌曲刚起播时与 <audio> 争抢带宽导致起播卡顿
+            // 延迟1.5秒启动后台音频缓存下载，下载完成后立刻将缓存注入播放器候选第一顺位
             const activeHash = hash;
-            setTimeout(() => {
-                CacheAudioFile(activeHash, urls).catch((err) => {
+            setTimeout(async () => {
+                try {
+                    const cacheRes = await CacheAudioFile(activeHash, urls);
+                    if (cacheRes && (cacheRes.data || cacheRes.success)) {
+                        const cachedUrl = cacheRes.data || `/__cache/${activeHash}`;
+                        console.log('✅ 后台音频缓存完成:', activeHash, cachedUrl);
+                        const player = window.audioPlayer && (typeof window.audioPlayer === 'function' ? window.audioPlayer() : window.audioPlayer);
+                        if (player && player.currentSong?.hash === activeHash && typeof player.promoteCachedUrl === 'function') {
+                            player.promoteCachedUrl(cachedUrl);
+                        }
+                    }
+                } catch (err) {
                     console.warn('⚠️ 写入音频缓存失败:', err);
-                });
-            }, 3000);
+                }
+            }, 1500);
 
             console.log('🎵 获取播放地址成功，共', urls.length, '个');
             return urls;

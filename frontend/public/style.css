@@ -437,7 +437,7 @@ body {
     min-width: 5vw;
     max-width: 5vw;
     background: var(--bg-color);
-    border-right: 1px solid rgba(51, 65, 85, 0.4);
+    border-right: 1px solid rgba(51, 65, 85, 0.15);
     display: flex;
     flex-direction: column;
     transition: all 0.3s ease;
@@ -457,7 +457,7 @@ body {
     align-items: center;
     justify-content: center; /* 收起状态下居中对齐 */
     padding: 0;
-    border-bottom: 1px solid rgba(51, 65, 85, 0.3);
+    border-bottom: 1px solid rgba(51, 65, 85, 0.12);
 }
 
 .sidebar.expanded .sidebar-header {
@@ -523,7 +523,7 @@ body {
 /* 分割线样式 - 更加微妙 */
 .sidebar-divider {
     height: 1px;
-    background: rgba(51, 65, 85, 0.2);
+    background: rgba(51, 65, 85, 0.1);
     margin: 10px 8px; /* 收起状态下左右留少量边距 */
 }
 

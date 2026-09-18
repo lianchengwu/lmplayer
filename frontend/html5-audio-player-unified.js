@@ -209,7 +209,16 @@ class HTML5AudioPlayer {
     });
 
     // 暂停
+    let stallTimeoutTimer = null;
+    const clearStallTimer = () => {
+      if (stallTimeoutTimer) {
+        clearTimeout(stallTimeoutTimer);
+        stallTimeoutTimer = null;
+      }
+    };
+
     addListener("pause", () => {
+      clearStallTimer();
       this._isPlaying = false;
       console.log("⏸️ 播放暂停");
       if (this.onPauseCallback) this.onPauseCallback();
@@ -219,18 +228,39 @@ class HTML5AudioPlayer {
     addListener("waiting", () => {
       this.isBuffering = true;
       console.log("⏳ 音频正在缓冲中 (waiting)... 当前位置:", this.audio ? this.audio.currentTime.toFixed(1) : 0);
+      clearStallTimer();
+      if (this._isPlaying && !this.isManuallyStopped) {
+        stallTimeoutTimer = setTimeout(() => {
+          if (this.isBuffering && this._isPlaying && !this.isManuallyStopped) {
+            console.warn("⚠️ 音频卡住超时(>12s)，尝试自动恢复播放...");
+            const currentPos = this.audio ? this.audio.currentTime : 0;
+            this.recoverPrematurePlayback(currentPos);
+          }
+        }, 12000);
+      }
     });
 
     // 缓冲恢复，继续播放
     addListener("playing", () => {
+      clearStallTimer();
       this.isBuffering = false;
       this._isPlaying = true;
       console.log("▶️ 音频恢复播放 (playing)");
     });
 
-    // 下载停滞
+    // 下载停滞：浏览器在缓冲填满或网络空闲时会正常触发stalled，只要音频仍在播放，绝不能打断！
     addListener("stalled", () => {
-      console.warn("⚠️ 音频下载停滞 (stalled)，等待数据恢复或网络响应...");
+      console.log("ℹ️ 音频下载处于空闲/停滞状态 (stalled)");
+      // 仅当确实处于卡顿缓冲等待中(isBuffering为true)且未设置定时器时，才等待超时恢复
+      if (this.isBuffering && !stallTimeoutTimer && this._isPlaying && !this.isManuallyStopped) {
+        stallTimeoutTimer = setTimeout(() => {
+          if (this.isBuffering && this._isPlaying && !this.isManuallyStopped) {
+            console.warn("⚠️ 音频缓冲停滞超时(>12s)，尝试自动恢复播放...");
+            const currentPos = this.audio ? this.audio.currentTime : 0;
+            this.recoverPrematurePlayback(currentPos);
+          }
+        }, 12000);
+      }
     });
 
     // 播放结束
@@ -292,6 +322,10 @@ class HTML5AudioPlayer {
 
     // 错误处理
     addListener("error", (e) => {
+      if (this.isManuallyStopped) {
+        console.log("⏹️ 播放已被手动停止，忽略后续错误事件");
+        return;
+      }
       const error = this.audio.error;
       let errorMessage = "未知错误";
 
@@ -333,9 +367,13 @@ class HTML5AudioPlayer {
       if (this.onLoadCallback) this.onLoadCallback();
     });
 
-    // 时间更新
+    // 时间更新：只要进度在走，说明正在健康播放，立刻清除卡顿定时器与缓冲标记！
     addListener("timeupdate", () => {
       if (this.audio && this.audio.currentTime > 0) {
+        if (Math.abs(this.audio.currentTime - (this.lastPlaybackPosition || 0)) > 0.05) {
+          clearStallTimer();
+          this.isBuffering = false;
+        }
         this.lastPlaybackPosition = this.audio.currentTime;
       }
       if (this.onTimeUpdateCallback) {
@@ -494,8 +532,9 @@ class HTML5AudioPlayer {
             console.log("✅ 发现已完成的本地音频缓存，切换到本地缓存恢复播放:", cached.data);
             if (!this.playUrls.includes(cached.data)) {
               this.playUrls.unshift(cached.data);
-              this.currentUrlIndex = 0;
             }
+            this.currentUrlIndex = this.playUrls.indexOf(cached.data);
+            this.prematureEndCount = 0;
           }
         } catch (e) {
           // ignore
@@ -562,7 +601,10 @@ class HTML5AudioPlayer {
 
       if (targetTime > 0.5) {
         const resumePos = Math.max(0, targetTime - 0.5);
+        let timeSet = false;
         const setTimeHandler = () => {
+          if (timeSet) return;
+          timeSet = true;
           try {
             this.audio.currentTime = resumePos;
             console.log(`⏱️ 恢复播放进度已设置到: ${resumePos.toFixed(1)}s`);
@@ -570,8 +612,12 @@ class HTML5AudioPlayer {
             console.warn("⚠️ 设置音频当前时间失败:", e);
           }
         };
-        this.audio.addEventListener("loadedmetadata", setTimeHandler, { once: true });
-        this.audio.addEventListener("canplay", setTimeHandler, { once: true });
+        if (this.audio.readyState >= 1) {
+          setTimeHandler();
+        } else {
+          this.audio.addEventListener("loadedmetadata", setTimeHandler, { once: true });
+          this.audio.addEventListener("canplay", setTimeHandler, { once: true });
+        }
       }
 
       await this.audio.play();
@@ -584,6 +630,15 @@ class HTML5AudioPlayer {
       console.error(`❌ 播放地址 ${this.currentUrlIndex + 1} 失败:`, error);
       console.error("❌ 播放错误:", error.message);
       console.error("❌ 当前URL:", url);
+      if (this.isManuallyStopped) {
+        console.log("⏹️ 播放已被手动停止，跳过错误处理");
+        return false;
+      }
+
+      if (error?.name === "AbortError") {
+        console.log("🎵 播放请求被中止 (AbortError)，忽略");
+        return false;
+      }
 
       if (error?.name === "NotAllowedError") {
         this.lastPlaybackBlockReason = "autoplay-blocked";
@@ -600,6 +655,10 @@ class HTML5AudioPlayer {
    * 处理播放错误
    */
   async handlePlaybackError() {
+    if (this.isManuallyStopped) {
+      console.log("⏹️ 播放已被手动停止，跳过错误重试");
+      return false;
+    }
     this.retryCount++;
 
     if (this.retryCount < this.maxRetries) {
@@ -702,6 +761,16 @@ class HTML5AudioPlayer {
       console.log("▶️ 继续播放");
     }
   }
+  /**
+   * 将已完成下载的本地音频缓存插入播放候选第一顺位
+   */
+  promoteCachedUrl(cachedUrl) {
+    if (!cachedUrl || this.playUrls.includes(cachedUrl)) return;
+    console.log("🎵 将本地音频缓存插入播放候选第一顺位:", cachedUrl);
+    this.playUrls.unshift(cachedUrl);
+    this.currentUrlIndex = 0;
+  }
+
 
   /**
    * 停止播放
@@ -712,8 +781,14 @@ class HTML5AudioPlayer {
     this.prematureEndCount = 0;
     this.lastPlaybackPosition = 0;
     if (this.audio) {
-      this.audio.pause();
-      this.audio.currentTime = 0;
+      try {
+        this.audio.pause();
+        if (this.audio.currentTime !== 0) {
+          this.audio.currentTime = 0;
+        }
+      } catch (e) {
+        console.warn("⚠️ 停止音频时捕获异常:", e);
+      }
       this._isPlaying = false;
       console.log("⏹️ 停止播放");
     }

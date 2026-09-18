@@ -6,6 +6,8 @@
 mod app;
 pub mod audio_cache;
 pub mod local_music;
+pub mod osd;
+pub mod osd_window;
 mod home;
 mod ipc;
 mod login;

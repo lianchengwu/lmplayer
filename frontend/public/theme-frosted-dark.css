@@ -165,7 +165,12 @@
 /* 磨砂黑主题侧边栏头部 */
 [data-theme="frosted-dark"] .sidebar-header {
     background: rgba(0, 0, 0, 0.25);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* 磨砂黑主题侧边栏分割线 */
+[data-theme="frosted-dark"] .sidebar-divider {
+    background: rgba(255, 255, 255, 0.05);
 }
 
 /* 磨砂黑主题"我的"文字样式 */

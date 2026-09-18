@@ -448,36 +448,6 @@
 
 /* 移除不再需要的歌词滚动容器样式，因为现在直接使用主页面的歌词组件 */
 
-/* 歌词渐变遮罩效果 */
-.immersive-lyrics-display::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 150px;
-    background: linear-gradient(to bottom,
-        rgba(26, 26, 46, 1) 0%,
-        rgba(26, 26, 46, 0.8) 30%,
-        transparent 100%);
-    z-index: 1;
-    pointer-events: none;
-}
-
-.immersive-lyrics-display::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 150px;
-    background: linear-gradient(to top,
-        rgba(26, 26, 46, 1) 0%,
-        rgba(26, 26, 46, 0.8) 30%,
-        transparent 100%);
-    z-index: 1;
-    pointer-events: none;
-}
 
 /* 控制区域 - 默认隐藏 */
 .immersive-controls {

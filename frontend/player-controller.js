@@ -92,11 +92,18 @@ function clearAutoNextErrorTimer() {
         autoNextErrorTimer = null;
     }
 }
+// 播放操作序列号，防止切歌并发/网络延迟导致的异步竞态
+let currentPlaySeq = 0;
+
+// 切歌防抖控制
+let lastSkipTime = 0;
+const SKIP_DEBOUNCE_MS = 250;
 
 // 播放当前歌曲
 async function playCurrentSong() {
     clearAutoNextErrorTimer();
-    console.log('🎵 获取当前歌曲...');
+    const playSeq = ++currentPlaySeq;
+    console.log(`🎵 [Seq #${playSeq}] 获取当前歌曲...`);
     const song = window.PlaylistManager.getCurrentSong();
     if (!song) {
         console.error('❌ 没有当前歌曲可播放');
@@ -136,8 +143,11 @@ async function playCurrentSong() {
         console.log('🎵 获取播放地址，歌曲hash:', song.hash);
         const playUrlsPromise = window.getSongPlayUrls(song.hash);
         const playUrls = await playUrlsPromise;
+        if (playSeq !== currentPlaySeq) {
+            console.log(`🎵 [Seq #${playSeq}] 切歌请求已过期 (当前最新 #${currentPlaySeq})，放弃旧播放地址`);
+            return false;
+        }
         console.log('🎵 获取到播放地址:', Array.isArray(playUrls) ? `${playUrls.length}个` : '无效');
-
         // 清除加载状态（如果存在）
         if (window.setPlayerLoadingState) {
             window.setPlayerLoadingState(false);
@@ -205,8 +215,16 @@ async function playCurrentSong() {
             const player = window.audioPlayer();
             if (player && player.play) {
                 try {
+                    if (playSeq !== currentPlaySeq) {
+                        console.log(`🎵 [Seq #${playSeq}] 切歌请求已过期，放弃调用播放器`);
+                        return false;
+                    }
                     // 直接调用HTML5播放器的play方法，避免循环调用
                     success = await player.play(legacySong, playUrls);
+                    if (playSeq !== currentPlaySeq) {
+                        console.log(`🎵 [Seq #${playSeq}] 播放器启动后发现已被更新切歌取代`);
+                        return false;
+                    }
                     if (success) {
                         console.log('✅ HTML5 音频播放器播放成功');
                         clearAutoNextErrorTimer();
@@ -292,8 +310,13 @@ async function playCurrentSong() {
 
 // 下一首
 async function playNextSong() {
+    const now = Date.now();
+    if (now - lastSkipTime < SKIP_DEBOUNCE_MS) {
+        console.log('⚠️ 切歌过快，忽略多余点击');
+        return false;
+    }
+    lastSkipTime = now;
     console.log('🎵 播放下一首');
-
     try {
         console.log('🎵 调用 PlaylistManager.getNextSong()...');
         const nextSong = await window.PlaylistManager.getNextSong();
@@ -316,8 +339,13 @@ async function playNextSong() {
 
 // 上一首
 async function playPreviousSong() {
+    const now = Date.now();
+    if (now - lastSkipTime < SKIP_DEBOUNCE_MS) {
+        console.log('⚠️ 切歌过快，忽略多余点击');
+        return false;
+    }
+    lastSkipTime = now;
     console.log('🎵 播放上一首');
-    
     try {
         const prevSong = await window.PlaylistManager.getPreviousSong();
         if (prevSong) {

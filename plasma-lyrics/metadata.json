@@ -1,0 +1,26 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "developer@wmplayer.com",
+                "Name": "wmPlayer Team"
+            }
+        ],
+        "Category": "Multimedia",
+        "Description": "Show real-time lyrics for wmPlayer via D-Bus",
+        "Description[zh_CN]": "通过 D-Bus 实时显示 wmPlayer 桌面/状态栏歌词",
+        "EnabledByDefault": true,
+        "Icon": "multimedia-audio-player",
+        "Id": "org.kde.plasma.wmplayer-lyrics",
+        "License": "GPL-3.0",
+        "Name": "wmPlayer Lyrics",
+        "Name[zh_CN]": "wmPlayer 歌词",
+        "ServiceTypes": [
+            "Plasma/Applet"
+        ],
+        "Version": "3.0",
+        "Website": "https://github.com/lianchengwu/wmplayer-lyric"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "X-Plasma-MainScript": "ui/main.qml"
+}

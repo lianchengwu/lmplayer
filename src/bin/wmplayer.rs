@@ -61,7 +61,7 @@ fn send_win(op: WinOp) {
     }
 }
 
-fn apply_win_op(win: &gtk4::ApplicationWindow, webview: &webkit6::WebView, op: WinOp) {
+fn apply_win_op(app: &gtk4::Application, win: &gtk4::ApplicationWindow, webview: &webkit6::WebView, op: WinOp) {
     match op {
         WinOp::Minimize => win.minimize(),
         WinOp::Maximize => {
@@ -80,6 +80,8 @@ fn apply_win_op(win: &gtk4::ApplicationWindow, webview: &webkit6::WebView, op: W
         WinOp::Close => {
             QUIT.store(true, Ordering::Relaxed);
             win.close();
+            app.quit();
+            std::process::exit(0);
         }
         WinOp::Drag { x, y } => begin_window_move(win, x, y),
         WinOp::Js(code) => {
@@ -193,7 +195,8 @@ async fn serve_cache(Path(hash): Path<String>, req: axum::extract::Request) -> R
     }
     use tower_http::services::ServeFile;
     use tower_service::Service;
-    let mut svc = ServeFile::new(path);
+    let mime = wmplayer::audio_cache::detect_audio_mime(&path);
+    let mut svc = ServeFile::new_with_mime(path, &mime);
     match svc.call(req).await {
         Ok(res) => res.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
@@ -255,7 +258,20 @@ fn main() {
         std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
     }
 
+    let app = gtk4::Application::builder()
+        .application_id("com.wmplayer.app")
+        .flags(gtk4::gio::ApplicationFlags::empty())
+        .build();
 
+    if let Err(e) = app.register(gtk4::gio::Cancellable::NONE) {
+        eprintln!("Failed to register application: {e}");
+    }
+    if app.is_remote() {
+        eprintln!("wmplayer is already running, activating existing instance...");
+        app.activate();
+        let _ = app.run_with_args::<&str>(&[]);
+        return;
+    }
     let player = load_player();
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -288,6 +304,11 @@ fn main() {
     let (router, origin) = (api.fallback(embedded_frontend), "dist=embedded".to_string());
 
     eprintln!("wmplayer http://{addr}  {origin}");
+    rt.spawn(async {
+        if let Err(e) = wmplayer::osd::start_dbus_service().await {
+            eprintln!("D-Bus lyric service: {e}");
+        }
+    });
     std::thread::Builder::new()
         .name("wmplayer-http".into())
         .spawn(move || {
@@ -298,22 +319,18 @@ fn main() {
             });
         })
         .expect("http thread");
-
-    start_webview(addr);
+    start_webview(app, addr);
 }
 
-fn start_webview(addr: SocketAddr) {
+fn start_webview(app: gtk4::Application, addr: SocketAddr) {
     let uri = format!("http://{addr}/");
-    let app = gtk4::Application::builder()
-        .application_id("com.wmplayer.app")
-        .flags(gtk4::gio::ApplicationFlags::NON_UNIQUE)
-        .build();
     app.connect_activate(move |app| {
-        if !app.windows().is_empty() {
-            if let Some(w) = app.active_window() {
-                w.present();
+        for window in app.windows() {
+            if window.title().as_deref() == Some("lmPlayer") {
+                window.set_visible(true);
+                window.present();
+                return;
             }
-            return;
         }
         let win = gtk4::ApplicationWindow::builder()
             .application(app)
@@ -328,7 +345,10 @@ fn start_webview(addr: SocketAddr) {
         });
         win.connect_close_request(|win| {
             if QUIT.load(Ordering::Relaxed) {
-                gtk4::glib::Propagation::Proceed
+                if let Some(app) = win.application() {
+                    app.quit();
+                }
+                std::process::exit(0);
             } else {
                 win.set_visible(false);
                 gtk4::glib::Propagation::Stop
@@ -350,15 +370,50 @@ fn start_webview(addr: SocketAddr) {
 
         let (tx, rx) = mpsc::channel::<WinOp>();
         let tray_tx = tx.clone();
+        let act_win_tx = tx.clone();
         let _ = WIN_TX.set(tx);
         let win_ops = win.clone();
         let web_ops = webview.clone();
+        let app_ops = app.clone();
         glib::timeout_add_local(Duration::from_millis(16), move || {
-            while let Ok(op) = rx.try_recv() {
-                apply_win_op(&win_ops, &web_ops, op);
+            if let Err(e) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                while let Ok(op) = rx.try_recv() {
+                    apply_win_op(&app_ops, &win_ops, &web_ops, op);
+                }
+            })) {
+                eprintln!("[apply_win_op] PANICKED in timeout_add_local: {e:?}");
             }
             glib::ControlFlow::Continue
         });
+
+        // Setup internal GTK4 OSD floating lyrics window
+        let osd_win = std::rc::Rc::new(wmplayer::osd_window::OsdWindow::new());
+        let (osd_tx, osd_rx) = std::sync::mpsc::channel();
+        wmplayer::osd::register_osd_cmd_sender(osd_tx);
+        wmplayer::osd_window::setup_osd_receiver(osd_win.clone(), osd_rx);
+
+        // Setup D-Bus remote playback actions handler
+        let (act_tx, act_rx) = std::sync::mpsc::channel::<wmplayer::osd::PlayerAction>();
+        wmplayer::osd::register_action_sender(act_tx);
+        glib::timeout_add_local(Duration::from_millis(50), move || {
+            let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                while let Ok(act) = act_rx.try_recv() {
+                    match act {
+                        wmplayer::osd::PlayerAction::TogglePlayPause => {
+                            let _ = act_win_tx.send(WinOp::Js(JS_TOGGLE));
+                        }
+                        wmplayer::osd::PlayerAction::Next => {
+                            let _ = act_win_tx.send(WinOp::Js(JS_NEXT));
+                        }
+                        wmplayer::osd::PlayerAction::Previous => {
+                            let _ = act_win_tx.send(WinOp::Js(JS_PREV));
+                        }
+                    }
+                }
+            }));
+            glib::ControlFlow::Continue
+        });
+
         start_tray(tray_tx);
 
         win.present();

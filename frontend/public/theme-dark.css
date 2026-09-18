@@ -203,22 +203,22 @@
 /* 暗色主题下的左侧栏样式 - 微妙分割线 */
 [data-theme="dark"] .sidebar {
     background: var(--bg-color);
-    border-right: 1px solid rgba(51, 65, 85, 0.4);
+    border-right: 1px solid rgba(51, 65, 85, 0.15);
 }
 
 [data-theme="dark"] .sidebar-header {
-    border-bottom: 1px solid rgba(51, 65, 85, 0.3);
+    border-bottom: 1px solid rgba(51, 65, 85, 0.12);
 }
 
 /* 暗色主题下的侧边栏分割线 */
 [data-theme="dark"] .sidebar-divider {
-    background: rgba(51, 65, 85, 0.25);
+    background: rgba(51, 65, 85, 0.1);
 }
 
 /* 暗色主题下的右侧栏样式 */
 [data-theme="dark"] .right-sidebar {
     background: var(--bg-color);
-    border-left: 1px solid rgba(51, 65, 85, 0.4);
+    border-left: 1px solid rgba(51, 65, 85, 0.15);
 }
 
 [data-theme="dark"] .tab-btn:hover {
