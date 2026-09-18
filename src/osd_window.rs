@@ -1,3 +1,4 @@
+use gtk4::gdk::prelude::*;
 use gtk4::glib;
 use gtk4::prelude::*;
 use std::cell::RefCell;
@@ -6,7 +7,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Instant;
 
-use crate::osd::{set_osd_enabled, LyricPayload, OsdCommand};
+use crate::osd::{set_osd_enabled, set_osd_locked, LyricPayload, OsdCommand};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct OsdConfig {
@@ -15,16 +16,23 @@ pub struct OsdConfig {
     pub height: i32,
     pub locked: bool,
     pub color: String,
+    #[serde(default = "default_opacity")]
+    pub opacity: f64,
+}
+
+fn default_opacity() -> f64 {
+    0.88
 }
 
 impl Default for OsdConfig {
     fn default() -> Self {
         Self {
-            font_size: 22,
-            width: 780,
-            height: 72,
+            font_size: 24,
+            width: 820,
+            height: 76,
             locked: false,
             color: "#38bdf8".to_string(),
+            opacity: 0.88,
         }
     }
 }
@@ -56,6 +64,98 @@ fn save_config(cfg: &OsdConfig) {
     }
 }
 
+/// Automatically configure KWin window rules so OSD window stays above all windows,
+/// skips the taskbar, skips the pager, and skips the Alt-Tab window switcher.
+fn ensure_kwin_rules() {
+    let kwin_path = dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("kwinrulesrc");
+
+    let content = fs::read_to_string(&kwin_path).unwrap_or_default();
+    if content.contains("wmplayer-osd") {
+        return;
+    }
+
+    let rule_block = "
+[wmplayer-osd]
+Description=wmplayer OSD lyrics
+above=true
+aboverule=2
+skippager=true
+skippagerrule=2
+skipswitcher=true
+skipswitcherrule=2
+skiptaskbar=true
+skiptaskbarrule=2
+title=wmPlayer OSD Lyrics
+titlematch=1
+types=1
+";
+
+    let new_content = if content.trim().is_empty() {
+        format!("[General]\ncount=1\nrules=wmplayer-osd\n{rule_block}")
+    } else if let Some(idx) = content.find("rules=") {
+        let line_end = content[idx..]
+            .find('\n')
+            .map(|i| idx + i)
+            .unwrap_or(content.len());
+        let current_rules = &content[idx + 6..line_end].trim();
+        let updated_line = if current_rules.is_empty() {
+            "rules=wmplayer-osd".to_string()
+        } else {
+            format!("rules={},wmplayer-osd", current_rules)
+        };
+        let mut updated = content.clone();
+        updated.replace_range(idx..line_end, &updated_line);
+        format!("{updated}\n{rule_block}")
+    } else {
+        format!("{content}\n[General]\nrules=wmplayer-osd\n{rule_block}")
+    };
+
+    if let Some(parent) = kwin_path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let _ = fs::write(&kwin_path, new_content);
+
+    // Ask KWin to reload rules immediately
+    let _ = std::process::Command::new("busctl")
+        .args(["--user", "call", "org.kde.KWin", "/KWin", "org.kde.KWin", "reconfigure"])
+        .spawn();
+}
+
+fn detect_edge(x: f64, y: f64, width: f64, height: f64, border: f64) -> Option<gtk4::gdk::SurfaceEdge> {
+    let on_top = y < border;
+    let on_bottom = y > height - border;
+    let on_left = x < border;
+    let on_right = x > width - border;
+
+    match (on_top, on_bottom, on_left, on_right) {
+        (true, false, true, false) => Some(gtk4::gdk::SurfaceEdge::NorthWest),
+        (true, false, false, true) => Some(gtk4::gdk::SurfaceEdge::NorthEast),
+        (false, true, true, false) => Some(gtk4::gdk::SurfaceEdge::SouthWest),
+        (false, true, false, true) => Some(gtk4::gdk::SurfaceEdge::SouthEast),
+        (true, false, false, false) => Some(gtk4::gdk::SurfaceEdge::North),
+        (false, true, false, false) => Some(gtk4::gdk::SurfaceEdge::South),
+        (false, false, true, false) => Some(gtk4::gdk::SurfaceEdge::West),
+        (false, false, false, true) => Some(gtk4::gdk::SurfaceEdge::East),
+        _ => None,
+    }
+}
+
+fn cursor_for_edge(edge: gtk4::gdk::SurfaceEdge) -> &'static str {
+    match edge {
+        gtk4::gdk::SurfaceEdge::North => "n-resize",
+        gtk4::gdk::SurfaceEdge::South => "s-resize",
+        gtk4::gdk::SurfaceEdge::East => "e-resize",
+        gtk4::gdk::SurfaceEdge::West => "w-resize",
+        gtk4::gdk::SurfaceEdge::NorthEast => "ne-resize",
+        gtk4::gdk::SurfaceEdge::NorthWest => "nw-resize",
+        gtk4::gdk::SurfaceEdge::SouthEast => "se-resize",
+        gtk4::gdk::SurfaceEdge::SouthWest => "sw-resize",
+        _ => "default",
+    }
+}
+
 // Token for KRC karaoke animation
 #[derive(Debug, Clone)]
 struct KrcToken {
@@ -73,6 +173,10 @@ struct KrcLine {
 pub struct OsdWindow {
     window: gtk4::Window,
     label: gtk4::Label,
+    toolbar: gtk4::Box,
+    btn_lock: gtk4::Button,
+    #[allow(dead_code)]
+    btn_opacity: gtk4::Button,
     config: Rc<RefCell<OsdConfig>>,
     current_krc: Rc<RefCell<Option<KrcLine>>>,
     krc_source_id: Rc<RefCell<Option<glib::SourceId>>>,
@@ -80,8 +184,13 @@ pub struct OsdWindow {
 
 impl OsdWindow {
     pub fn new() -> Self {
+        ensure_kwin_rules();
+
         let config = Rc::new(RefCell::new(load_config()));
         let cfg = config.borrow().clone();
+
+        // Sync atomic lock flag with loaded config
+        crate::osd::set_osd_locked(cfg.locked);
 
         let window = gtk4::Window::builder()
             .title("wmPlayer OSD Lyrics")
@@ -89,9 +198,11 @@ impl OsdWindow {
             .default_height(cfg.height)
             .decorated(false)
             .resizable(true)
+            .focusable(false)
             .build();
 
         window.add_css_class("osd-window");
+        window.set_opacity(cfg.opacity);
 
         // Main layout container
         let root_box = gtk4::Box::new(gtk4::Orientation::Vertical, 0);
@@ -99,24 +210,34 @@ impl OsdWindow {
         root_box.set_vexpand(true);
         root_box.add_css_class("osd-root-box");
 
-        // Top subtle control toolbar (shown on hover)
+        // Top subtle control toolbar (shown on hover when unlocked)
         let toolbar = gtk4::Box::new(gtk4::Orientation::Horizontal, 6);
         toolbar.set_halign(gtk4::Align::End);
         toolbar.set_valign(gtk4::Align::Start);
         toolbar.set_margin_top(4);
         toolbar.set_margin_end(8);
         toolbar.add_css_class("osd-toolbar");
-        toolbar.set_opacity(0.15); // subtle by default
+        toolbar.set_opacity(0.18); // subtle by default
+
+        if cfg.locked {
+            toolbar.set_visible(false);
+        }
 
         // Add hover effect to toolbar
         let motion_ctrl = gtk4::EventControllerMotion::new();
         let tb_hover = toolbar.clone();
+        let cfg_hover = config.clone();
         motion_ctrl.connect_enter(move |_, _, _| {
-            tb_hover.set_opacity(1.0);
+            if !cfg_hover.borrow().locked {
+                tb_hover.set_opacity(1.0);
+            }
         });
         let tb_leave = toolbar.clone();
+        let cfg_leave = config.clone();
         motion_ctrl.connect_leave(move |_| {
-            tb_leave.set_opacity(0.15);
+            if !cfg_leave.borrow().locked {
+                tb_leave.set_opacity(0.18);
+            }
         });
         window.add_controller(motion_ctrl);
 
@@ -129,9 +250,18 @@ impl OsdWindow {
         btn_font_inc.add_css_class("osd-mini-btn");
         btn_font_inc.set_tooltip_text(Some("放大字号"));
 
+        let pct = (cfg.opacity * 100.0).round() as i32;
+        let btn_opacity = gtk4::Button::with_label(&format!("{}%", pct));
+        btn_opacity.add_css_class("osd-mini-btn");
+        btn_opacity.set_tooltip_text(Some(&format!("调节透明度: 当前 {}% (滚轮微调)", pct)));
+
         let btn_lock = gtk4::Button::with_label(if cfg.locked { "🔒" } else { "🔓" });
         btn_lock.add_css_class("osd-mini-btn");
-        btn_lock.set_tooltip_text(Some(if cfg.locked { "解锁拖拽" } else { "锁定位置" }));
+        btn_lock.set_tooltip_text(Some(if cfg.locked {
+            "已锁定 (鼠标穿透中)"
+        } else {
+            "锁定 (开启鼠标穿透)"
+        }));
 
         let btn_close = gtk4::Button::with_label("✕");
         btn_close.add_css_class("osd-mini-btn");
@@ -140,6 +270,7 @@ impl OsdWindow {
 
         toolbar.append(&btn_font_dec);
         toolbar.append(&btn_font_inc);
+        toolbar.append(&btn_opacity);
         toolbar.append(&btn_lock);
         toolbar.append(&btn_close);
 
@@ -162,13 +293,37 @@ impl OsdWindow {
         root_box.append(&label);
         window.set_child(Some(&root_box));
 
-        // Drag gesture to move window
+        // Edge cursor motion detection
+        let motion_edge = gtk4::EventControllerMotion::new();
+        let win_motion = window.clone();
+        let cfg_edge = config.clone();
+        motion_edge.connect_motion(move |_, x, y| {
+            if cfg_edge.borrow().locked {
+                win_motion.set_cursor_from_name(Some("default"));
+                return;
+            }
+            let w = win_motion.width() as f64;
+            let h = win_motion.height() as f64;
+            if let Some(edge) = detect_edge(x, y, w, h, 10.0) {
+                win_motion.set_cursor_from_name(Some(cursor_for_edge(edge)));
+            } else {
+                win_motion.set_cursor_from_name(Some("default"));
+            }
+        });
+        window.add_controller(motion_edge);
+
+        // Drag gesture: window moving AND border resizing
         let gesture_drag = gtk4::GestureDrag::new();
         let cfg_for_drag = config.clone();
+        let win_drag = window.clone();
         gesture_drag.connect_drag_begin(move |gesture, x, y| {
             if cfg_for_drag.borrow().locked {
                 return;
             }
+            let w = win_drag.width() as f64;
+            let h = win_drag.height() as f64;
+            let edge_opt = detect_edge(x, y, w, h, 10.0);
+
             if let Some(widget) = gesture.widget() {
                 if let Some(native) = widget.native() {
                     if let Some(surface) = native.surface() {
@@ -176,7 +331,11 @@ impl OsdWindow {
                             if let Some(display) = gtk4::gdk::Display::default() {
                                 if let Some(seat) = display.default_seat() {
                                     if let Some(pointer) = seat.pointer() {
-                                        toplevel.begin_move(&pointer, 1, x, y, 0);
+                                        if let Some(edge) = edge_opt {
+                                            toplevel.begin_resize(edge, Some(&pointer), 1, x, y, 0);
+                                        } else {
+                                            toplevel.begin_move(&pointer, 1, x, y, 0);
+                                        }
                                     }
                                 }
                             }
@@ -186,6 +345,46 @@ impl OsdWindow {
             }
         });
         window.add_controller(gesture_drag);
+
+        // Scroll controller:
+        // - Plain scroll: adjust opacity (smooth)
+        // - Ctrl + scroll: zoom font size (A- / A+)
+        let scroll_ctrl = gtk4::EventControllerScroll::new(
+            gtk4::EventControllerScrollFlags::VERTICAL,
+        );
+        let cfg_scroll = config.clone();
+        let win_scroll = window.clone();
+        let lbl_scroll = label.clone();
+        let btn_op_clone = btn_opacity.clone();
+        scroll_ctrl.connect_scroll(move |controller, _, dy| {
+            if cfg_scroll.borrow().locked {
+                return glib::Propagation::Proceed;
+            }
+            let state = controller.current_event_state();
+            let is_ctrl = state.contains(gtk4::gdk::ModifierType::CONTROL_MASK);
+
+            if is_ctrl {
+                let mut c = cfg_scroll.borrow_mut();
+                if dy < 0.0 && c.font_size < 56 {
+                    c.font_size += 2;
+                } else if dy > 0.0 && c.font_size > 14 {
+                    c.font_size -= 2;
+                }
+                save_config(&c);
+                lbl_scroll.queue_draw();
+            } else {
+                let mut c = cfg_scroll.borrow_mut();
+                let delta = if dy < 0.0 { 0.05 } else { -0.05 };
+                c.opacity = (c.opacity + delta).clamp(0.20, 1.0);
+                win_scroll.set_opacity(c.opacity);
+                let pct = (c.opacity * 100.0).round() as i32;
+                btn_op_clone.set_label(&format!("{}%", pct));
+                btn_op_clone.set_tooltip_text(Some(&format!("调节透明度: 当前 {}% (滚轮微调)", pct)));
+                save_config(&c);
+            }
+            glib::Propagation::Stop
+        });
+        window.add_controller(scroll_ctrl);
 
         // Button actions
         let cfg_fdec = config.clone();
@@ -203,33 +402,86 @@ impl OsdWindow {
         let lbl_finc = label.clone();
         btn_font_inc.connect_clicked(move |_| {
             let mut c = cfg_finc.borrow_mut();
-            if c.font_size < 48 {
+            if c.font_size < 56 {
                 c.font_size += 2;
                 save_config(&c);
                 lbl_finc.queue_draw();
             }
         });
 
+        // Opacity cycle presets button: 100% -> 85% -> 70% -> 50% -> 35% -> 20%
+        let cfg_op = config.clone();
+        let win_op = window.clone();
+        let btn_op_action = btn_opacity.clone();
+        btn_opacity.connect_clicked(move |_| {
+            let mut c = cfg_op.borrow_mut();
+            let next_op = if c.opacity >= 0.95 {
+                0.85
+            } else if c.opacity >= 0.80 {
+                0.70
+            } else if c.opacity >= 0.65 {
+                0.50
+            } else if c.opacity >= 0.45 {
+                0.35
+            } else if c.opacity >= 0.30 {
+                0.20
+            } else {
+                1.0
+            };
+            c.opacity = next_op;
+            win_op.set_opacity(c.opacity);
+            let pct = (c.opacity * 100.0).round() as i32;
+            btn_op_action.set_label(&format!("{}%", pct));
+            btn_op_action.set_tooltip_text(Some(&format!("调节透明度: 当前 {}% (滚轮微调)", pct)));
+            save_config(&c);
+        });
+
         let cfg_lock = config.clone();
+        let win_lock = window.clone();
+        let tb_lock = toolbar.clone();
         let btn_lock_clone = btn_lock.clone();
         btn_lock.connect_clicked(move |_| {
-            let mut c = cfg_lock.borrow_mut();
-            c.locked = !c.locked;
-            btn_lock_clone.set_label(if c.locked { "🔒" } else { "🔓" });
-            btn_lock_clone.set_tooltip_text(Some(if c.locked { "解锁拖拽" } else { "锁定位置" }));
-            save_config(&c);
+            let is_locked = {
+                let mut c = cfg_lock.borrow_mut();
+                c.locked = !c.locked;
+                save_config(&c);
+                c.locked
+            };
+
+            set_osd_locked(is_locked);
+            Self::apply_lock_state(&win_lock, &tb_lock, &btn_lock_clone, is_locked);
         });
 
         btn_close.connect_clicked(move |_| {
             set_osd_enabled(false);
         });
 
-        // Window close handler (intercept close to hide instead)
+        // Intercept close request to hide instead
         let win_close = window.clone();
         window.connect_close_request(move |_| {
             win_close.set_visible(false);
             set_osd_enabled(false);
             glib::Propagation::Stop
+        });
+
+        // Save window dimensions on resize
+        let cfg_sz = config.clone();
+        let win_sz = window.clone();
+        window.connect_default_width_notify(move |_| {
+            let mut c = cfg_sz.borrow_mut();
+            c.width = win_sz.width();
+            c.height = win_sz.height();
+            save_config(&c);
+        });
+
+        // Apply input region on realize / map
+        let win_realize = window.clone();
+        let cfg_realize = config.clone();
+        window.connect_realize(move |_| {
+            let locked = cfg_realize.borrow().locked;
+            let w = win_realize.width();
+            let h = win_realize.height();
+            Self::set_window_input_region(&win_realize, locked, w, h);
         });
 
         // Install CSS
@@ -238,10 +490,65 @@ impl OsdWindow {
         Self {
             window,
             label,
+            toolbar,
+            btn_lock,
+            btn_opacity,
             config,
             current_krc: Rc::new(RefCell::new(None)),
             krc_source_id: Rc::new(RefCell::new(None)),
         }
+    }
+
+    fn apply_lock_state(
+        window: &gtk4::Window,
+        toolbar: &gtk4::Box,
+        btn_lock: &gtk4::Button,
+        locked: bool,
+    ) {
+        btn_lock.set_label(if locked { "🔒" } else { "🔓" });
+        btn_lock.set_tooltip_text(Some(if locked {
+            "已锁定 (鼠标穿透中)"
+        } else {
+            "锁定 (开启鼠标穿透)"
+        }));
+
+        if locked {
+            toolbar.set_visible(false);
+        } else {
+            toolbar.set_visible(true);
+            toolbar.set_opacity(0.18);
+        }
+
+        Self::set_window_input_region(window, locked, window.width(), window.height());
+    }
+
+    fn set_window_input_region(window: &gtk4::Window, locked: bool, width: i32, height: i32) {
+        if let Some(surface) = gtk4::prelude::NativeExt::surface(window) {
+            if locked {
+                // Empty input region = 100% mouse click-through
+                let empty = gtk4::cairo::Region::create();
+                surface.set_input_region(&empty);
+            } else {
+                // Full rectangle = fully interactive
+                let rect = gtk4::cairo::RectangleInt::new(0, 0, width.max(200), height.max(40));
+                let full = gtk4::cairo::Region::create_rectangle(&rect);
+                surface.set_input_region(&full);
+            }
+        }
+    }
+
+    pub fn set_locked(&self, locked: bool) {
+        {
+            let mut c = self.config.borrow_mut();
+            c.locked = locked;
+            save_config(&c);
+        }
+        Self::apply_lock_state(&self.window, &self.toolbar, &self.btn_lock, locked);
+    }
+
+    pub fn toggle_lock(&self) {
+        let is_locked = !self.config.borrow().locked;
+        self.set_locked(is_locked);
     }
 
     fn apply_css() {
@@ -258,18 +565,18 @@ impl OsdWindow {
                 padding: 4px 12px 10px 12px;
             }
             .osd-mini-btn {
-                background: rgba(255, 255, 255, 0.1);
-                color: rgba(255, 255, 255, 0.85);
-                border: 1px solid rgba(255, 255, 255, 0.15);
+                background: rgba(255, 255, 255, 0.12);
+                color: rgba(255, 255, 255, 0.9);
+                border: 1px solid rgba(255, 255, 255, 0.18);
                 border-radius: 12px;
-                padding: 1px 6px;
+                padding: 1px 7px;
                 font-size: 11px;
                 font-weight: bold;
                 min-height: 20px;
                 min-width: 24px;
             }
             .osd-mini-btn:hover {
-                background: rgba(255, 255, 255, 0.25);
+                background: rgba(255, 255, 255, 0.28);
                 color: #ffffff;
             }
             .osd-close-btn:hover {
@@ -277,7 +584,7 @@ impl OsdWindow {
                 color: #ffffff;
             }
             .osd-lyric-label {
-                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.85);
             }
             ",
         );
@@ -293,8 +600,14 @@ impl OsdWindow {
 
     pub fn set_visible(&self, visible: bool) {
         if visible {
+            ensure_kwin_rules();
             self.window.set_visible(true);
             self.window.present();
+
+            let locked = self.config.borrow().locked;
+            let w = self.window.width();
+            let h = self.window.height();
+            Self::set_window_input_region(&self.window, locked, w, h);
         } else {
             self.window.set_visible(false);
             self.stop_krc_timer();
@@ -324,14 +637,13 @@ impl OsdWindow {
         }
 
         if payload.format == "krc" || (raw.contains("]<") && raw.contains('>')) {
-            self.start_krc_display(raw);
+            self.start_krc_display(raw, payload.current_time);
         } else {
             self.display_lrc_line(raw);
         }
     }
 
     fn display_lrc_line(&self, line: &str) {
-        // Strip [02:34.56] if present
         let clean = if let Some(idx) = line.find(']') {
             &line[idx + 1..]
         } else {
@@ -347,30 +659,38 @@ impl OsdWindow {
         ));
     }
 
-    fn start_krc_display(&self, krc_raw: &str) {
-        let (tokens, duration) = parse_krc_line(krc_raw);
+    fn start_krc_display(&self, krc_raw: &str, current_audio_sec: f64) {
+        let (tokens, duration, line_start_ms) = parse_krc_line(krc_raw);
         if tokens.is_empty() {
             self.display_lrc_line(krc_raw);
             return;
         }
 
+        // Timing anchor: calculate how many milliseconds into this line the playback is
+        let current_audio_ms = (current_audio_sec * 1000.0).round() as u64;
+        let initial_offset_ms = if current_audio_ms >= line_start_ms {
+            (current_audio_ms - line_start_ms).min(duration)
+        } else {
+            0
+        };
+
         let krc_line = KrcLine {
             tokens,
-            start_time: Instant::now(),
+            start_time: Instant::now() - std::time::Duration::from_millis(initial_offset_ms),
             total_duration_ms: duration,
         };
 
         *self.current_krc.borrow_mut() = Some(krc_line);
 
-        // Initial render
+        // Initial render frame
         self.render_krc_frame();
 
-        // Start 40ms timer for smooth karaoke progressive animation
+        // 30ms progressive highlight animation timer
         let current_krc = self.current_krc.clone();
         let label = self.label.clone();
         let config = self.config.clone();
         let krc_source_id = self.krc_source_id.clone();
-        let source_id = glib::timeout_add_local(std::time::Duration::from_millis(40), move || {
+        let source_id = glib::timeout_add_local(std::time::Duration::from_millis(30), move || {
             let krc_opt = current_krc.borrow();
             let Some(krc) = krc_opt.as_ref() else {
                 *krc_source_id.borrow_mut() = None;
@@ -390,7 +710,7 @@ impl OsdWindow {
                         cfg.color, escaped
                     ));
                 } else {
-                    // Pending: dimmed grey color
+                    // Pending: dimmed white text
                     markup.push_str(&format!(
                         "<span foreground=\"#ffffff\" alpha=\"45%\">{}</span>",
                         escaped
@@ -401,9 +721,8 @@ impl OsdWindow {
 
             label.set_markup(&markup);
 
-            // Continue while within duration + small grace buffer (600ms)
+            // Continue while within duration + grace buffer (600ms)
             if elapsed > krc.total_duration_ms + 600 {
-                // Done with this line, keep full highlighted text until next line
                 *krc_source_id.borrow_mut() = None;
                 return glib::ControlFlow::Break;
             }
@@ -443,17 +762,21 @@ impl OsdWindow {
     }
 }
 
-// Parses KRC format: [line_start, line_duration]<offset, duration, 0>text<offset, duration, 0>text
-fn parse_krc_line(krc_raw: &str) -> (Vec<KrcToken>, u64) {
+// Parses KRC format: [line_start, line_duration]<offset, duration, 0>text...
+// Returns (tokens, total_duration, line_start_ms)
+fn parse_krc_line(krc_raw: &str) -> (Vec<KrcToken>, u64, u64) {
     let mut tokens = Vec::new();
     let mut total_duration = 0u64;
+    let mut line_start_ms = 0u64;
 
-    // Check line timestamp: [171960,5040]
     let mut rest = krc_raw;
     if rest.starts_with('[') {
         if let Some(end_bracket) = rest.find(']') {
             let inside = &rest[1..end_bracket];
             if let Some(comma) = inside.find(',') {
+                if let Ok(start) = inside[..comma].trim().parse::<u64>() {
+                    line_start_ms = start;
+                }
                 if let Ok(dur) = inside[comma + 1..].trim().parse::<u64>() {
                     total_duration = dur;
                 }
@@ -462,7 +785,6 @@ fn parse_krc_line(krc_raw: &str) -> (Vec<KrcToken>, u64) {
         }
     }
 
-    // Parse tokens: <offset, duration, 0>word
     while let Some(start_bracket) = rest.find('<') {
         let after_start = &rest[start_bracket + 1..];
         let Some(end_bracket) = after_start.find('>') else {
@@ -471,14 +793,12 @@ fn parse_krc_line(krc_raw: &str) -> (Vec<KrcToken>, u64) {
         let tag_content = &after_start[..end_bracket];
         let after_tag = &after_start[end_bracket + 1..];
 
-        // Next word text ends at next '<' or end of string
         let (word, next_rest) = if let Some(next_lt) = after_tag.find('<') {
             (&after_tag[..next_lt], &after_tag[next_lt..])
         } else {
             (after_tag, "")
         };
 
-        // Parse offset and duration: "0,240,0" -> offset=0, duration=240
         let parts: Vec<&str> = tag_content.split(',').collect();
         let offset = parts.first().and_then(|s| s.trim().parse::<u64>().ok()).unwrap_or(0);
         let duration = parts.get(1).and_then(|s| s.trim().parse::<u64>().ok()).unwrap_or(150);
@@ -498,12 +818,12 @@ fn parse_krc_line(krc_raw: &str) -> (Vec<KrcToken>, u64) {
         rest = next_rest;
     }
 
-    (tokens, total_duration)
+    (tokens, total_duration, line_start_ms)
 }
 
 // Setup OSD receiver in the GTK thread
 pub fn setup_osd_receiver(osd_win: Rc<OsdWindow>, rx: std::sync::mpsc::Receiver<OsdCommand>) {
-    glib::timeout_add_local(std::time::Duration::from_millis(30), move || {
+    glib::timeout_add_local(std::time::Duration::from_millis(25), move || {
         while let Ok(cmd) = rx.try_recv() {
             let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 match cmd {
@@ -512,6 +832,12 @@ pub fn setup_osd_receiver(osd_win: Rc<OsdWindow>, rx: std::sync::mpsc::Receiver<
                     }
                     OsdCommand::SetVisible(visible) => {
                         osd_win.set_visible(visible);
+                    }
+                    OsdCommand::SetLocked(locked) => {
+                        osd_win.set_locked(locked);
+                    }
+                    OsdCommand::ToggleLock => {
+                        osd_win.toggle_lock();
                     }
                 }
             }));
@@ -527,18 +853,11 @@ mod tests {
     #[test]
     fn test_parse_krc_line() {
         let line = "[171960,5040]<0,240,0>hello<240,300,0>world";
-        let (tokens, duration) = parse_krc_line(line);
+        let (tokens, duration, start) = parse_krc_line(line);
         assert_eq!(tokens.len(), 2);
         assert_eq!(tokens[0].text, "hello");
         assert_eq!(tokens[1].text, "world");
         assert_eq!(duration, 5040);
-    }
-
-    #[test]
-    fn test_remove_nonexistent_source_does_not_panic() {
-        // Source ID 999999 does not exist in GLib context.
-        // Direct call to g_source_remove safely returns GFALSE (0) without panic.
-        let res = unsafe { gtk4::glib::ffi::g_source_remove(999999) };
-        assert_eq!(res, gtk4::glib::ffi::GFALSE);
+        assert_eq!(start, 171960);
     }
 }

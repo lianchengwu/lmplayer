@@ -284,7 +284,12 @@ pub async fn dispatch(player: &Player, cmd: &str, args: Value) -> Value {
             let text = arg_str(&args, "text");
             let song = arg_str(&args, "song");
             let artist = arg_str(&args, "artist");
-            crate::osd::update_lyrics(&text, &song, &artist);
+            let current_time = args
+                .get("currentTime")
+                .or_else(|| args.get("current_time"))
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
+            crate::osd::update_lyrics(&text, &song, &artist, current_time);
             ok(json!("ok"))
         }
         "set_osd_enabled" => {
@@ -296,6 +301,24 @@ pub async fn dispatch(player: &Player, cmd: &str, args: Value) -> Value {
             })
         }
         "is_osd_enabled" => json!(crate::osd::is_osd_enabled()),
+        "toggle_osd_lock" => {
+            let locked = crate::osd::toggle_osd_lock();
+            json!({
+                "success": true,
+                "locked": locked,
+                "message": if locked { "桌面歌词已锁定 (鼠标穿透)" } else { "桌面歌词已解锁" }
+            })
+        }
+        "set_osd_locked" => {
+            let locked = arg_bool(&args, "locked");
+            crate::osd::set_osd_locked(locked);
+            json!({
+                "success": true,
+                "locked": locked,
+                "message": if locked { "桌面歌词已锁定 (鼠标穿透)" } else { "桌面歌词已解锁" }
+            })
+        }
+        "is_osd_locked" => json!(crate::osd::is_osd_locked()),
         "get_media_key_status" => json!({ "registered": false }),
         "check_for_updates" => json!({ "success": true, "hasUpdate": false }),
         "get_current_version" => json!("0.1.0"),

@@ -3203,6 +3203,7 @@ h1 {
 }
 
 /* OSD歌词按钮特殊样式 */
+/* OSD歌词与锁定按钮特殊样式 */
 #osdLyricsBtn.active {
     background: #1db954;
     color: white;
@@ -3210,6 +3211,15 @@ h1 {
 
 #osdLyricsBtn.active:hover {
     background: #1ed760;
+}
+
+#osdLockBtn.active {
+    background: #f59e0b;
+    color: white;
+}
+
+#osdLockBtn.active:hover {
+    background: #d97706;
 }
 
 .lyrics-display {

@@ -1390,50 +1390,28 @@ function startTimeUpdateInterval() {
       if (window.updateLyricsHighlight) {
         window.updateLyricsHighlight(currentTime);
       } else {
-        // 只在第一次找不到函数时输出警告
         if (!window._lyricsWarningShown) {
           console.warn("🎵 updateLyricsHighlight 函数不可用");
           window._lyricsWarningShown = true;
         }
       }
-    }, 500); // 提高更新频率到500ms，让歌词同步更精确
+    }, 60); // 60ms高频同步，毫秒级精度杜绝歌词延后
   } else {
-    // 🔧 内存泄漏修复：降级模式下也尽量使用全局资源管理器
-    if (window.GlobalResourceManager) {
-      timeUpdateInterval = window.GlobalResourceManager.addInterval(() => {
-        const currentTime = audioPlayer.getCurrentTime();
-        const duration = audioPlayer.getDuration();
-        updateTimeDisplay(currentTime, duration);
-        updateProgressBar(currentTime, duration);
-        // 更新歌词高亮
-        if (window.updateLyricsHighlight) {
-          window.updateLyricsHighlight(currentTime);
-        } else {
-          // 只在第一次找不到函数时输出警告
-          if (!window._lyricsWarningShown) {
-            console.warn("🎵 updateLyricsHighlight 函数不可用");
-            window._lyricsWarningShown = true;
-          }
+    timeUpdateInterval = setInterval(() => {
+      const currentTime = audioPlayer.getCurrentTime();
+      const duration = audioPlayer.getDuration();
+      updateTimeDisplay(currentTime, duration);
+      updateProgressBar(currentTime, duration);
+      // 更新歌词高亮
+      if (window.updateLyricsHighlight) {
+        window.updateLyricsHighlight(currentTime);
+      } else {
+        if (!window._lyricsWarningShown) {
+          console.warn("🎵 updateLyricsHighlight 函数不可用");
+          window._lyricsWarningShown = true;
         }
-      }, 500);
-    } else {
-      timeUpdateInterval = setInterval(() => {
-        const currentTime = audioPlayer.getCurrentTime();
-        const duration = audioPlayer.getDuration();
-        updateTimeDisplay(currentTime, duration);
-        updateProgressBar(currentTime, duration);
-        // 更新歌词高亮
-        if (window.updateLyricsHighlight) {
-          window.updateLyricsHighlight(currentTime);
-        } else {
-          // 只在第一次找不到函数时输出警告
-          if (!window._lyricsWarningShown) {
-            console.warn("🎵 updateLyricsHighlight 函数不可用");
-            window._lyricsWarningShown = true;
-          }
-        }
-      }, 500);
-    }
+      }
+    }, 60);
   }
 }
 

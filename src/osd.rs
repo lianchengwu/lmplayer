@@ -10,17 +10,20 @@ pub struct LyricPayload {
     pub artist: String,
     pub lyric: String,
     pub format: String,
+    pub current_time: f64,
 }
 
 #[derive(Default)]
 pub struct LyricState {
     pub payload: LyricPayload,
     pub is_playing: bool,
+    pub is_locked: bool,
 }
 
 static LYRIC_STATE: LazyLock<RwLock<LyricState>> =
     LazyLock::new(|| RwLock::new(LyricState::default()));
 static OSD_ENABLED: AtomicBool = AtomicBool::new(false);
+static OSD_LOCKED: AtomicBool = AtomicBool::new(false);
 static DBUS_CONN: OnceLock<connection::Connection> = OnceLock::new();
 
 pub struct LyricDbus;
@@ -62,6 +65,10 @@ impl LyricDbus {
         OSD_ENABLED.load(Ordering::Relaxed)
     }
 
+    #[zbus(property)]
+    async fn is_locked(&self) -> bool {
+        OSD_LOCKED.load(Ordering::Relaxed)
+    }
     #[zbus(signal)]
     pub async fn lyric_updated(
         emitter: &SignalEmitter<'_>,
@@ -86,6 +93,14 @@ impl LyricDbus {
     async fn toggle_osd(&self) {
         let new_state = !OSD_ENABLED.load(Ordering::Relaxed);
         set_osd_enabled(new_state);
+    }
+
+    async fn toggle_lock(&self) {
+        crate::osd::toggle_osd_lock();
+    }
+
+    async fn set_locked(&self, locked: bool) {
+        crate::osd::set_osd_locked(locked);
     }
 }
 
@@ -125,6 +140,23 @@ pub fn is_osd_enabled() -> bool {
     OSD_ENABLED.load(Ordering::Relaxed)
 }
 
+pub fn is_osd_locked() -> bool {
+    OSD_LOCKED.load(Ordering::Relaxed)
+}
+
+pub fn set_osd_locked(locked: bool) {
+    OSD_LOCKED.store(locked, Ordering::Relaxed);
+    if let Some(tx) = OSD_CMD_TX.get() {
+        let _ = tx.send(OsdCommand::SetLocked(locked));
+    }
+}
+
+pub fn toggle_osd_lock() -> bool {
+    let new_locked = !OSD_LOCKED.load(Ordering::Relaxed);
+    set_osd_locked(new_locked);
+    new_locked
+}
+
 pub fn set_osd_enabled(enabled: bool) {
     OSD_ENABLED.store(enabled, Ordering::Relaxed);
     notify_osd_visibility(enabled);
@@ -134,6 +166,8 @@ pub fn set_osd_enabled(enabled: bool) {
 pub enum OsdCommand {
     UpdateLyrics(LyricPayload),
     SetVisible(bool),
+    SetLocked(bool),
+    ToggleLock,
 }
 
 static OSD_CMD_TX: OnceLock<std::sync::mpsc::Sender<OsdCommand>> = OnceLock::new();
@@ -148,7 +182,7 @@ fn notify_osd_visibility(visible: bool) {
     }
 }
 
-pub fn update_lyrics(text: &str, song: &str, artist: &str) {
+pub fn update_lyrics(text: &str, song: &str, artist: &str, current_time: f64) {
     let format = if text.contains("]<") || (text.contains('<') && text.contains('>')) {
         "krc".to_string()
     } else {
@@ -160,6 +194,7 @@ pub fn update_lyrics(text: &str, song: &str, artist: &str) {
         artist: artist.to_string(),
         lyric: text.to_string(),
         format: format.clone(),
+        current_time,
     };
 
     // 1. Update memory state

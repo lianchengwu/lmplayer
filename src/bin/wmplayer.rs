@@ -502,6 +502,14 @@ impl ksni::Tray for PlayerTray {
                 ..Default::default()
             }
             .into(),
+            StandardItem {
+                label: "锁定/解锁桌面歌词".into(),
+                activate: Box::new(|_| {
+                    wmplayer::osd::toggle_osd_lock();
+                }),
+                ..Default::default()
+            }
+            .into(),
             MenuItem::Separator,
             StandardItem {
                 label: "退出".into(),

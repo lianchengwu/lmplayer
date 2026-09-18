@@ -5,6 +5,7 @@
 
 // OSD歌词状态
 let osdLyricsEnabled = true; // 桌面歌词是否打开
+let osdLyricsLocked = false; // 桌面歌词是否锁定 (鼠标穿透)
 let osdLyricsService = null; // 服务对象，初始化时设置
 let osdLyricsInitialized = false; // 服务是否已初始化
 
@@ -49,10 +50,11 @@ async function initOSDLyrics() {
 
     try {
         // 导入所有必要的绑定服务方法
-        const { UpdateCurrentLyrics, SetEnabled, IsEnabled } = await import('./bindings/wmplayer/cacheservice.js');
-        osdLyricsService = { UpdateCurrentLyrics, SetEnabled, IsEnabled };
+        const { UpdateCurrentLyrics, SetEnabled, IsEnabled, ToggleOSDLock, SetOSDLocked, IsOSDLocked } = await import('./bindings/wmplayer/cacheservice.js');
+        osdLyricsService = { UpdateCurrentLyrics, SetEnabled, IsEnabled, ToggleOSDLock, SetOSDLocked, IsOSDLocked };
         osdLyricsInitialized = true;
         console.log('✅ OSD歌词服务初始化完成');
+        await updateOSDLockStatus();
 
         // 初始化UI
         initOSDLyricsUI();
@@ -69,6 +71,18 @@ function initOSDLyricsUI() {
     if (osdBtn) {
         osdBtn.addEventListener('click', toggleOSDLyrics);
         console.log('✅ OSD歌词按钮事件已绑定');
+    }
+
+    const lockBtn = document.getElementById('osdLockBtn');
+    if (lockBtn) {
+        lockBtn.addEventListener('click', toggleOSDLock);
+        console.log('✅ OSD歌词锁定按钮事件已绑定');
+    }
+
+    if (window.Events && window.Events.On) {
+        window.Events.On('systray:toggle-osd-lock', () => {
+            toggleOSDLock();
+        });
     }
 }
 
@@ -144,9 +158,54 @@ async function updateOSDLyricsStatus() {
         const enabled = await osdLyricsService.IsEnabled();
         osdLyricsEnabled = enabled;
         updateOSDLyricsButtonState();
+        await updateOSDLockStatus();
         console.log('🎵 OSD歌词状态已更新:', osdLyricsEnabled);
     } catch (error) {
         console.error('❌ 获取OSD歌词状态失败:', error);
+    }
+}
+
+async function updateOSDLockStatus() {
+    if (!osdLyricsService || !osdLyricsService.IsOSDLocked) return;
+    try {
+        const locked = await osdLyricsService.IsOSDLocked();
+        osdLyricsLocked = !!locked;
+        updateOSDLockButtonState();
+    } catch (e) {
+        console.error('❌ 获取OSD锁定状态失败:', e);
+    }
+}
+
+async function toggleOSDLock() {
+    if (!osdLyricsService) return osdLyricsLocked;
+    try {
+        const res = await osdLyricsService.ToggleOSDLock();
+        if (res && res.success) {
+            osdLyricsLocked = res.locked;
+            updateOSDLockButtonState();
+            if (typeof showMessage === 'function') {
+                showMessage(res.message, 'info');
+            }
+        }
+        return osdLyricsLocked;
+    } catch (error) {
+        console.error('❌ 切换OSD锁定状态失败:', error);
+        return osdLyricsLocked;
+    }
+}
+
+function updateOSDLockButtonState() {
+    const lockBtn = document.getElementById('osdLockBtn');
+    if (lockBtn) {
+        if (osdLyricsLocked) {
+            lockBtn.classList.add('active');
+            lockBtn.innerHTML = '<i class="fas fa-lock"></i>';
+            lockBtn.title = '桌面歌词已锁定 (鼠标穿透中，点击解锁)';
+        } else {
+            lockBtn.classList.remove('active');
+            lockBtn.innerHTML = '<i class="fas fa-lock-open"></i>';
+            lockBtn.title = '锁定桌面歌词 (开启鼠标穿透)';
+        }
     }
 }
 
@@ -162,6 +221,7 @@ function updateOSDLyricsButtonState() {
             osdBtn.title = '开启桌面歌词';
         }
     }
+    updateOSDLockButtonState();
 }
 
 // 更新OSD歌词内容
@@ -172,8 +232,11 @@ async function updateOSDLyrics(lyricsText, songName = '', artist = '') {
     }
 
     try {
-        console.log('🎵 发送歌词到桌面:', lyricsText);
-        const response = await osdLyricsService.UpdateCurrentLyrics(lyricsText, songName, artist);
+        const player = window.audioPlayer && (typeof window.audioPlayer === 'function' ? window.audioPlayer() : window.audioPlayer);
+        const currentTime = player?.getCurrentTime ? player.getCurrentTime() : (player?.audio?.currentTime || 0);
+
+        console.log('🎵 发送歌词到桌面:', lyricsText, `(${currentTime.toFixed(2)}s)`);
+        const response = await osdLyricsService.UpdateCurrentLyrics(lyricsText, songName, artist, currentTime);
 
         if (!response.success) {
             console.warn('⚠️ 更新OSD歌词失败:', response.message);
@@ -206,13 +269,16 @@ async function sendKRCLineToOSD(lyricsLine) {
 
         // console.log(`🎵 发送原始${format.toUpperCase()}歌词行到OSD:`, originalLine);
 
-        // 直接发送原始歌词行，OSD歌词自己计算播放进度
+        // 发送原始歌词行与精确当前播放时间戳，OSD毫秒级对齐杜绝延后
+        const player = window.audioPlayer && (typeof window.audioPlayer === 'function' ? window.audioPlayer() : window.audioPlayer);
+        const currentTime = player?.getCurrentTime ? player.getCurrentTime() : (player?.audio?.currentTime || 0);
+
         const response = await osdLyricsService.UpdateCurrentLyrics(
             originalLine,
             songName,
-            artist
+            artist,
+            currentTime
         );
-
         if (!response.success) {
             console.warn('⚠️ 发送歌词失败:', response.message);
         }
@@ -328,6 +394,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // 导出函数供其他模块使用
 window.OSDLyrics = {
+    toggleOSDLock,
+    isLocked: () => osdLyricsLocked,
     updateOSDLyrics,
     updateCurrentOSDLyrics,
     toggleOSDLyrics,
