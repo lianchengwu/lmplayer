@@ -51,7 +51,7 @@ fn config_path() -> PathBuf {
         .join("osd_lyrics.json")
 }
 
-fn load_config() -> OsdConfig {
+pub fn load_config() -> OsdConfig {
     let path = config_path();
     if let Ok(content) = fs::read_to_string(&path) {
         if let Ok(cfg) = serde_json::from_str::<OsdConfig>(&content) {
@@ -680,6 +680,15 @@ impl OsdWindow {
         self.set_locked(is_locked);
     }
 
+    pub fn set_color(&self, color: String) {
+        {
+            let mut c = self.config.borrow_mut();
+            c.color = color;
+            save_config(&c);
+        }
+        self.render_krc_frame();
+    }
+
     pub fn set_visible(&self, visible: bool) {
         if visible {
             ensure_kwin_rules();
@@ -920,6 +929,9 @@ pub fn setup_osd_receiver(osd_win: Rc<OsdWindow>, rx: std::sync::mpsc::Receiver<
                     }
                     OsdCommand::ToggleLock => {
                         osd_win.toggle_lock();
+                    }
+                    OsdCommand::SetColor(color) => {
+                        osd_win.set_color(color);
                     }
                 }
             }));

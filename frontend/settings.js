@@ -26,7 +26,8 @@ const DEFAULT_SETTINGS = {
         language: 'zh-CN',
         showLyrics: true,
         showSpectrum: false,
-        miniPlayer: false
+        miniPlayer: false,
+        osdLyricsColor: '#38bdf8'
     },
     // 下载设置
     download: {
@@ -129,6 +130,13 @@ async function loadSettings() {
         if (settingsData.behavior.hardwareAcceleration === undefined) {
             settingsData.behavior.hardwareAcceleration = true;
         }
+        try {
+            const { GetOSDColor } = await import('./bindings/wmplayer/cacheservice.js');
+            const res = await GetOSDColor();
+            if (res && res.success && res.color) {
+                settingsData.interface.osdLyricsColor = res.color;
+            }
+        } catch (e) {}
     } catch (error) {
         console.error('加载设置失败:', error);
         settingsData = structuredClone(DEFAULT_SETTINGS);
@@ -164,6 +172,11 @@ function applyAllSettings() {
             }
         }
         console.log('主题设置已应用:', settingsData.interface.theme);
+    }
+
+    // 应用桌面歌词颜色设置
+    if (settingsData.interface.osdLyricsColor) {
+        applyOsdColor(settingsData.interface.osdLyricsColor);
     }
 
     // 应用音量设置
@@ -339,6 +352,31 @@ function renderSettingsPage() {
                                onchange="updateSetting('interface.showLyrics', this.checked)">
                         <span class="settings-switch-slider"></span>
                     </label>
+                </div>
+            </div>
+
+            <div class="settings-item">
+                <div class="settings-item-info">
+                    <div class="settings-item-title">桌面歌词颜色</div>
+                    <div class="settings-item-description">自定义桌面悬浮歌词的高亮显示颜色</div>
+                </div>
+                <div class="settings-item-control">
+                    <div class="osd-color-controls">
+                        <div class="osd-color-presets">
+                            <button type="button" class="osd-color-swatch ${(settingsData.interface.osdLyricsColor || '#38bdf8').toLowerCase() === '#38bdf8' ? 'active' : ''}" style="--swatch:#38bdf8;" data-color="#38bdf8" title="天空蓝" onclick="updateOsdColor('#38bdf8')"></button>
+                            <button type="button" class="osd-color-swatch ${(settingsData.interface.osdLyricsColor || '').toLowerCase() === '#10b981' ? 'active' : ''}" style="--swatch:#10b981;" data-color="#10b981" title="翡翠绿" onclick="updateOsdColor('#10b981')"></button>
+                            <button type="button" class="osd-color-swatch ${(settingsData.interface.osdLyricsColor || '').toLowerCase() === '#f59e0b' ? 'active' : ''}" style="--swatch:#f59e0b;" data-color="#f59e0b" title="日落橙" onclick="updateOsdColor('#f59e0b')"></button>
+                            <button type="button" class="osd-color-swatch ${(settingsData.interface.osdLyricsColor || '').toLowerCase() === '#ec4899' ? 'active' : ''}" style="--swatch:#ec4899;" data-color="#ec4899" title="樱花粉" onclick="updateOsdColor('#ec4899')"></button>
+                            <button type="button" class="osd-color-swatch ${(settingsData.interface.osdLyricsColor || '').toLowerCase() === '#8b5cf6' ? 'active' : ''}" style="--swatch:#8b5cf6;" data-color="#8b5cf6" title="极光紫" onclick="updateOsdColor('#8b5cf6')"></button>
+                            <button type="button" class="osd-color-swatch ${(settingsData.interface.osdLyricsColor || '').toLowerCase() === '#ef4444' ? 'active' : ''}" style="--swatch:#ef4444;" data-color="#ef4444" title="热情红" onclick="updateOsdColor('#ef4444')"></button>
+                            <button type="button" class="osd-color-swatch ${(settingsData.interface.osdLyricsColor || '').toLowerCase() === '#eab308' ? 'active' : ''}" style="--swatch:#eab308;" data-color="#eab308" title="明艳黄" onclick="updateOsdColor('#eab308')"></button>
+                            <button type="button" class="osd-color-swatch ${(settingsData.interface.osdLyricsColor || '').toLowerCase() === '#ffffff' ? 'active' : ''}" style="--swatch:#ffffff;" data-color="#ffffff" title="珍珠白" onclick="updateOsdColor('#ffffff')"></button>
+                        </div>
+                        <div class="osd-color-picker-wrap">
+                            <input type="color" class="osd-color-native-input" id="osdColorNativePicker" value="${settingsData.interface.osdLyricsColor || '#38bdf8'}" onchange="updateOsdColor(this.value)">
+                            <span class="osd-color-code" id="osdColorCode">${settingsData.interface.osdLyricsColor || '#38bdf8'}</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -596,8 +634,34 @@ function applySetting(path, value) {
         case 'behavior.hardwareAcceleration':
             applyHardwareAcceleration(value);
             break;
+        case 'interface.osdLyricsColor':
+            applyOsdColor(value);
+            break;
     }
 }
+
+async function applyOsdColor(color) {
+    if (!color) return;
+    try {
+        const { SetOSDColor } = await import('./bindings/wmplayer/cacheservice.js');
+        await SetOSDColor(color);
+        console.log('✅ 桌面歌词颜色已同步到 OSD:', color);
+    } catch (e) {
+        console.warn('⚠️ 同步桌面歌词颜色失败:', e);
+    }
+}
+
+window.updateOsdColor = async (color) => {
+    if (!color) return;
+    await window.updateSetting('interface.osdLyricsColor', color);
+    const codeEl = document.getElementById('osdColorCode');
+    if (codeEl) codeEl.textContent = color;
+    const pickerEl = document.getElementById('osdColorNativePicker');
+    if (pickerEl) pickerEl.value = color;
+    document.querySelectorAll('.osd-color-swatch').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.color.toLowerCase() === color.toLowerCase());
+    });
+};
 
 // 选择下载路径
 window.selectDownloadPath = async () => {

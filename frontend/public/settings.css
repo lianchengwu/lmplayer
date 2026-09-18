@@ -302,3 +302,81 @@
     margin: 0;
     color: var(--text-tertiary);
 }
+
+/* 桌面歌词颜色调节控件 */
+.osd-color-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.osd-color-presets {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.osd-color-swatch {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background-color: var(--swatch);
+    border: 2px solid transparent;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    padding: 0;
+    outline: none;
+}
+
+.osd-color-swatch:hover {
+    transform: scale(1.15);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.osd-color-swatch.active {
+    border-color: #ffffff;
+    box-shadow: 0 0 0 2px var(--accent-color, #6366f1);
+    transform: scale(1.1);
+}
+
+.osd-color-picker-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--hover-bg, rgba(0, 0, 0, 0.05));
+    padding: 3px 8px 3px 5px;
+    border-radius: 20px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.osd-color-native-input {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    background-color: transparent;
+    border: none;
+    cursor: pointer;
+    border-radius: 50%;
+    padding: 0;
+}
+
+.osd-color-native-input::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+.osd-color-native-input::-webkit-color-swatch {
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 50%;
+}
+
+.osd-color-code {
+    font-size: 13px;
+    font-family: monospace;
+    font-weight: 600;
+    color: var(--text-secondary);
+}

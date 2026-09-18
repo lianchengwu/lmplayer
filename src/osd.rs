@@ -69,6 +69,15 @@ impl LyricDbus {
     async fn is_locked(&self) -> bool {
         OSD_LOCKED.load(Ordering::Relaxed)
     }
+
+    #[zbus(property)]
+    async fn color(&self) -> String {
+        crate::osd::get_osd_color()
+    }
+
+    async fn set_color(&self, color: String) {
+        crate::osd::set_osd_color(&color);
+    }
     #[zbus(signal)]
     pub async fn lyric_updated(
         emitter: &SignalEmitter<'_>,
@@ -157,6 +166,16 @@ pub fn toggle_osd_lock() -> bool {
     new_locked
 }
 
+pub fn set_osd_color(color: &str) {
+    if let Some(tx) = OSD_CMD_TX.get() {
+        let _ = tx.send(OsdCommand::SetColor(color.to_string()));
+    }
+}
+
+pub fn get_osd_color() -> String {
+    crate::osd_window::load_config().color
+}
+
 pub fn set_osd_enabled(enabled: bool) {
     OSD_ENABLED.store(enabled, Ordering::Relaxed);
     notify_osd_visibility(enabled);
@@ -168,6 +187,7 @@ pub enum OsdCommand {
     SetVisible(bool),
     SetLocked(bool),
     ToggleLock,
+    SetColor(String),
 }
 
 static OSD_CMD_TX: OnceLock<std::sync::mpsc::Sender<OsdCommand>> = OnceLock::new();

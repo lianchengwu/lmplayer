@@ -319,6 +319,12 @@ pub async fn dispatch(player: &Player, cmd: &str, args: Value) -> Value {
             })
         }
         "is_osd_locked" => json!(crate::osd::is_osd_locked()),
+        "set_osd_color" => {
+            let color = arg_str(&args, "color");
+            crate::osd::set_osd_color(&color);
+            json!({ "success": true, "color": color })
+        }
+        "get_osd_color" => json!({ "success": true, "color": crate::osd::get_osd_color() }),
         "get_media_key_status" => json!({ "registered": false }),
         "check_for_updates" => json!({ "success": true, "hasUpdate": false }),
         "get_current_version" => json!("0.1.0"),

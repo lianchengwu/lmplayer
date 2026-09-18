@@ -38,6 +38,8 @@ function argsObject(name, args) {
         toggle_osd_lock: [],
         set_osd_locked: ['locked'],
         is_osd_locked: [],
+        set_osd_color: ['color'],
+        get_osd_color: [],
         update_mpris_playback_status: ['status'],
         update_mpris_metadata: ['title', 'artist', 'album', 'artUrl', 'duration'],
         update_mpris_volume: ['volume'],
