@@ -327,7 +327,7 @@ pub async fn dispatch(player: &Player, cmd: &str, args: Value) -> Value {
         "get_osd_color" => json!({ "success": true, "color": crate::osd::get_osd_color() }),
         "get_media_key_status" => json!({ "registered": false }),
         "check_for_updates" => json!({ "success": true, "hasUpdate": false }),
-        "get_current_version" => json!("0.1.0"),
+        "get_current_version" => json!(env!("CARGO_PKG_VERSION")),
         "get_download_records" => ok(json!({ "records": [], "total_count": 0 })),
         "add_download_record" | "delete_download_record" | "clear_download_records" => ok(json!({})),
         "open_file_folder" => {
