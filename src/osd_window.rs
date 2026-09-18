@@ -80,7 +80,7 @@ fn ensure_kwin_rules() {
 
     let content = fs::read_to_string(&kwin_path).unwrap_or_default();
     // If rule section already exists with position+size remember, skip
-    if content.contains("wmplayer-osd") && content.contains("positionrule=4") {
+    if content.contains("wmplayer-osd") && content.contains("onalldesktopsrule=2") {
         return;
     }
 
@@ -89,6 +89,8 @@ fn ensure_kwin_rules() {
 Description=wmplayer OSD lyrics
 above=true
 aboverule=2
+onalldesktops=true
+onalldesktopsrule=2
 positionrule=4
 sizerule=4
 skippager=true
