@@ -18,10 +18,16 @@ pub struct OsdConfig {
     pub color: String,
     #[serde(default = "default_opacity")]
     pub opacity: f64,
+    #[serde(default = "default_bg_opacity")]
+    pub bg_opacity: f64,
 }
 
 fn default_opacity() -> f64 {
-    0.88
+    0.95
+}
+
+fn default_bg_opacity() -> f64 {
+    0.78
 }
 
 impl Default for OsdConfig {
@@ -32,7 +38,8 @@ impl Default for OsdConfig {
             height: 76,
             locked: false,
             color: "#38bdf8".to_string(),
-            opacity: 0.88,
+            opacity: 0.95,
+            bg_opacity: 0.78,
         }
     }
 }
@@ -156,6 +163,62 @@ fn cursor_for_edge(edge: gtk4::gdk::SurfaceEdge) -> &'static str {
     }
 }
 
+fn generate_css(bg_opacity: f64) -> String {
+    let border_opacity = (bg_opacity * 0.25).clamp(0.0, 0.25);
+    let shadow_opacity = (bg_opacity * 0.65).clamp(0.0, 0.65);
+    let bg_str = if bg_opacity <= 0.05 {
+        "transparent".to_string()
+    } else {
+        format!("rgba(15, 23, 42, {bg_opacity:.2})")
+    };
+    let border_str = if bg_opacity <= 0.05 {
+        "none".to_string()
+    } else {
+        format!("1px solid rgba(255, 255, 255, {border_opacity:.2})")
+    };
+    let shadow_str = if bg_opacity <= 0.05 {
+        "none".to_string()
+    } else {
+        format!("0 10px 30px rgba(0, 0, 0, {shadow_opacity:.2})")
+    };
+
+    format!(
+        "
+        window.osd-window {{
+            background-color: {bg_str};
+            border-radius: 16px;
+            border: {border_str};
+            box-shadow: {shadow_str};
+        }}
+        .osd-root-box {{
+            padding: 4px 12px 10px 12px;
+        }}
+        .osd-mini-btn {{
+            background: rgba(255, 255, 255, 0.16);
+            color: rgba(255, 255, 255, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            border-radius: 12px;
+            padding: 2px 8px;
+            font-size: 11px;
+            font-weight: bold;
+            min-height: 22px;
+            min-width: 24px;
+        }}
+        .osd-mini-btn:hover {{
+            background: rgba(255, 255, 255, 0.38);
+            color: #ffffff;
+        }}
+        .osd-close-btn:hover {{
+            background: rgba(239, 68, 68, 0.85);
+            color: #ffffff;
+        }}
+        .osd-lyric-label {{
+            text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
+        }}
+        "
+    )
+}
+
 // Token for KRC karaoke animation
 #[derive(Debug, Clone)]
 struct KrcToken {
@@ -177,6 +240,10 @@ pub struct OsdWindow {
     btn_lock: gtk4::Button,
     #[allow(dead_code)]
     btn_opacity: gtk4::Button,
+    #[allow(dead_code)]
+    btn_bg: gtk4::Button,
+    #[allow(dead_code)]
+    css_provider: gtk4::CssProvider,
     config: Rc<RefCell<OsdConfig>>,
     current_krc: Rc<RefCell<Option<KrcLine>>>,
     krc_source_id: Rc<RefCell<Option<glib::SourceId>>>,
@@ -217,7 +284,7 @@ impl OsdWindow {
         toolbar.set_margin_top(4);
         toolbar.set_margin_end(8);
         toolbar.add_css_class("osd-toolbar");
-        toolbar.set_opacity(0.18); // subtle by default
+        toolbar.set_opacity(0.35); // visible enough to be seen
 
         if cfg.locked {
             toolbar.set_visible(false);
@@ -236,7 +303,7 @@ impl OsdWindow {
         let cfg_leave = config.clone();
         motion_ctrl.connect_leave(move |_| {
             if !cfg_leave.borrow().locked {
-                tb_leave.set_opacity(0.18);
+                tb_leave.set_opacity(0.35);
             }
         });
         window.add_controller(motion_ctrl);
@@ -250,15 +317,20 @@ impl OsdWindow {
         btn_font_inc.add_css_class("osd-mini-btn");
         btn_font_inc.set_tooltip_text(Some("放大字号"));
 
+        let bg_pct = (cfg.bg_opacity * 100.0).round() as i32;
+        let btn_bg = gtk4::Button::with_label(&format!("🌓 {}%", bg_pct));
+        btn_bg.add_css_class("osd-mini-btn");
+        btn_bg.set_tooltip_text(Some(&format!("调节底色亮度/透明度 (当前底色: {}%)", bg_pct)));
+
         let pct = (cfg.opacity * 100.0).round() as i32;
-        let btn_opacity = gtk4::Button::with_label(&format!("{}%", pct));
+        let btn_opacity = gtk4::Button::with_label(&format!("🔆 {}%", pct));
         btn_opacity.add_css_class("osd-mini-btn");
-        btn_opacity.set_tooltip_text(Some(&format!("调节透明度: 当前 {}% (滚轮微调)", pct)));
+        btn_opacity.set_tooltip_text(Some(&format!("调节窗口透明度: 当前 {}% (滚轮微调)", pct)));
 
         let btn_lock = gtk4::Button::with_label(if cfg.locked { "🔒" } else { "🔓" });
         btn_lock.add_css_class("osd-mini-btn");
         btn_lock.set_tooltip_text(Some(if cfg.locked {
-            "已锁定 (鼠标穿透中)"
+            "已锁定 (鼠标穿透中，点击解锁)"
         } else {
             "锁定 (开启鼠标穿透)"
         }));
@@ -270,6 +342,7 @@ impl OsdWindow {
 
         toolbar.append(&btn_font_dec);
         toolbar.append(&btn_font_inc);
+        toolbar.append(&btn_bg);
         toolbar.append(&btn_opacity);
         toolbar.append(&btn_lock);
         toolbar.append(&btn_close);
@@ -312,29 +385,25 @@ impl OsdWindow {
         });
         window.add_controller(motion_edge);
 
-        // Drag gesture: window moving AND border resizing
-        let gesture_drag = gtk4::GestureDrag::new();
-        let cfg_for_drag = config.clone();
-        let win_drag = window.clone();
-        gesture_drag.connect_drag_begin(move |gesture, x, y| {
-            if cfg_for_drag.borrow().locked {
+        // Window edge resize gesture: ONLY triggers when hovering over borders/corners
+        let gesture_resize = gtk4::GestureDrag::new();
+        let cfg_resize = config.clone();
+        let win_resize = window.clone();
+        gesture_resize.connect_drag_begin(move |gesture, x, y| {
+            if cfg_resize.borrow().locked {
                 return;
             }
-            let w = win_drag.width() as f64;
-            let h = win_drag.height() as f64;
-            let edge_opt = detect_edge(x, y, w, h, 10.0);
-
-            if let Some(widget) = gesture.widget() {
-                if let Some(native) = widget.native() {
-                    if let Some(surface) = native.surface() {
-                        if let Ok(toplevel) = surface.downcast::<gtk4::gdk::Toplevel>() {
-                            if let Some(display) = gtk4::gdk::Display::default() {
-                                if let Some(seat) = display.default_seat() {
-                                    if let Some(pointer) = seat.pointer() {
-                                        if let Some(edge) = edge_opt {
+            let w = win_resize.width() as f64;
+            let h = win_resize.height() as f64;
+            if let Some(edge) = detect_edge(x, y, w, h, 10.0) {
+                if let Some(widget) = gesture.widget() {
+                    if let Some(native) = widget.native() {
+                        if let Some(surface) = native.surface() {
+                            if let Ok(toplevel) = surface.downcast::<gtk4::gdk::Toplevel>() {
+                                if let Some(display) = gtk4::gdk::Display::default() {
+                                    if let Some(seat) = display.default_seat() {
+                                        if let Some(pointer) = seat.pointer() {
                                             toplevel.begin_resize(edge, Some(&pointer), 1, x, y, 0);
-                                        } else {
-                                            toplevel.begin_move(&pointer, 1, x, y, 0);
                                         }
                                     }
                                 }
@@ -344,7 +413,33 @@ impl OsdWindow {
                 }
             }
         });
-        window.add_controller(gesture_drag);
+        window.add_controller(gesture_resize);
+
+        // Window moving gesture: attached directly to the lyric label
+        // This completely prevents dragging from intercepting clicks on the toolbar buttons!
+        let gesture_move = gtk4::GestureDrag::new();
+        let cfg_move = config.clone();
+        gesture_move.connect_drag_begin(move |gesture, x, y| {
+            if cfg_move.borrow().locked {
+                return;
+            }
+            if let Some(widget) = gesture.widget() {
+                if let Some(native) = widget.native() {
+                    if let Some(surface) = native.surface() {
+                        if let Ok(toplevel) = surface.downcast::<gtk4::gdk::Toplevel>() {
+                            if let Some(display) = gtk4::gdk::Display::default() {
+                                if let Some(seat) = display.default_seat() {
+                                    if let Some(pointer) = seat.pointer() {
+                                        toplevel.begin_move(&pointer, 1, x, y, 0);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        label.add_controller(gesture_move);
 
         // Scroll controller:
         // - Plain scroll: adjust opacity (smooth)
@@ -378,8 +473,8 @@ impl OsdWindow {
                 c.opacity = (c.opacity + delta).clamp(0.20, 1.0);
                 win_scroll.set_opacity(c.opacity);
                 let pct = (c.opacity * 100.0).round() as i32;
-                btn_op_clone.set_label(&format!("{}%", pct));
-                btn_op_clone.set_tooltip_text(Some(&format!("调节透明度: 当前 {}% (滚轮微调)", pct)));
+                btn_op_clone.set_label(&format!("🔆 {}%", pct));
+                btn_op_clone.set_tooltip_text(Some(&format!("调节窗口透明度: 当前 {}% (滚轮微调)", pct)));
                 save_config(&c);
             }
             glib::Propagation::Stop
@@ -409,7 +504,44 @@ impl OsdWindow {
             }
         });
 
-        // Opacity cycle presets button: 100% -> 85% -> 70% -> 50% -> 35% -> 20%
+        // Background brightness / opacity presets:
+        // 0% (纯透) -> 35% (微弱) -> 65% (半透) -> 85% (标准) -> 95% (高对比) -> 0%
+        let css_provider = gtk4::CssProvider::new();
+        css_provider.load_from_data(&generate_css(cfg.bg_opacity));
+
+        if let Some(display) = gtk4::gdk::Display::default() {
+            gtk4::style_context_add_provider_for_display(
+                &display,
+                &css_provider,
+                gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
+            );
+        }
+
+        let cfg_bg = config.clone();
+        let btn_bg_clone = btn_bg.clone();
+        let css_provider_clone = css_provider.clone();
+        btn_bg.connect_clicked(move |_| {
+            let mut c = cfg_bg.borrow_mut();
+            let next_bg = if c.bg_opacity >= 0.90 {
+                0.0
+            } else if c.bg_opacity <= 0.05 {
+                0.35
+            } else if c.bg_opacity <= 0.40 {
+                0.65
+            } else if c.bg_opacity <= 0.70 {
+                0.85
+            } else {
+                0.95
+            };
+            c.bg_opacity = next_bg;
+            css_provider_clone.load_from_data(&generate_css(c.bg_opacity));
+            let pct = (c.bg_opacity * 100.0).round() as i32;
+            btn_bg_clone.set_label(&format!("🌓 {}%", pct));
+            btn_bg_clone.set_tooltip_text(Some(&format!("调节底色亮度/透明度: 当前 {}%", pct)));
+            save_config(&c);
+        });
+
+        // Window overall opacity presets: 100% -> 85% -> 70% -> 50% -> 35%
         let cfg_op = config.clone();
         let win_op = window.clone();
         let btn_op_action = btn_opacity.clone();
@@ -423,16 +555,14 @@ impl OsdWindow {
                 0.50
             } else if c.opacity >= 0.45 {
                 0.35
-            } else if c.opacity >= 0.30 {
-                0.20
             } else {
                 1.0
             };
             c.opacity = next_op;
             win_op.set_opacity(c.opacity);
             let pct = (c.opacity * 100.0).round() as i32;
-            btn_op_action.set_label(&format!("{}%", pct));
-            btn_op_action.set_tooltip_text(Some(&format!("调节透明度: 当前 {}% (滚轮微调)", pct)));
+            btn_op_action.set_label(&format!("🔆 {}%", pct));
+            btn_op_action.set_tooltip_text(Some(&format!("调节窗口透明度: 当前 {}% (滚轮微调)", pct)));
             save_config(&c);
         });
 
@@ -484,15 +614,14 @@ impl OsdWindow {
             Self::set_window_input_region(&win_realize, locked, w, h);
         });
 
-        // Install CSS
-        Self::apply_css();
-
         Self {
             window,
             label,
             toolbar,
             btn_lock,
             btn_opacity,
+            btn_bg,
+            css_provider,
             config,
             current_krc: Rc::new(RefCell::new(None)),
             krc_source_id: Rc::new(RefCell::new(None)),
@@ -507,7 +636,7 @@ impl OsdWindow {
     ) {
         btn_lock.set_label(if locked { "🔒" } else { "🔓" });
         btn_lock.set_tooltip_text(Some(if locked {
-            "已锁定 (鼠标穿透中)"
+            "已锁定 (鼠标穿透中，点击解锁)"
         } else {
             "锁定 (开启鼠标穿透)"
         }));
@@ -516,7 +645,7 @@ impl OsdWindow {
             toolbar.set_visible(false);
         } else {
             toolbar.set_visible(true);
-            toolbar.set_opacity(0.18);
+            toolbar.set_opacity(0.35);
         }
 
         Self::set_window_input_region(window, locked, window.width(), window.height());
@@ -549,53 +678,6 @@ impl OsdWindow {
     pub fn toggle_lock(&self) {
         let is_locked = !self.config.borrow().locked;
         self.set_locked(is_locked);
-    }
-
-    fn apply_css() {
-        let css_provider = gtk4::CssProvider::new();
-        css_provider.load_from_data(
-            "
-            window.osd-window {
-                background-color: rgba(15, 23, 42, 0.78);
-                border-radius: 16px;
-                border: 1px solid rgba(255, 255, 255, 0.15);
-                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-            }
-            .osd-root-box {
-                padding: 4px 12px 10px 12px;
-            }
-            .osd-mini-btn {
-                background: rgba(255, 255, 255, 0.12);
-                color: rgba(255, 255, 255, 0.9);
-                border: 1px solid rgba(255, 255, 255, 0.18);
-                border-radius: 12px;
-                padding: 1px 7px;
-                font-size: 11px;
-                font-weight: bold;
-                min-height: 20px;
-                min-width: 24px;
-            }
-            .osd-mini-btn:hover {
-                background: rgba(255, 255, 255, 0.28);
-                color: #ffffff;
-            }
-            .osd-close-btn:hover {
-                background: rgba(239, 68, 68, 0.85);
-                color: #ffffff;
-            }
-            .osd-lyric-label {
-                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.85);
-            }
-            ",
-        );
-
-        if let Some(display) = gtk4::gdk::Display::default() {
-            gtk4::style_context_add_provider_for_display(
-                &display,
-                &css_provider,
-                gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
-            );
-        }
     }
 
     pub fn set_visible(&self, visible: bool) {
