@@ -79,7 +79,8 @@ fn ensure_kwin_rules() {
         .join("kwinrulesrc");
 
     let content = fs::read_to_string(&kwin_path).unwrap_or_default();
-    if content.contains("wmplayer-osd") {
+    // If rule section already exists with position+size remember, skip
+    if content.contains("wmplayer-osd") && content.contains("positionrule=4") {
         return;
     }
 
@@ -88,6 +89,8 @@ fn ensure_kwin_rules() {
 Description=wmplayer OSD lyrics
 above=true
 aboverule=2
+positionrule=4
+sizerule=4
 skippager=true
 skippagerrule=2
 skipswitcher=true
@@ -99,8 +102,35 @@ titlematch=1
 types=1
 ";
 
+    // Remove old [wmplayer-osd] section if present (upgrade path)
+    let content = if let Some(start) = content.find("\n[wmplayer-osd]") {
+        let after = &content[start + 1..]; // skip the leading \n
+        let section_end = after.find("\n[")
+            .map(|i| start + 1 + i)
+            .unwrap_or(content.len());
+        let mut cleaned = content[..start].to_string();
+        if section_end < content.len() {
+            cleaned.push_str(&content[section_end..]);
+        }
+        cleaned
+    } else if content.starts_with("[wmplayer-osd]") {
+        let section_end = content.find("\n[")
+            .map(|i| i)
+            .unwrap_or(content.len());
+        if section_end < content.len() {
+            content[section_end..].to_string()
+        } else {
+            String::new()
+        }
+    } else {
+        content
+    };
+
     let new_content = if content.trim().is_empty() {
         format!("[General]\ncount=1\nrules=wmplayer-osd\n{rule_block}")
+    } else if content.contains("wmplayer-osd") {
+        // rules= line already lists wmplayer-osd, just append new block
+        format!("{content}\n{rule_block}")
     } else if let Some(idx) = content.find("rules=") {
         let line_end = content[idx..]
             .find('\n')

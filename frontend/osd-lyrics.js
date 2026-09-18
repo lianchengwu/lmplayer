@@ -4,7 +4,7 @@
  */
 
 // OSD歌词状态
-let osdLyricsEnabled = true; // 桌面歌词是否打开
+let osdLyricsEnabled = false; // 桌面歌词是否打开（默认关闭，启动时从后端同步）
 let osdLyricsLocked = false; // 桌面歌词是否锁定 (鼠标穿透)
 let osdLyricsService = null; // 服务对象，初始化时设置
 let osdLyricsInitialized = false; // 服务是否已初始化
@@ -54,7 +54,8 @@ async function initOSDLyrics() {
         osdLyricsService = { UpdateCurrentLyrics, SetEnabled, IsEnabled, ToggleOSDLock, SetOSDLocked, IsOSDLocked };
         osdLyricsInitialized = true;
         console.log('✅ OSD歌词服务初始化完成');
-        await updateOSDLockStatus();
+        // 同步后端启用和锁定状态
+        await updateOSDLyricsStatus();
 
         // 初始化UI
         initOSDLyricsUI();
