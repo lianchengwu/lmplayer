@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=wmPlayer
+GenericName=Music Player
+GenericName[zh_CN]=音乐播放器
+Comment=Modern Kugou music player built with Rust and GTK4
+Comment[zh_CN]=基于 Rust 与 GTK4 构建的现代化酷狗音乐播放器，支持桌面悬浮歌词与本地音乐
+Exec=wmplayer
+Icon=com.wmplayer.app
+Terminal=false
+Categories=AudioVideo;Player;GTK;
+StartupWMClass=com.wmplayer.app
+Keywords=music;kugou;player;lyrics;歌词;酷狗;音乐;播放器;

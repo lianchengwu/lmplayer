@@ -57,9 +57,13 @@ jobs:
 
       - name: Package
         run: |
-          mkdir -p bin
-          cp target/release/wmplayer bin/wmplayer
-          tar -C bin -czvf wmplayer-linux-amd64.tar.gz wmplayer
+          mkdir -p pkg/wmplayer-linux-amd64
+          cp target/release/wmplayer pkg/wmplayer-linux-amd64/wmplayer
+          cp packaging/linux/com.wmplayer.app.desktop pkg/wmplayer-linux-amd64/
+          cp packaging/linux/com.wmplayer.app.png pkg/wmplayer-linux-amd64/
+          cp packaging/linux/install.sh pkg/wmplayer-linux-amd64/
+          chmod +x pkg/wmplayer-linux-amd64/install.sh
+          tar -C pkg -czvf wmplayer-linux-amd64.tar.gz wmplayer-linux-amd64
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
