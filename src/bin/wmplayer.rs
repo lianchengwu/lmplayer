@@ -1,8 +1,13 @@
+#[cfg(target_os = "linux")]
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(target_os = "linux")]
 use std::sync::mpsc::{self, Sender};
-use std::sync::{Arc, OnceLock};
+#[cfg(target_os = "linux")]
+use std::sync::OnceLock;
+use std::sync::Arc;
+#[cfg(target_os = "linux")]
 use std::time::Duration;
 
 use axum::extract::{Path, State};
@@ -48,12 +53,18 @@ enum WinOp {
 #[cfg(target_os = "linux")]
 static WIN_TX: OnceLock<Sender<WinOp>> = OnceLock::new();
 static MAXIMIZED: AtomicBool = AtomicBool::new(false);
+#[cfg(target_os = "linux")]
 static QUIT: AtomicBool = AtomicBool::new(false);
 
+#[cfg(target_os = "linux")]
 const JS_TOGGLE: &str = "window.Events&&window.Events.Emit('systray:toggle-play-pause')";
+#[cfg(target_os = "linux")]
 const JS_PREV: &str = "window.Events&&window.Events.Emit('systray:previous-song')";
+#[cfg(target_os = "linux")]
 const JS_NEXT: &str = "window.Events&&window.Events.Emit('systray:next-song')";
+#[cfg(target_os = "linux")]
 const JS_FAV: &str = "window.Events&&window.Events.Emit('systray:favorite-song')";
+#[cfg(target_os = "linux")]
 const JS_OSD: &str = "window.Events&&window.Events.Emit('systray:toggle-osd-lyrics')";
 
 #[cfg(target_os = "linux")]
@@ -108,6 +119,7 @@ fn apply_win_op(app: &gtk4::Application, win: &gtk4::ApplicationWindow, webview:
     }
 }
 
+#[cfg(target_os = "linux")]
 fn hardware_accel_enabled() -> bool {
     let path = dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))

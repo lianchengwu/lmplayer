@@ -4,13 +4,17 @@ use gtk4::gdk::prelude::*;
 use gtk4::glib;
 #[cfg(target_os = "linux")]
 use gtk4::prelude::*;
+#[cfg(target_os = "linux")]
 use std::cell::RefCell;
 use std::fs;
 use std::path::PathBuf;
 use std::rc::Rc;
+#[cfg(target_os = "linux")]
 use std::time::Instant;
 
-use crate::osd::{set_osd_enabled, set_osd_locked, LyricPayload, OsdCommand};
+#[cfg(target_os = "linux")]
+use crate::osd::{set_osd_enabled, set_osd_locked};
+use crate::osd::{LyricPayload, OsdCommand};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct OsdConfig {
@@ -64,6 +68,7 @@ pub fn load_config() -> OsdConfig {
     OsdConfig::default()
 }
 
+#[allow(dead_code)]
 fn save_config(cfg: &OsdConfig) {
     let path = config_path();
     if let Some(parent) = path.parent() {

@@ -32,6 +32,7 @@ static DBUS_CONN: OnceLock<connection::Connection> = OnceLock::new();
 #[cfg(target_os = "linux")]
 pub struct LyricDbus;
 
+#[cfg(target_os = "linux")]
 impl LyricDbus {
     pub fn new() -> Self {
         Self
