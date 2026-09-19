@@ -9,7 +9,8 @@ fn main() {
     if Path::new("frontend/dist/index.html").exists() {
         return;
     }
-    let status = Command::new("npm")
+    let npm_cmd = if cfg!(target_os = "windows") { "npm.cmd" } else { "npm" };
+    let status = Command::new(npm_cmd)
         .args(["run", "build"])
         .current_dir("frontend")
         .status()

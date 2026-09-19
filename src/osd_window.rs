@@ -1,5 +1,8 @@
+#[cfg(target_os = "linux")]
 use gtk4::gdk::prelude::*;
+#[cfg(target_os = "linux")]
 use gtk4::glib;
+#[cfg(target_os = "linux")]
 use gtk4::prelude::*;
 use std::cell::RefCell;
 use std::fs;
@@ -73,14 +76,15 @@ fn save_config(cfg: &OsdConfig) {
 
 /// Automatically configure KWin window rules so OSD window stays above all windows,
 /// skips the taskbar, skips the pager, and skips the Alt-Tab window switcher.
+#[cfg(target_os = "linux")]
 fn ensure_kwin_rules() {
     let kwin_path = dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("kwinrulesrc");
 
     let content = fs::read_to_string(&kwin_path).unwrap_or_default();
-    // If rule section already exists with position+size remember, skip
-    if content.contains("wmplayer-osd") && content.contains("onalldesktopsrule=2") {
+    // If rule section already exists with position+size remember and desktop rules, skip
+    if content.contains("wmplayer-osd") && content.contains("desktopsrule=2") {
         return;
     }
 
@@ -89,6 +93,8 @@ fn ensure_kwin_rules() {
 Description=wmplayer OSD lyrics
 above=true
 aboverule=2
+desktops=
+desktopsrule=2
 onalldesktops=true
 onalldesktopsrule=2
 positionrule=4
@@ -157,11 +163,25 @@ types=1
     let _ = fs::write(&kwin_path, new_content);
 
     // Ask KWin to reload rules immediately
-    let _ = std::process::Command::new("busctl")
+    let ok = std::process::Command::new("busctl")
         .args(["--user", "call", "org.kde.KWin", "/KWin", "org.kde.KWin", "reconfigure"])
-        .spawn();
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+
+    if !ok {
+        let _ = std::process::Command::new("qdbus6")
+            .args(["org.kde.KWin", "/KWin", "reconfigure"])
+            .status()
+            .or_else(|_| {
+                std::process::Command::new("qdbus")
+                    .args(["org.kde.KWin", "/KWin", "reconfigure"])
+                    .status()
+            });
+    }
 }
 
+#[cfg(target_os = "linux")]
 fn detect_edge(x: f64, y: f64, width: f64, height: f64, border: f64) -> Option<gtk4::gdk::SurfaceEdge> {
     let on_top = y < border;
     let on_bottom = y > height - border;
@@ -181,6 +201,7 @@ fn detect_edge(x: f64, y: f64, width: f64, height: f64, border: f64) -> Option<g
     }
 }
 
+#[cfg(target_os = "linux")]
 fn cursor_for_edge(edge: gtk4::gdk::SurfaceEdge) -> &'static str {
     match edge {
         gtk4::gdk::SurfaceEdge::North => "n-resize",
@@ -195,6 +216,7 @@ fn cursor_for_edge(edge: gtk4::gdk::SurfaceEdge) -> &'static str {
     }
 }
 
+#[cfg(target_os = "linux")]
 fn generate_css(bg_opacity: f64) -> String {
     let border_opacity = (bg_opacity * 0.25).clamp(0.0, 0.25);
     let shadow_opacity = (bg_opacity * 0.65).clamp(0.0, 0.65);
@@ -252,6 +274,7 @@ fn generate_css(bg_opacity: f64) -> String {
 }
 
 // Token for KRC karaoke animation
+#[cfg(target_os = "linux")]
 #[derive(Debug, Clone)]
 struct KrcToken {
     start_offset_ms: u64,
@@ -259,12 +282,14 @@ struct KrcToken {
     text: String,
 }
 
+#[cfg(target_os = "linux")]
 struct KrcLine {
     tokens: Vec<KrcToken>,
     start_time: Instant,
     total_duration_ms: u64,
 }
 
+#[cfg(target_os = "linux")]
 pub struct OsdWindow {
     window: gtk4::Window,
     label: gtk4::Label,
@@ -281,6 +306,7 @@ pub struct OsdWindow {
     krc_source_id: Rc<RefCell<Option<glib::SourceId>>>,
 }
 
+#[cfg(target_os = "linux")]
 impl OsdWindow {
     pub fn new() -> Self {
         ensure_kwin_rules();
@@ -887,6 +913,7 @@ impl OsdWindow {
 
 // Parses KRC format: [line_start, line_duration]<offset, duration, 0>text...
 // Returns (tokens, total_duration, line_start_ms)
+#[cfg(target_os = "linux")]
 fn parse_krc_line(krc_raw: &str) -> (Vec<KrcToken>, u64, u64) {
     let mut tokens = Vec::new();
     let mut total_duration = 0u64;
@@ -945,6 +972,7 @@ fn parse_krc_line(krc_raw: &str) -> (Vec<KrcToken>, u64, u64) {
 }
 
 // Setup OSD receiver in the GTK thread
+#[cfg(target_os = "linux")]
 pub fn setup_osd_receiver(osd_win: Rc<OsdWindow>, rx: std::sync::mpsc::Receiver<OsdCommand>) {
     glib::timeout_add_local(std::time::Duration::from_millis(25), move || {
         while let Ok(cmd) = rx.try_recv() {
@@ -972,11 +1000,30 @@ pub fn setup_osd_receiver(osd_win: Rc<OsdWindow>, rx: std::sync::mpsc::Receiver<
     });
 }
 
+#[cfg(not(target_os = "linux"))]
+pub struct OsdWindow;
+
+#[cfg(not(target_os = "linux"))]
+impl OsdWindow {
+    pub fn new() -> Self {
+        Self
+    }
+    pub fn set_visible(&self, _v: bool) {}
+    pub fn update_lyrics(&self, _p: LyricPayload) {}
+    pub fn set_locked(&self, _l: bool) {}
+    pub fn toggle_lock(&self) {}
+    pub fn set_color(&self, _c: String) {}
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn setup_osd_receiver(_osd_win: Rc<OsdWindow>, _rx: std::sync::mpsc::Receiver<OsdCommand>) {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
+    #[cfg(target_os = "linux")]
     fn test_parse_krc_line() {
         let line = "[171960,5040]<0,240,0>hello<240,300,0>world";
         let (tokens, duration, start) = parse_krc_line(line);
@@ -985,5 +1032,24 @@ mod tests {
         assert_eq!(tokens[1].text, "world");
         assert_eq!(duration, 5040);
         assert_eq!(start, 171960);
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn test_ensure_kwin_rules() {
+        ensure_kwin_rules();
+        let kwin_path = dirs::config_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("kwinrulesrc");
+        let content = fs::read_to_string(&kwin_path).unwrap_or_default();
+        assert!(content.contains("wmplayer-osd"));
+        assert!(content.contains("desktopsrule=2"));
+        assert!(content.contains("desktops="));
+        assert!(content.contains("title=wmPlayer OSD Lyrics"));
+
+        // Calling it a second time should be idempotent and not duplicate
+        ensure_kwin_rules();
+        let content_after = fs::read_to_string(&kwin_path).unwrap_or_default();
+        assert_eq!(content, content_after);
     }
 }

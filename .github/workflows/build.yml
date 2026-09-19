@@ -93,19 +93,73 @@ jobs:
           npm ci
           npm run build
 
-      # Desktop shell is GTK4 + WebKitGTK + ksni (Linux). MSYS2 has no
-      # webkitgtk-6.0, so the wmplayer binary cannot be produced here.
-      # kugou (HTTP/protocol crate) is the portable Windows compile.
-      - name: Build kugou
-        run: cargo build -p kugou --release
+      - name: Build wmplayer
+        run: cargo build --release --bin wmplayer
 
       - name: Test kugou
         run: cargo test --manifest-path kugou/Cargo.toml
 
+      - name: Package Windows
+        shell: bash
+        run: |
+          mkdir -p bin
+          cp target/release/wmplayer.exe bin/
+          7z a -tzip wmplayer-windows-amd64.zip ./bin/wmplayer.exe
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wmplayer-windows-amd64
+          path: wmplayer-windows-amd64.zip
+
+  build-macos:
+    name: Build macOS (Universal)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build wmplayer
+        run: cargo build --release --bin wmplayer
+
+      - name: Test kugou
+        run: cargo test --manifest-path kugou/Cargo.toml
+
+      - name: Package macOS
+        run: |
+          mkdir -p bin
+          cp target/release/wmplayer bin/wmplayer
+          chmod +x bin/wmplayer
+          zip -j wmplayer-darwin-universal.zip bin/wmplayer
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wmplayer-darwin-universal
+          path: wmplayer-darwin-universal.zip
   release:
     name: GitHub Release
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [build-linux, build-windows]
+    needs: [build-linux, build-windows, build-macos]
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts

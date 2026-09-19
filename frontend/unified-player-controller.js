@@ -142,6 +142,7 @@ class UnifiedPlayerController {
             if (success) {
                 this.state.isPlaying = true;
                 this.emit('playStateChanged', this.state.isPlaying);
+                if (window.syncSleepInhibitor) window.syncSleepInhibitor(true);
             }
             return success;
         }
@@ -154,6 +155,7 @@ class UnifiedPlayerController {
             if (success) {
                 this.state.isPlaying = false;
                 this.emit('playStateChanged', this.state.isPlaying);
+                if (window.syncSleepInhibitor) window.syncSleepInhibitor(false);
             }
             return success;
         }

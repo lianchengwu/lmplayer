@@ -11,14 +11,19 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::Json;
 use axum::Router;
+#[cfg(target_os = "linux")]
 use gtk4::gdk::prelude::*;
+#[cfg(target_os = "linux")]
 use gtk4::glib;
+#[cfg(target_os = "linux")]
 use gtk4::prelude::*;
 use serde_json::{json, Value};
 use tower_http::cors::CorsLayer;
 #[cfg(debug_assertions)]
 use tower_http::services::ServeDir;
+#[cfg(target_os = "linux")]
 use webkit6::prelude::*;
+#[cfg(target_os = "linux")]
 use webkit6::HardwareAccelerationPolicy;
 use wmplayer::{dispatch, Player};
 
@@ -40,6 +45,7 @@ enum WinOp {
     HwAccel(bool),
 }
 
+#[cfg(target_os = "linux")]
 static WIN_TX: OnceLock<Sender<WinOp>> = OnceLock::new();
 static MAXIMIZED: AtomicBool = AtomicBool::new(false);
 static QUIT: AtomicBool = AtomicBool::new(false);
@@ -50,6 +56,7 @@ const JS_NEXT: &str = "window.Events&&window.Events.Emit('systray:next-song')";
 const JS_FAV: &str = "window.Events&&window.Events.Emit('systray:favorite-song')";
 const JS_OSD: &str = "window.Events&&window.Events.Emit('systray:toggle-osd-lyrics')";
 
+#[cfg(target_os = "linux")]
 fn send_win(op: WinOp) {
     match WIN_TX.get() {
         Some(tx) => {
@@ -61,6 +68,10 @@ fn send_win(op: WinOp) {
     }
 }
 
+#[cfg(not(target_os = "linux"))]
+fn send_win(_op: WinOp) {}
+
+#[cfg(target_os = "linux")]
 fn apply_win_op(app: &gtk4::Application, win: &gtk4::ApplicationWindow, webview: &webkit6::WebView, op: WinOp) {
     match op {
         WinOp::Minimize => win.minimize(),
@@ -110,6 +121,7 @@ fn hardware_accel_enabled() -> bool {
         .unwrap_or(true)
 }
 
+#[cfg(target_os = "linux")]
 fn apply_hw_accel(webview: &webkit6::WebView, on: bool) {
     if let Some(settings) = webkit6::prelude::WebViewExt::settings(webview) {
         settings.set_hardware_acceleration_policy(if on {
@@ -121,6 +133,7 @@ fn apply_hw_accel(webview: &webkit6::WebView, on: bool) {
 }
 
 
+#[cfg(target_os = "linux")]
 fn begin_window_move(win: &gtk4::ApplicationWindow, x: f64, y: f64) {
     let Some(native) = win.native() else {
         return;
@@ -252,26 +265,29 @@ fn load_player() -> Player {
 }
 
 fn main() {
-    // NVIDIA + WebKitGTK: DMA-BUF often freezes input.
-    // Do not disable compositing / GSK cairo — that paints the whole UI on CPU.
+    #[cfg(target_os = "linux")]
     if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
         std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
     }
 
-    let app = gtk4::Application::builder()
-        .application_id("com.wmplayer.app")
-        .flags(gtk4::gio::ApplicationFlags::empty())
-        .build();
+    #[cfg(target_os = "linux")]
+    let app = {
+        let app = gtk4::Application::builder()
+            .application_id("com.wmplayer.app")
+            .flags(gtk4::gio::ApplicationFlags::empty())
+            .build();
 
-    if let Err(e) = app.register(gtk4::gio::Cancellable::NONE) {
-        eprintln!("Failed to register application: {e}");
-    }
-    if app.is_remote() {
-        eprintln!("wmplayer is already running, activating existing instance...");
-        app.activate();
-        let _ = app.run_with_args::<&str>(&[]);
-        return;
-    }
+        if let Err(e) = app.register(gtk4::gio::Cancellable::NONE) {
+            eprintln!("Failed to register application: {e}");
+        }
+        if app.is_remote() {
+            eprintln!("wmplayer is already running, activating existing instance...");
+            app.activate();
+            let _ = app.run_with_args::<&str>(&[]);
+            return;
+        }
+        app
+    };
     let player = load_player();
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -304,24 +320,61 @@ fn main() {
     let (router, origin) = (api.fallback(embedded_frontend), "dist=embedded".to_string());
 
     eprintln!("wmplayer http://{addr}  {origin}");
-    rt.spawn(async {
-        if let Err(e) = wmplayer::osd::start_dbus_service().await {
-            eprintln!("D-Bus lyric service: {e}");
+    #[cfg(target_os = "linux")]
+    {
+        rt.spawn(async {
+            if let Err(e) = wmplayer::osd::start_dbus_service().await {
+                eprintln!("D-Bus lyric service: {e}");
+            }
+        });
+        std::thread::Builder::new()
+            .name("wmplayer-http".into())
+            .spawn(move || {
+                rt.block_on(async move {
+                    if let Err(e) = axum::serve(listener, router).await {
+                        eprintln!("http server: {e}");
+                    }
+                });
+            })
+            .expect("http thread");
+        start_webview(app, addr);
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        let uri = format!("http://{addr}/");
+        eprintln!("🎵 wmplayer running at {uri}");
+        eprintln!("Opening default browser...");
+
+        #[cfg(target_os = "windows")]
+        {
+            let _ = std::process::Command::new("rundll32")
+                .args(["url.dll,FileProtocolHandler", &uri])
+                .spawn();
         }
-    });
-    std::thread::Builder::new()
-        .name("wmplayer-http".into())
-        .spawn(move || {
-            rt.block_on(async move {
-                if let Err(e) = axum::serve(listener, router).await {
-                    eprintln!("http server: {e}");
+        #[cfg(target_os = "macos")]
+        {
+            let _ = std::process::Command::new("open")
+                .arg(&uri)
+                .spawn();
+        }
+
+        rt.block_on(async {
+            let _ = tokio::select! {
+                res = axum::serve(listener, router) => {
+                    if let Err(e) = res {
+                        eprintln!("http server error: {e}");
+                    }
                 }
-            });
-        })
-        .expect("http thread");
-    start_webview(app, addr);
+                _ = tokio::signal::ctrl_c() => {
+                    eprintln!("Shutting down wmplayer...");
+                }
+            };
+        });
+    }
 }
 
+#[cfg(target_os = "linux")]
 fn start_webview(app: gtk4::Application, addr: SocketAddr) {
     let uri = format!("http://{addr}/");
     app.connect_activate(move |app| {
@@ -421,10 +474,12 @@ fn start_webview(app: gtk4::Application, addr: SocketAddr) {
     app.run();
 }
 
+#[cfg(target_os = "linux")]
 struct PlayerTray {
     tx: Sender<WinOp>,
 }
 
+#[cfg(target_os = "linux")]
 impl ksni::Tray for PlayerTray {
     fn id(&self) -> String {
         "com.wmplayer.app".into()
@@ -523,6 +578,7 @@ impl ksni::Tray for PlayerTray {
     }
 }
 
+#[cfg(target_os = "linux")]
 fn start_tray(tx: Sender<WinOp>) {
     use ksni::blocking::TrayMethods;
     match (PlayerTray { tx }).spawn() {
@@ -531,6 +587,7 @@ fn start_tray(tx: Sender<WinOp>) {
     }
 }
 
+#[cfg(target_os = "linux")]
 fn tray_logo() -> Vec<ksni::Icon> {
     static ICONS: std::sync::OnceLock<Vec<ksni::Icon>> = std::sync::OnceLock::new();
     ICONS

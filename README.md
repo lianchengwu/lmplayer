@@ -8,7 +8,7 @@
 
 [![Rust Version](https://img.shields.io/badge/Rust-2021_Edition-DEA584.svg?style=flat-square&logo=rust)](https://www.rust-lang.org/)
 [![UI Shell](https://img.shields.io/badge/UI-GTK4%20%2B%20WebKitGTK%206.0-4A90E2.svg?style=flat-square&logo=gnome)](https://gtk.org/)
-[![Release](https://img.shields.io/badge/Release-v0.8.6-blue.svg?style=flat-square)](https://github.com/lianchengwu/lmplayer/releases)
+[![Release](https://img.shields.io/badge/Release-v0.8.7-blue.svg?style=flat-square)](https://github.com/lianchengwu/lmplayer/releases)
 [![GitHub Actions](https://img.shields.io/github/actions/workflow/status/lianchengwu/lmplayer/build.yml?branch=rust&style=flat-square&logo=github-actions)](https://github.com/lianchengwu/lmplayer/actions)
 [![License](https://img.shields.io/badge/License-GPL--3.0-green.svg?style=flat-square)](LICENSE)
 
@@ -185,17 +185,18 @@ target/release/wmplayer
 本项目配置了 **GitHub Actions CI 流水线** (`.github/workflows/build.yml`)：
 
 ### 自动化发布流程
-只需向仓库推送以 `v` 开头的版本标签（例如 `v0.8.6`），CI 将自动完成编译、打包并创建 GitHub Release 发布：
+只需向仓库推送以 `v` 开头的版本标签（例如 `v0.8.7`），CI 将自动完成编译、打包并创建 GitHub Release 发布：
 
 ```bash
-git tag v0.8.6
-git push origin v0.8.6
+git tag v0.8.7
+git push origin v0.8.7
 ```
 
 | 平台 | 架构 | 生成产物 | 说明 |
 | :--- | :--- | :--- | :--- |
-| **Linux** | x86_64 | `wmplayer-linux-amd64.tar.gz` | 单一自包含可执行程序（内嵌 WebUI 与纯 Rust 协议引擎） |
-| **Windows** | x86_64 | `kugou` crate 单元测试与库构建 | 纯 Rust 协议库跨平台编译验证 |
+| **Linux** | x86_64 | `wmplayer-linux-amd64.tar.gz` | 原生 GTK4 + WebKitGTK 6.0 桌面应用（内嵌 WebUI 与纯 Rust 协议引擎） |
+| **Windows** | x86_64 | `wmplayer-windows-amd64.zip` | 单一可执行程序 `wmplayer.exe`，启动并自动开启网页界面 |
+| **macOS** | Universal (x86_64 / arm64) | `wmplayer-darwin-universal.zip` | 单一可执行程序 `wmplayer`，启动并自动开启网页界面 |
 
 ---
 

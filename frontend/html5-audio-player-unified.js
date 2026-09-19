@@ -31,6 +31,20 @@ function normalizeSongUrls(data) {
   return normalizedUrls;
 }
 
+function syncSleepInhibitor(isPlaying) {
+  try {
+    fetch("/__ipc", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        cmd: "set_playback_state",
+        args: { playing: Boolean(isPlaying) },
+      }),
+    }).catch(() => {});
+  } catch (_) {}
+}
+window.syncSleepInhibitor = syncSleepInhibitor;
+
 /**
  * HTML5 音频播放器类
  * 使用原生 HTML5 Audio API 实现音频播放功能
@@ -205,6 +219,7 @@ class HTML5AudioPlayer {
     addListener("play", () => {
       this._isPlaying = true;
       console.log("🎵 播放开始");
+      syncSleepInhibitor(true);
       if (this.onPlayCallback) this.onPlayCallback();
     });
 
@@ -221,6 +236,7 @@ class HTML5AudioPlayer {
       clearStallTimer();
       this._isPlaying = false;
       console.log("⏸️ 播放暂停");
+      syncSleepInhibitor(false);
       if (this.onPauseCallback) this.onPauseCallback();
     });
 
@@ -245,6 +261,7 @@ class HTML5AudioPlayer {
       clearStallTimer();
       this.isBuffering = false;
       this._isPlaying = true;
+      syncSleepInhibitor(true);
       console.log("▶️ 音频恢复播放 (playing)");
     });
 
@@ -316,6 +333,7 @@ class HTML5AudioPlayer {
       this._isPlaying = false;
       this.prematureEndCount = 0;
       this.lastPlaybackPosition = 0;
+      syncSleepInhibitor(false);
       console.log("🎵 播放正常结束");
       if (this.onEndCallback) this.onEndCallback();
     });
@@ -790,6 +808,7 @@ class HTML5AudioPlayer {
         console.warn("⚠️ 停止音频时捕获异常:", e);
       }
       this._isPlaying = false;
+      syncSleepInhibitor(false);
       console.log("⏹️ 停止播放");
     }
   }

@@ -8,6 +8,7 @@ pub mod audio_cache;
 pub mod local_music;
 pub mod osd;
 pub mod osd_window;
+pub mod sleep_inhibitor;
 mod home;
 mod ipc;
 mod login;

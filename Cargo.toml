@@ -1,6 +1,6 @@
 [package]
 name = "wmplayer"
-version = "0.8.6"
+version = "0.8.7"
 edition = "2021"
 description = "wmPlayer Rust backend — KuGou via kugou crate, Lite default"
 
@@ -20,16 +20,18 @@ axum = { version = "0.8", features = ["macros"] }
 tower-http = { version = "0.6", features = ["fs", "cors"] }
 rust-embed = "8"
 mime_guess = "2"
-ksni = { version = "0.3", features = ["blocking"] }
 image = { version = "0.25", default-features = false, features = ["png", "ico"] }
-gtk4 = "0.9"
-webkit6 = "0.4"
 lofty = "0.25.2"
 rfd = "0.17.2"
 walkdir = "2"
 md5 = "0.7"
 tower-service = "0.3"
 parking_lot = "0.12"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk4 = "0.9"
+webkit6 = "0.4"
+ksni = { version = "0.3", features = ["blocking"] }
 zbus = { version = "5", default-features = false, features = ["tokio"] }
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

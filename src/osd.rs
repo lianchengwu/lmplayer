@@ -1,7 +1,9 @@
 use parking_lot::RwLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{LazyLock, OnceLock};
+#[cfg(target_os = "linux")]
 use zbus::object_server::SignalEmitter;
+#[cfg(target_os = "linux")]
 use zbus::{connection, interface};
 
 #[derive(Clone, Default, Debug, serde::Serialize, serde::Deserialize)]
@@ -24,8 +26,10 @@ static LYRIC_STATE: LazyLock<RwLock<LyricState>> =
     LazyLock::new(|| RwLock::new(LyricState::default()));
 static OSD_ENABLED: AtomicBool = AtomicBool::new(false);
 static OSD_LOCKED: AtomicBool = AtomicBool::new(false);
+#[cfg(target_os = "linux")]
 static DBUS_CONN: OnceLock<connection::Connection> = OnceLock::new();
 
+#[cfg(target_os = "linux")]
 pub struct LyricDbus;
 
 impl LyricDbus {
@@ -34,6 +38,7 @@ impl LyricDbus {
     }
 }
 
+#[cfg(target_os = "linux")]
 #[interface(name = "org.wmplayer.Lyric")]
 impl LyricDbus {
     #[zbus(property)]
@@ -132,6 +137,7 @@ pub fn send_player_action(action: PlayerAction) {
     }
 }
 
+#[cfg(target_os = "linux")]
 pub async fn start_dbus_service() -> zbus::Result<()> {
     let lyric_iface = LyricDbus::new();
     let conn = connection::Builder::session()?
@@ -142,6 +148,11 @@ pub async fn start_dbus_service() -> zbus::Result<()> {
 
     let _ = DBUS_CONN.set(conn);
     eprintln!("✅ [D-Bus] Registered org.wmplayer.Lyric on session bus");
+    Ok(())
+}
+
+#[cfg(not(target_os = "linux"))]
+pub async fn start_dbus_service() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     Ok(())
 }
 
@@ -230,6 +241,7 @@ pub fn update_lyrics(text: &str, song: &str, artist: &str, current_time: f64) {
     }
 
     // 3. Emit D-Bus signal for external subscribers (KDE Plasma plugin)
+    #[cfg(target_os = "linux")]
     if let Some(conn) = DBUS_CONN.get() {
         let conn = conn.clone();
         let song_str = song.to_string();

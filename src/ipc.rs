@@ -290,6 +290,9 @@ pub async fn dispatch(player: &Player, cmd: &str, args: Value) -> Value {
                 .and_then(|v| v.as_f64())
                 .unwrap_or(0.0);
             crate::osd::update_lyrics(&text, &song, &artist, current_time);
+            if current_time > 0.0 {
+                crate::sleep_inhibitor::set_playback_state(true);
+            }
             ok(json!("ok"))
         }
         "set_osd_enabled" => {
@@ -325,6 +328,26 @@ pub async fn dispatch(player: &Player, cmd: &str, args: Value) -> Value {
             json!({ "success": true, "color": color })
         }
         "get_osd_color" => json!({ "success": true, "color": crate::osd::get_osd_color() }),
+        "set_playback_state" => {
+            let playing = arg_bool(&args, "playing");
+            crate::sleep_inhibitor::set_playback_state(playing);
+            ok(json!({
+                "success": true,
+                "playing": playing,
+                "inhibited": crate::sleep_inhibitor::is_inhibited()
+            }))
+        }
+        "is_sleep_inhibited" => json!({
+            "success": true,
+            "inhibited": crate::sleep_inhibitor::is_inhibited(),
+            "playing": crate::sleep_inhibitor::is_playing(),
+        }),
+        "update_mpris_playback_status" => {
+            let status = arg_str(&args, "status");
+            let is_playing = status.eq_ignore_ascii_case("playing");
+            crate::sleep_inhibitor::set_playback_state(is_playing);
+            ok(json!({ "success": true, "status": status }))
+        }
         "get_media_key_status" => json!({ "registered": false }),
         "check_for_updates" => json!({ "success": true, "hasUpdate": false }),
         "get_current_version" => json!(env!("CARGO_PKG_VERSION")),
@@ -524,4 +547,31 @@ fn filter_history(data: &Value, req: &Value) -> Value {
         "records": page_recs,
         "total_count": total,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_playback_state_ipc() {
+        let _guard = crate::sleep_inhibitor::TEST_MUTEX.lock();
+        let player = crate::Player::lite().unwrap();
+
+        // Set playback state to true
+        let res1 = dispatch(&player, "set_playback_state", json!({ "playing": true })).await;
+        assert_eq!(res1["success"], true);
+        assert_eq!(res1["data"]["playing"], true);
+        assert!(crate::sleep_inhibitor::is_playing());
+
+        // Query status
+        let res2 = dispatch(&player, "is_sleep_inhibited", json!({})).await;
+        assert_eq!(res2["success"], true);
+        assert_eq!(res2["playing"], true);
+
+        // Set playback state to false via update_mpris_playback_status
+        let res3 = dispatch(&player, "update_mpris_playback_status", json!({ "status": "Paused" })).await;
+        assert_eq!(res3["success"], true);
+        assert!(!crate::sleep_inhibitor::is_playing());
+    }
 }

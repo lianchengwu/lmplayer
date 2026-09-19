@@ -44,6 +44,8 @@ function argsObject(name, args) {
         update_mpris_metadata: ['title', 'artist', 'album', 'artUrl', 'duration'],
         update_mpris_volume: ['volume'],
         update_mpris_position: ['position'],
+        set_playback_state: ['playing'],
+        is_sleep_inhibited: [],
         get_download_records: ['request'],
         add_download_record: ['request'],
         delete_download_record: ['request'],
