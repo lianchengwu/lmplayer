@@ -89,7 +89,9 @@ fn ensure_kwin_rules() {
 
     let content = fs::read_to_string(&kwin_path).unwrap_or_default();
     // If rule section already exists with position+size remember and desktop rules, skip
-    if content.contains("wmplayer-osd") && content.contains("desktopsrule=2") {
+    let has_osd_rule = content.contains("[wmplayer-osd]");
+    let has_exact_desktopsrule = content.lines().any(|l| l.trim() == "desktopsrule=2");
+    if has_osd_rule && has_exact_desktopsrule {
         return;
     }
 
@@ -140,7 +142,7 @@ types=1
     };
 
     let new_content = if content.trim().is_empty() {
-        format!("[General]\ncount=1\nrules=wmplayer-osd\n{rule_block}")
+        format!("[General]\ncount=1\nrules=wmplayer-osd\nOrder=wmplayer-osd\n{rule_block}")
     } else if content.contains("wmplayer-osd") {
         // rules= line already lists wmplayer-osd, just append new block
         format!("{content}\n{rule_block}")
@@ -151,15 +153,15 @@ types=1
             .unwrap_or(content.len());
         let current_rules = &content[idx + 6..line_end].trim();
         let updated_line = if current_rules.is_empty() {
-            "rules=wmplayer-osd".to_string()
+            "rules=wmplayer-osd\nOrder=wmplayer-osd".to_string()
         } else {
-            format!("rules={},wmplayer-osd", current_rules)
+            format!("rules={current_rules},wmplayer-osd\nOrder={current_rules},wmplayer-osd")
         };
         let mut updated = content.clone();
         updated.replace_range(idx..line_end, &updated_line);
         format!("{updated}\n{rule_block}")
     } else {
-        format!("{content}\n[General]\nrules=wmplayer-osd\n{rule_block}")
+        format!("{content}\n[General]\nrules=wmplayer-osd\nOrder=wmplayer-osd\n{rule_block}")
     };
 
     if let Some(parent) = kwin_path.parent() {
@@ -243,13 +245,19 @@ fn generate_css(bg_opacity: f64) -> String {
 
     format!(
         "
-        window.osd-window {{
+        window.osd-window,
+        window.osd-window.background,
+        window.background.osd-window,
+        .osd-window {{
+            background-image: none;
             background-color: {bg_str};
             border-radius: 16px;
             border: {border_str};
             box-shadow: {shadow_str};
         }}
         .osd-root-box {{
+            background-image: none;
+            background-color: transparent;
             padding: 4px 12px 10px 12px;
         }}
         .osd-mini-btn {{
@@ -576,7 +584,7 @@ impl OsdWindow {
             gtk4::style_context_add_provider_for_display(
                 &display,
                 &css_provider,
-                gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
+                gtk4::STYLE_PROVIDER_PRIORITY_USER,
             );
         }
 
@@ -1048,8 +1056,8 @@ mod tests {
             .join("kwinrulesrc");
         let content = fs::read_to_string(&kwin_path).unwrap_or_default();
         assert!(content.contains("wmplayer-osd"));
-        assert!(content.contains("desktopsrule=2"));
-        assert!(content.contains("desktops="));
+        assert!(content.lines().any(|l| l.trim() == "desktopsrule=2"));
+        assert!(content.lines().any(|l| l.trim() == "desktops="));
         assert!(content.contains("title=wmPlayer OSD Lyrics"));
 
         // Calling it a second time should be idempotent and not duplicate
