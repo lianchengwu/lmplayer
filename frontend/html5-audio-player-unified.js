@@ -70,6 +70,9 @@ class HTML5AudioPlayer {
     this.isManuallyStopped = false;
     this.isRecovering = false;
 
+    // 预缓存下一首状态追踪
+    this.hasPrecachedForCurrentSong = null;
+    this.isPrecacheInProgress = false;
     // 调试变量
     this.lastLoggedCurrentTime = 0;
     this.durationLogged = false;
@@ -393,6 +396,7 @@ class HTML5AudioPlayer {
           this.isBuffering = false;
         }
         this.lastPlaybackPosition = this.audio.currentTime;
+        this.checkPrecacheNextSong();
       }
       if (this.onTimeUpdateCallback) {
         this.onTimeUpdateCallback(this.audio.currentTime, this.audio.duration);
@@ -458,6 +462,8 @@ class HTML5AudioPlayer {
     this.lastPlaybackPosition = 0;
     this.isManuallyStopped = false;
     this.isRecovering = false;
+    this.hasPrecachedForCurrentSong = null;
+    this.isPrecacheInProgress = false;
 
     console.log("🎵 开始播放歌曲:", song);
 
@@ -511,6 +517,8 @@ class HTML5AudioPlayer {
     this.prematureEndCount = 0;
     this.lastPlaybackPosition = 0;
     this.isRecovering = false;
+    this.hasPrecachedForCurrentSong = null;
+    this.isPrecacheInProgress = false;
 
     console.log("✅ HTML5播放器实例已销毁");
   }
@@ -798,6 +806,8 @@ class HTML5AudioPlayer {
     this.isRecovering = false;
     this.prematureEndCount = 0;
     this.lastPlaybackPosition = 0;
+    this.hasPrecachedForCurrentSong = null;
+    this.isPrecacheInProgress = false;
     if (this.audio) {
       try {
         this.audio.pause();
@@ -836,6 +846,94 @@ class HTML5AudioPlayer {
    */
   getDuration() {
     return this.audio ? this.audio.duration : 0;
+  }
+
+  /**
+   * 自动在当前曲目最后 30 秒时提前静默预缓存下一首歌曲
+   */
+  async checkPrecacheNextSong() {
+    if (!this.audio || this.isPrecacheInProgress) return;
+
+    const currentTime = this.audio.currentTime;
+    const duration = this.audio.duration;
+
+    // 需具备有效歌曲信息与合法总时长
+    if (!Number.isFinite(duration) || duration <= 0 || !this.currentSong?.hash) {
+      return;
+    }
+
+    // 若当前歌曲已触发过预缓存，不再重复执行
+    if (this.hasPrecachedForCurrentSong === this.currentSong.hash) {
+      return;
+    }
+
+    // 判断是否进入最后 30 秒（若总时长小于等于 35 秒，则在播放过半后触发）
+    const remainingTime = duration - currentTime;
+    const shouldPrecache = duration > 35
+      ? (remainingTime <= 30 && remainingTime > 0)
+      : (currentTime >= duration * 0.5);
+
+    if (!shouldPrecache) {
+      return;
+    }
+
+    // 立即标记避免在异步请求期间重复进入
+    this.hasPrecachedForCurrentSong = this.currentSong.hash;
+
+    const nextSong = window.PlaylistManager?.peekNextSong?.();
+    if (!nextSong || !nextSong.hash) {
+      return;
+    }
+
+    // 本地音乐无需网络下载缓存
+    if (nextSong.hash.startsWith("local-")) {
+      console.log("ℹ️ [Precache] 下一首为本地音乐，无需网络预缓存:", nextSong.songname || nextSong.title);
+      return;
+    }
+
+    // 单曲循环或相同歌曲无需额外下载
+    if (nextSong.hash === this.currentSong.hash) {
+      return;
+    }
+
+    console.log(`⏳ [Precache] 距离当前曲目结束还剩 ${remainingTime.toFixed(1)}s，提前开始预缓存下一首:`, nextSong.songname || nextSong.title, nextSong.hash);
+
+    this.isPrecacheInProgress = true;
+    try {
+      const { GetCachedURL, CacheAudioFile } = await import("./bindings/wmplayer/cacheservice.js");
+      const { GetSongUrl } = await import("./bindings/wmplayer/homepageservice.js");
+
+      // 1. 检查下一首是否已命中本地缓存
+      const cached = await GetCachedURL(nextSong.hash);
+      if (cached?.success && cached?.data) {
+        console.log("✅ [Precache] 下一首已在本地缓存中，切歌将秒开:", nextSong.songname || nextSong.title, cached.data);
+        return;
+      }
+
+      // 2. 解析下一首歌曲播放地址
+      const response = await GetSongUrl(nextSong.hash);
+      if (!response?.success || !response.data) {
+        console.warn("⚠️ [Precache] 获取下一首播放地址失败:", response?.message);
+        return;
+      }
+
+      const urls = normalizeSongUrls(response.data);
+      if (!urls || urls.length === 0) {
+        console.warn("⚠️ [Precache] 下一首无可用播放地址");
+        return;
+      }
+
+      // 3. 后台静默下载缓存
+      console.log(`📥 [Precache] 正在后台静默下载缓存下一首 (${urls.length} 个候选流)...`);
+      const cacheRes = await CacheAudioFile(nextSong.hash, urls);
+      if (cacheRes && (cacheRes.data || cacheRes.success)) {
+        console.log("🎉 [Precache] 下一首预缓存完成:", nextSong.songname || nextSong.title, cacheRes.data || `/__cache/${nextSong.hash}`);
+      }
+    } catch (err) {
+      console.warn("⚠️ [Precache] 预缓存发生异常:", err);
+    } finally {
+      this.isPrecacheInProgress = false;
+    }
   }
 
   /**

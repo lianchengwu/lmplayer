@@ -378,8 +378,8 @@ function peekNextSong() {
         return null;
     }
 
-    // 安全策略：随机播放 / FM / 单曲循环不做预判，避免预缓存错歌
-    if (shuffleMode || playlistName === '私人FM' || repeatMode === 'one') {
+    // 安全策略：随机播放 / 单曲循环不做预判，避免预缓存错歌
+    if (shuffleMode || repeatMode === 'one') {
         return null;
     }
 
