@@ -93,30 +93,42 @@ pub(crate) fn aes_decrypt(data_hex: &str, key: &str, iv: Option<&str>) -> Result
 
 #[allow(dead_code)]
 pub(crate) fn playlist_aes_encrypt(data: &Value) -> Result<AesEncrypt, Error> {
+    let (enc, _) = playlist_aes_encrypt_raw(data)?;
+    Ok(enc)
+}
+
+pub(crate) fn playlist_aes_encrypt_raw(data: &Value) -> Result<(AesEncrypt, Vec<u8>), Error> {
     let use_data = match data {
         Value::String(s) => s.clone(),
         other => other.to_string(),
     };
     let key = random_string(6).to_lowercase();
     let digest = md5_str(&key);
-    let encrypt_key = digest[..16].to_string();
-    let iv = digest[16..32].to_string();
+    let encrypt_key = &digest[..16];
+    let iv = &digest[16..32];
     let ct = aes_encrypt_raw(encrypt_key.as_bytes(), iv.as_bytes(), use_data.as_bytes())?;
-    Ok(AesEncrypt {
-        key,
-        str: base64::engine::general_purpose::STANDARD.encode(ct),
-    })
+    Ok((
+        AesEncrypt {
+            key,
+            str: base64::engine::general_purpose::STANDARD.encode(&ct),
+        },
+        ct,
+    ))
 }
 
 #[allow(dead_code)]
 pub(crate) fn playlist_aes_decrypt(str_b64: &str, key: &str) -> Result<Value, Error> {
-    let digest = md5_str(key);
-    let encrypt_key = digest[..16].to_string();
-    let iv = digest[16..32].to_string();
     let ct = base64::engine::general_purpose::STANDARD
         .decode(str_b64)
         .map_err(|e| Error::crypto(e.to_string()))?;
-    let pt = aes_decrypt_raw(encrypt_key.as_bytes(), iv.as_bytes(), &ct)?;
+    playlist_aes_decrypt_bytes(&ct, key)
+}
+
+pub(crate) fn playlist_aes_decrypt_bytes(bytes: &[u8], key: &str) -> Result<Value, Error> {
+    let digest = md5_str(key);
+    let encrypt_key = &digest[..16];
+    let iv = &digest[16..32];
+    let pt = aes_decrypt_raw(encrypt_key.as_bytes(), iv.as_bytes(), bytes)?;
     let text = String::from_utf8_lossy(&pt).to_string();
     Ok(serde_json::from_str(&text).unwrap_or(Value::String(text)))
 }
@@ -150,6 +162,14 @@ mod tests {
         let src = json!({"foo": "bar"});
         let enc = playlist_aes_encrypt(&src).unwrap();
         let dec = playlist_aes_decrypt(&enc.str, &enc.key).unwrap();
+        assert_eq!(dec, src);
+    }
+
+    #[test]
+    fn playlist_raw_bytes_roundtrip() {
+        let src = json!({"page": 1, "pagesize": 30, "getkmr": 1});
+        let (enc, raw) = playlist_aes_encrypt_raw(&src).unwrap();
+        let dec = playlist_aes_decrypt_bytes(&raw, &enc.key).unwrap();
         assert_eq!(dec, src);
     }
 }

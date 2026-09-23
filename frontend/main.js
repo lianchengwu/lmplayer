@@ -7,6 +7,7 @@ import * as SettingsService from "./bindings/wmplayer/settingsservice.js";
 import {initLocalMusic} from "./local.js";
 import "./playlists.js";
 import "./album-detail.js";
+import "./cloud.js";
  
 // 移除了示例时间元素代码，因为页面中没有对应的元素
 
@@ -226,7 +227,8 @@ const PAGE_STATES = {
     FAVORITES: 'favorites',
     PLAYLISTS: 'playlists',
     SETTINGS: 'settings',
-    ALBUM_DETAIL: 'album-detail'
+    ALBUM_DETAIL: 'album-detail',
+    CLOUD: 'cloud'
 };
 
 // 将PAGE_STATES暴露到全局作用域
@@ -317,6 +319,10 @@ function updatePageContent(pageState) {
                 window.DownloadManager.loadDownloadRecords();
             }
             break;
+        case PAGE_STATES.CLOUD:
+            activateSidebarItem('音乐云盘');
+            showMainContent(pageState);
+            break;
         case PAGE_STATES.FAVORITES:
             activateSidebarItem('我喜欢的');
             // 导航到专辑详情页面显示"我喜欢的"歌单
@@ -395,7 +401,8 @@ function showMainContent(pageState) {
         [PAGE_STATES.FAVORITES]: 'favoritesPage',
         [PAGE_STATES.PLAYLISTS]: 'playlistsPage',
         [PAGE_STATES.SETTINGS]: 'settingsPage',
-        [PAGE_STATES.ALBUM_DETAIL]: 'albumDetailPage'
+        [PAGE_STATES.ALBUM_DETAIL]: 'albumDetailPage',
+        [PAGE_STATES.CLOUD]: 'cloudPage'
     };
 
     const targetPageId = pageMap[pageState];
@@ -433,6 +440,10 @@ function showMainContent(pageState) {
             // 如果是设置页面，初始化设置页面功能
             if (pageState === PAGE_STATES.SETTINGS && window.initSettingsPage) {
                 window.initSettingsPage();
+            }
+            // 如果是云盘页面，初始化云盘功能
+            if (pageState === PAGE_STATES.CLOUD && window.initCloudPage) {
+                window.initCloudPage();
             }
 
             // 如果是专辑详情页面，确保AlbumDetailManager已初始化
@@ -532,6 +543,13 @@ window.refreshPage = () => {
                 window.DownloadManager.loadDownloadRecords();
             }
             break;
+        case PAGE_STATES.CLOUD:
+            // 刷新云盘
+            console.log('刷新云盘');
+            if (window.refreshCloudPage) {
+                window.refreshCloudPage();
+            }
+            break;
         case PAGE_STATES.FAVORITES:
             // 刷新我喜欢的音乐（使用歌单逻辑）
             console.log('刷新我喜欢的音乐');
@@ -613,7 +631,8 @@ function getPageDisplayName(pageState) {
         [PAGE_STATES.FAVORITES]: '我喜欢',
         [PAGE_STATES.PLAYLISTS]: '歌单',
         [PAGE_STATES.SETTINGS]: '设置',
-        [PAGE_STATES.ALBUM_DETAIL]: '碟片'
+        [PAGE_STATES.ALBUM_DETAIL]: '碟片',
+        [PAGE_STATES.CLOUD]: '音乐云盘'
     };
     return displayNames[pageState] || pageState;
 }
@@ -798,7 +817,9 @@ window.navigateToSection = (section, clickedElement) => {
         '本地音乐': PAGE_STATES.LOCAL,
         '下载管理': PAGE_STATES.DOWNLOADS,
         '我喜欢的': PAGE_STATES.FAVORITES,
-        '收藏的歌单': PAGE_STATES.PLAYLISTS
+        '收藏的歌单': PAGE_STATES.PLAYLISTS,
+        '音乐云盘': PAGE_STATES.CLOUD,
+        '云盘': PAGE_STATES.CLOUD
     };
 
     const pageState = sectionToPageState[section];

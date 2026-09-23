@@ -125,6 +125,7 @@ pub async fn dispatch(player: &Player, cmd: &str, args: Value) -> Value {
         "get_playlist_detail" => wrap(home.playlist_detail(&arg_str(&args, "playlistID")).await),
         "get_playlist_songs_album" => wrap(home.playlist_songs(&arg_str(&args, "playlistID"), arg_u32(&args, "page", 1), arg_u32(&args, "pageSize", 150)).await),
         "get_user_playlists" => wrap(home.user_playlist().await),
+        "get_cloud_songs" | "user_cloud" => wrap(home.user_cloud(arg_u32(&args, "page", 1), arg_u32(&args, "pageSize", 50)).await),
         "get_favorite_playlist_songs" => wrap(home.playlist_songs(&arg_str(&args, "globalCollectionID"), 1, 200).await),
         "add_favorite" => {
             let req = args.get("request").cloned().unwrap_or_else(|| args.clone());
@@ -573,5 +574,13 @@ mod tests {
         let res3 = dispatch(&player, "update_mpris_playback_status", json!({ "status": "Paused" })).await;
         assert_eq!(res3["success"], true);
         assert!(!crate::sleep_inhibitor::is_playing());
+    }
+
+    #[tokio::test]
+    async fn test_cloud_songs_ipc_dispatch() {
+        let player = crate::Player::lite().unwrap();
+        let res = dispatch(&player, "get_cloud_songs", json!({ "page": 1, "pageSize": 10 })).await;
+        // Should be a valid ApiResponse with success field
+        assert!(res.get("success").is_some());
     }
 }

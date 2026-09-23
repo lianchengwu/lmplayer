@@ -23,7 +23,7 @@ impl HomeApi<'_> {
             Ok(r) => r,
             Err(e) => return ApiResponse::fail(e.to_string()),
         };
-        let urls = match url_res.body.get("url") {
+        let mut urls = match url_res.body.get("url") {
             Some(Value::String(s)) if !s.is_empty() => vec![s.clone()],
             Some(Value::Array(arr)) => arr
                 .iter()
@@ -33,6 +33,17 @@ impl HomeApi<'_> {
                 .collect(),
             _ => Vec::new(),
         };
+        if urls.is_empty() {
+            if let Ok(cloud_res) = self.player.kg.user_cloud_url(hash, "", 0).await {
+                if let Some(arr) = cloud_res.body.pointer("/data/url").and_then(|v| v.as_array()) {
+                    urls = arr.iter().filter_map(|v| v.as_str()).filter(|s| !s.is_empty()).map(|s| s.to_string()).collect();
+                } else if let Some(s) = cloud_res.body.pointer("/data/url").and_then(|v| v.as_str()) {
+                    if !s.is_empty() {
+                        urls = vec![s.to_string()];
+                    }
+                }
+            }
+        }
         if urls.is_empty() {
             return ApiResponse::fail(format!("无播放地址: {}", url_res.body));
         }
@@ -137,6 +148,30 @@ impl HomeApi<'_> {
         match self.player.kg.user_playlist(1, 100).await {
             Ok(res) if res.kugou_ok() => ApiResponse::ok("获取用户歌单成功", map_user_playlists(res.data())),
             Ok(res) => ApiResponse::fail(format!("无数据: {}", res.body)),
+            Err(e) => ApiResponse::fail(e.to_string()),
+        }
+    }
+
+    pub async fn user_cloud(&self, page: u32, pagesize: u32) -> ApiResponse<Value> {
+        let pagesize = if pagesize == 0 { 50 } else { pagesize };
+        let page = if page == 0 { 1 } else { page };
+        match self.player.kg.user_cloud(page, pagesize).await {
+            Ok(res) if res.kugou_ok() => {
+                let data = res.data();
+                let songs = map_cloud_songs(data);
+                let total = data
+                    .get("total")
+                    .or_else(|| data.get("count"))
+                    .and_then(|v| v.as_i64())
+                    .unwrap_or(0);
+                ApiResponse::ok("获取云盘歌曲成功", json!({
+                    "songs": songs,
+                    "total": total,
+                    "page": page,
+                    "pagesize": pagesize,
+                }))
+            }
+            Ok(res) => ApiResponse::fail(format!("获取云盘歌曲失败: {}", res.body)),
             Err(e) => ApiResponse::fail(e.to_string()),
         }
     }
@@ -468,6 +503,109 @@ fn map_album_songs(data: &Value) -> Value {
 
 fn map_playlist_songs(data: &Value) -> Value {
     map_album_songs(data)
+}
+
+fn map_cloud_songs(data: &Value) -> Value {
+    use crate::resp::{i, s};
+    let list = data
+        .get("songs")
+        .or_else(|| data.get("info"))
+        .or_else(|| data.get("list"))
+        .or_else(|| data.get("song_list"))
+        .cloned()
+        .unwrap_or_else(|| {
+            if data.is_array() {
+                data.clone()
+            } else {
+                Value::Array(vec![])
+            }
+        });
+    Value::Array(
+        list.as_array()
+            .cloned()
+            .unwrap_or_default()
+            .iter()
+            .map(|item| {
+                let songname = first_nonempty(&[
+                    s(item.pointer("/base/audio_name")),
+                    s(item.get("songname")),
+                    s(item.get("ori_audio_name")),
+                    s(item.get("SongName")),
+                ]);
+                let author = first_nonempty(&[
+                    s(item.pointer("/base/author_name")),
+                    s(item.pointer("/singerinfo/0/name")),
+                    s(item.get("author_name")),
+                    s(item.get("SingerName")),
+                    s(item.get("singername")),
+                ]);
+                let album_name = first_nonempty(&[
+                    s(item.pointer("/album_info/album_name")),
+                    s(item.pointer("/albuminfo/name")),
+                    s(item.get("album_name")),
+                ]);
+                let album_id = first_nonempty(&[
+                    s(item.pointer("/base/album_id")),
+                    s(item.pointer("/albuminfo/id")),
+                    s(item.get("album_id")),
+                ]);
+                let album_audio_id = first_nonempty(&[
+                    s(item.pointer("/base/album_audio_id")),
+                    s(item.get("album_audio_id")),
+                ]);
+                let cover = first_nonempty(&[
+                    s(item.pointer("/album_info/cover")),
+                    s(item.pointer("/album_info/sizable_cover")),
+                    s(item.get("union_cover")),
+                    s(item.get("cover")),
+                    s(item.get("sizable_cover")),
+                    s(item.get("pic")),
+                    s(item.pointer("/trans_param/union_cover")),
+                ]);
+                let mut filename = first_nonempty(&[s(item.get("filename")), s(item.get("name"))]);
+                if filename.is_empty() && (!author.is_empty() || !songname.is_empty()) {
+                    filename = format!("{author} - {songname}");
+                }
+                let songname = if songname.is_empty() {
+                    filename
+                        .split_once(" - ")
+                        .map(|(_, title)| title.to_string())
+                        .filter(|s| !s.is_empty())
+                        .unwrap_or_else(|| filename.clone())
+                } else {
+                    songname
+                };
+                let mut time_length = i(item
+                    .pointer("/audio_info/duration")
+                    .or_else(|| item.pointer("/audio_info/timelength"))
+                    .or_else(|| item.get("time_length"))
+                    .or_else(|| item.get("timelength"))
+                    .or_else(|| item.get("timelen")));
+                if time_length > 10_000 {
+                    time_length /= 1000;
+                }
+                json!({
+                    "hash": first_nonempty(&[
+                        s(item.pointer("/audio_info/hash")),
+                        s(item.get("hash")),
+                        s(item.get("FileHash")),
+                    ]),
+                    "songname": songname,
+                    "author_name": author,
+                    "album_name": album_name,
+                    "album_id": album_id,
+                    "album_audio_id": album_audio_id,
+                    "filename": filename,
+                    "time_length": time_length,
+                    "union_cover": cover,
+                    "filesize": i(item.get("filesize")),
+                    "fileid": s(item.get("kv_id").or_else(|| item.get("fileid"))),
+                    "addtime": s(item.get("addtime")),
+                    "is_cloud": true,
+                })
+            })
+            .collect(),
+    )
 }
 
 fn map_user_playlists(data: &Value) -> Value {

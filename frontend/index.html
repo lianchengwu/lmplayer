@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="/player-left.css"/>
     <link rel="stylesheet" href="/immersive-player.css"/>
     <link rel="stylesheet" href="/settings.css"/>
+    <link rel="stylesheet" href="/cloud.css"/>
     <link rel="stylesheet" href="/theme-light.css"/>
     <link rel="stylesheet" href="/theme-dark.css"/>
     <link rel="stylesheet" href="/theme-frosted.css"/>
@@ -123,6 +124,10 @@
                     <li class="list-item">
                         <i class="fas fa-cloud-download-alt"></i>
                         <span class="item-text">下载管理</span>
+                    </li>
+                    <li class="list-item">
+                        <i class="fas fa-cloud"></i>
+                        <span class="item-text">音乐云盘</span>
                     </li>
                 </ul>
             </div>
@@ -806,6 +811,59 @@
                         <button class="pagination-btn" id="nextPageBtn" disabled>
                             <i class="fas fa-chevron-right"></i>
                         </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 音乐云盘页面 -->
+            <div class="page-content" id="cloudPage">
+                <div class="cloud-content-wrapper">
+                    <div class="cloud-header">
+                        <div class="cloud-title-group">
+                            <h1 class="cloud-title">
+                                <i class="fas fa-cloud"></i>
+                                音乐云盘
+                            </h1>
+                            <p class="cloud-subtitle">存储在酷狗云端的私有音乐资产</p>
+                        </div>
+                        <div class="cloud-actions">
+                            <button class="cloud-btn cloud-btn-play" id="cloudPlayAllBtn" title="播放全部歌曲">
+                                <i class="fas fa-play"></i>
+                                <span>播放全部</span>
+                            </button>
+                            <button class="cloud-btn cloud-btn-secondary" id="cloudRefreshBtn" title="刷新云盘">
+                                <i class="fas fa-sync-alt"></i>
+                                <span>刷新</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="cloud-stats">
+                        <div class="cloud-stat-card">
+                            <div class="cloud-stat-number" id="cloudSongCount">0</div>
+                            <div class="cloud-stat-label">首歌曲</div>
+                        </div>
+                    </div>
+
+                    <div class="cloud-filter-bar">
+                        <div class="cloud-search-box">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="cloudSearchInput" placeholder="搜索云盘歌曲...">
+                        </div>
+                    </div>
+
+                    <div class="cloud-list-container">
+                        <div class="cloud-song-header">
+                            <div class="cloud-col-index">#</div>
+                            <div class="cloud-col-title">歌曲</div>
+                            <div class="cloud-col-artist">歌手</div>
+                            <div class="cloud-col-album">专辑</div>
+                            <div class="cloud-col-duration">时长</div>
+                            <div class="cloud-col-actions">操作</div>
+                        </div>
+                        <div class="cloud-song-list" id="cloudSongList">
+                            <!-- 由 JavaScript 动态渲染 -->
+                        </div>
                     </div>
                 </div>
             </div>

@@ -1,3 +1,4 @@
+mod cloud;
 mod catalog;
 mod login;
 mod lyric;

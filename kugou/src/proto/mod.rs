@@ -9,16 +9,18 @@ mod rsa;
 mod sign;
 mod simulate;
 
-pub(crate) use aes::{aes_decrypt, aes_encrypt_value};
+pub(crate) use aes::{
+    aes_decrypt, aes_encrypt_value, json_bytes, playlist_aes_decrypt_bytes, playlist_aes_encrypt_raw,
+};
 pub(crate) use cookie::{parse_cookie_header, parse_set_cookie};
 pub(crate) use hash::md5_str;
 pub(crate) use id::{
     calculate_mid, generate_webgl_hash, get_guid, is_uuid_v4, md5_guid_like, now_ms, now_s, random_string,
 };
-pub(crate) use rsa::{rsa_raw_encrypt_value, PUBLIC_LITE_RSA_KEY, PUBLIC_RSA_KEY};
+pub(crate) use rsa::{rsa_pkcs1_encrypt, rsa_raw_encrypt_value, PUBLIC_LITE_RSA_KEY, PUBLIC_RSA_KEY};
 pub(crate) use sign::{
-    sign_key, sign_params_key, signature_android_params, signature_register_params, signature_web_params,
-    value_query,
+    sign_cloud_key, sign_key, sign_params_key, signature_android_params, signature_register_params,
+    signature_web_params, value_query,
 };
 pub(crate) use simulate::generate_simulate;
 
