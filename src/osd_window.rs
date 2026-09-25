@@ -866,16 +866,16 @@ impl OsdWindow {
             for tok in &krc.tokens {
                 let escaped = glib::markup_escape_text(&tok.text);
                 if elapsed >= tok.start_offset_ms {
-                    // Played: active highlight color
-                    markup.push_str(&format!(
-                        "<span foreground=\"{}\">{}</span>",
-                        cfg.color, escaped
-                    ));
-                } else {
-                    // Pending: dimmed white text
+                    // Played
                     markup.push_str(&format!(
                         "<span foreground=\"#ffffff\" alpha=\"45%\">{}</span>",
                         escaped
+                    ));
+                } else {
+                    // Pending
+                    markup.push_str(&format!(
+                        "<span foreground=\"{}\">{}</span>",
+                        cfg.color, escaped
                     ));
                 }
             }
@@ -909,13 +909,13 @@ impl OsdWindow {
             let escaped = glib::markup_escape_text(&tok.text);
             if elapsed >= tok.start_offset_ms {
                 markup.push_str(&format!(
-                    "<span foreground=\"{}\">{}</span>",
-                    cfg.color, escaped
+                    "<span foreground=\"#ffffff\" alpha=\"45%\">{}</span>",
+                    escaped
                 ));
             } else {
                 markup.push_str(&format!(
-                    "<span foreground=\"#ffffff\" alpha=\"45%\">{}</span>",
-                    escaped
+                    "<span foreground=\"{}\">{}</span>",
+                    cfg.color, escaped
                 ));
             }
         }

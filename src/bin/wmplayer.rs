@@ -400,8 +400,8 @@ fn start_webview(app: gtk4::Application, addr: SocketAddr) {
         let win = gtk4::ApplicationWindow::builder()
             .application(app)
             .title("lmPlayer")
-            .default_width(1200)
-            .default_height(800)
+            .default_width(1440)
+            .default_height(900)
             .decorated(false)
             .build();
         win.set_decorated(false);
