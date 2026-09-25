@@ -117,6 +117,10 @@ impl LyricDbus {
     async fn set_locked(&self, locked: bool) {
         crate::osd::set_osd_locked(locked);
     }
+
+    async fn save_position(&self, x: i32, y: i32) {
+        crate::osd::save_osd_position(x, y);
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -200,6 +204,13 @@ pub enum OsdCommand {
     SetLocked(bool),
     ToggleLock,
     SetColor(String),
+    SavePosition(i32, i32),
+}
+
+pub fn save_osd_position(x: i32, y: i32) {
+    if let Some(tx) = OSD_CMD_TX.get() {
+        let _ = tx.send(OsdCommand::SavePosition(x, y));
+    }
 }
 
 static OSD_CMD_TX: OnceLock<std::sync::mpsc::Sender<OsdCommand>> = OnceLock::new();

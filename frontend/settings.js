@@ -83,7 +83,6 @@ function mergeSettings(base, overlay) {
     return out;
 }
 
-// 初始化设置页面
 window.initSettingsPage = async () => {
     console.log('初始化设置页面');
     try {
@@ -94,7 +93,22 @@ window.initSettingsPage = async () => {
     }
     renderSettingsPage();
     await loadSettingsPath();
+    await loadAppVersion();
 };
+
+async function loadAppVersion() {
+    try {
+        const { GetCurrentVersion } = await import('./bindings/wmplayer/updateservice.js');
+        const ver = await GetCurrentVersion();
+        const el = document.getElementById('appVersionDisplay');
+        if (el && ver) {
+            const verStr = typeof ver === 'string' ? ver.trim() : String(ver);
+            el.textContent = verStr.startsWith('v') ? verStr : 'v' + verStr;
+        }
+    } catch (e) {
+        console.warn('获取版本号失败:', e);
+    }
+}
 
 // 加载设置文件路径
 async function loadSettingsPath() {
@@ -143,36 +157,50 @@ async function loadSettings() {
     }
 }
 
+export function applyTheme(theme) {
+    let resolvedTheme = theme;
+    if (!theme || theme === 'auto') {
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        resolvedTheme = prefersDark ? 'dark' : 'light';
+    }
+    document.documentElement.setAttribute('data-theme', resolvedTheme);
+
+    const themeBtn = document.querySelector('.theme-toggle-btn i');
+    if (themeBtn) {
+        switch (resolvedTheme) {
+            case 'light':
+                themeBtn.className = 'fas fa-moon';
+                break;
+            case 'dark':
+                themeBtn.className = 'fas fa-sun';
+                break;
+            case 'frosted':
+                themeBtn.className = 'fas fa-snowflake';
+                break;
+            case 'frosted-dark':
+                themeBtn.className = 'fas fa-gem';
+                break;
+            default:
+                themeBtn.className = 'fas fa-moon';
+        }
+    }
+    console.log('主题设置已应用:', theme, '(当前生效: ' + resolvedTheme + ')');
+}
+
+if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        if (settingsData.interface.theme === 'auto') {
+            applyTheme('auto');
+        }
+    });
+}
+
 // 应用所有设置
 function applyAllSettings() {
     console.log('应用所有设置...');
 
     // 应用主题设置
-    if (settingsData.interface.theme && settingsData.interface.theme !== 'auto') {
-        document.documentElement.setAttribute('data-theme', settingsData.interface.theme);
-
-        // 更新主题切换按钮图标
-        const themeBtn = document.querySelector('.theme-toggle-btn i');
-        if (themeBtn) {
-            switch (settingsData.interface.theme) {
-                case 'light':
-                    themeBtn.className = 'fas fa-moon';
-                    break;
-                case 'dark':
-                    themeBtn.className = 'fas fa-sun';
-                    break;
-                case 'frosted':
-                    themeBtn.className = 'fas fa-snowflake';
-                    break;
-                case 'frosted-dark':
-                    themeBtn.className = 'fas fa-gem';
-                    break;
-                default:
-                    themeBtn.className = 'fas fa-moon';
-            }
-        }
-        console.log('主题设置已应用:', settingsData.interface.theme);
-    }
+    applyTheme(settingsData.interface.theme);
 
     // 应用桌面歌词颜色设置
     if (settingsData.interface.osdLyricsColor) {
@@ -181,14 +209,19 @@ function applyAllSettings() {
 
     // 应用音量设置
     if (settingsData.playback.volume !== undefined) {
-        if (window.PlayerController && window.PlayerController.setVolume) {
-            window.PlayerController.setVolume(settingsData.playback.volume);
+        if (typeof window.setVolume === 'function') {
+            window.setVolume(settingsData.playback.volume);
             console.log('音量设置已应用:', settingsData.playback.volume);
+        } else if (window.UnifiedPlayerController?.setVolume) {
+            window.UnifiedPlayerController.setVolume(settingsData.playback.volume);
         }
     }
 
     if (settingsData.behavior?.closeAction) {
         window.closeAction = settingsData.behavior.closeAction;
+        if (window.appSettings?.behavior) {
+            window.appSettings.behavior.closeAction = settingsData.behavior.closeAction;
+        }
         console.log('关闭行为设置已应用:', settingsData.behavior.closeAction);
     }
 
@@ -593,42 +626,23 @@ window.updateSetting = async (path, value) => {
 function applySetting(path, value) {
     switch (path) {
         case 'interface.theme':
-            if (value !== 'auto') {
-                document.documentElement.setAttribute('data-theme', value);
-
-                // 更新主题切换按钮图标
-                const themeBtn = document.querySelector('.theme-toggle-btn i');
-                if (themeBtn) {
-                    switch (value) {
-                        case 'light':
-                            themeBtn.className = 'fas fa-moon';
-                            break;
-                        case 'dark':
-                            themeBtn.className = 'fas fa-sun';
-                            break;
-                        case 'frosted':
-                            themeBtn.className = 'fas fa-snowflake';
-                            break;
-                        case 'frosted-dark':
-                            themeBtn.className = 'fas fa-gem';
-                            break;
-                        default:
-                            themeBtn.className = 'fas fa-moon';
-                    }
-                }
-            }
+            applyTheme(value);
             break;
         case 'playback.volume':
-            // 更新音量显示
             const volumeDisplay = document.querySelector('.settings-value');
             if (volumeDisplay) {
                 volumeDisplay.textContent = value + '%';
             }
+            if (typeof window.setVolume === 'function') {
+                window.setVolume(value);
+            } else if (window.UnifiedPlayerController?.setVolume) {
+                window.UnifiedPlayerController.setVolume(value);
+            }
             break;
         case 'behavior.closeAction':
-            // 更新全局关闭行为设置
-            if (window.closeAction !== undefined) {
-                window.closeAction = value;
+            window.closeAction = value;
+            if (window.appSettings?.behavior) {
+                window.appSettings.behavior.closeAction = value;
             }
             break;
         case 'behavior.hardwareAcceleration':
@@ -663,14 +677,14 @@ window.updateOsdColor = async (color) => {
     });
 };
 
-// 选择下载路径
 window.selectDownloadPath = async () => {
     try {
-        // 这里应该调用系统文件选择对话框
-        // 暂时使用模拟路径
-        const path = '/Users/username/Music/Downloads';
-        updateSetting('download.downloadPath', path);
-        renderSettingsPage(); // 重新渲染以显示路径
+        const { SelectMusicFolder } = await import('./bindings/wmplayer/localmusicservice.js');
+        const res = await SelectMusicFolder();
+        if (res && res.success && res.path) {
+            await window.updateSetting('download.downloadPath', res.path);
+            renderSettingsPage();
+        }
     } catch (error) {
         console.error('选择下载路径失败:', error);
     }
@@ -711,73 +725,25 @@ window.importSettings = (event) => {
     reader.readAsText(file);
 };
 
-// 显示设置文件
 window.showSettingsPath = async () => {
     try {
         const response = await SettingsService.GetSettingsPath();
-        if (response.Success && response.Data) {
-            // 在系统中显示文件（这里可以调用系统API打开文件管理器）
-            alert(`设置文件位置：\n${response.Data}`);
+        const filePath = response.Data || response.data;
+        if (filePath) {
+            const { OpenFileFolder } = await import('./bindings/wmplayer/downloadservice.js');
+            await OpenFileFolder(filePath);
         }
     } catch (error) {
-        console.error('获取设置文件路径失败:', error);
-        alert('获取设置文件路径失败');
+        console.error('打开设置文件路径失败:', error);
     }
 };
 
-// 重置所有设置
 window.resetSettings = async () => {
     if (confirm('确定要重置所有设置吗？此操作不可撤销。')) {
         try {
-            // 加载默认设置并保存
-            settingsData = {
-                playback: {
-                    autoPlay: true,
-                    crossfade: false,
-                    crossfadeDuration: 3,
-                    gaplessPlayback: true,
-                    replayGain: false,
-                    volume: 80
-                },
-                quality: {
-                    streamingQuality: 'high',
-                    downloadQuality: 'lossless',
-                    wifiOnly: false
-                },
-                interface: {
-                    theme: 'auto',
-                    language: 'zh-CN',
-                    showLyrics: true,
-                    showSpectrum: false,
-                    miniPlayer: false
-                },
-                download: {
-                    downloadPath: '',
-                    autoDownload: false,
-                    downloadLyrics: true,
-                    downloadCover: true
-                },
-                hotkeys: {
-                    playPause: 'Space',
-                    nextTrack: 'Ctrl+Right',
-                    prevTrack: 'Ctrl+Left',
-                    volumeUp: 'Ctrl+Up',
-                    volumeDown: 'Ctrl+Down',
-                    toggleLyrics: 'Ctrl+L'
-                },
-                privacy: {
-                    saveHistory: true,
-                    shareListening: false,
-                    analytics: true
-                },
-                behavior: {
-                    closeAction: 'ask',
-                    startMinimized: false,
-                    autoStart: false
-                }
-            };
-
+            settingsData = structuredClone(DEFAULT_SETTINGS);
             await saveSettings();
+            applyAllSettings();
             renderSettingsPage();
             alert('设置已重置为默认值');
         } catch (error) {

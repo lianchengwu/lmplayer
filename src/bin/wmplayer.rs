@@ -132,6 +132,19 @@ fn hardware_accel_enabled() -> bool {
         .and_then(|v| v.as_bool())
         .unwrap_or(true)
 }
+#[cfg(target_os = "linux")]
+fn start_minimized_enabled() -> bool {
+    let path = dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("wmplayer")
+        .join("settings.json");
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|s| serde_json::from_str::<Value>(&s).ok())
+        .and_then(|v| v.pointer("/behavior/startMinimized").cloned())
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+}
 
 #[cfg(target_os = "linux")]
 fn apply_hw_accel(webview: &webkit6::WebView, on: bool) {
@@ -481,7 +494,11 @@ fn start_webview(app: gtk4::Application, addr: SocketAddr) {
 
         start_tray(tray_tx);
 
-        win.present();
+        if !start_minimized_enabled() {
+            win.present();
+        } else {
+            win.set_visible(false);
+        }
     });
     app.run();
 }

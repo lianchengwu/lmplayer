@@ -14,12 +14,33 @@ pub struct HomeApi<'a> {
     pub player: &'a Player,
 }
 
+fn configured_streaming_quality() -> kugou::Quality {
+    let path = dirs::config_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join("wmplayer")
+        .join("settings.json");
+    let q_str = std::fs::read_to_string(path)
+        .ok()
+        .and_then(|s| serde_json::from_str::<Value>(&s).ok())
+        .and_then(|v| v.pointer("/quality/streamingQuality").cloned())
+        .and_then(|v| v.as_str().map(|s| s.to_string()))
+        .unwrap_or_else(|| "high".to_string());
+
+    match q_str.as_str() {
+        "low" => kugou::Quality::P128,
+        "medium" => kugou::Quality::P320,
+        "high" | "lossless" => kugou::Quality::Flac,
+        _ => kugou::Quality::P320,
+    }
+}
+
 impl HomeApi<'_> {
     pub async fn song_url(&self, hash: &str) -> ApiResponse<SongUrlData> {
         if hash.is_empty() {
             return ApiResponse::fail("歌曲hash不能为空");
         }
-        let url_res = match self.player.kg.song_url(hash).send().await {
+        let q = configured_streaming_quality();
+        let url_res = match self.player.kg.song_url(hash).quality(q.clone()).send().await {
             Ok(r) => r,
             Err(e) => return ApiResponse::fail(e.to_string()),
         };
@@ -33,6 +54,17 @@ impl HomeApi<'_> {
                 .collect(),
             _ => Vec::new(),
         };
+        if urls.is_empty() && q != kugou::Quality::P128 {
+            if let Ok(fallback_res) = self.player.kg.song_url(hash).quality(kugou::Quality::P128).send().await {
+                if let Some(arr) = fallback_res.body.get("url").and_then(|v| v.as_array()) {
+                    urls = arr.iter().filter_map(|v| v.as_str()).filter(|s| !s.is_empty()).map(|s| s.to_string()).collect();
+                } else if let Some(s) = fallback_res.body.get("url").and_then(|v| v.as_str()) {
+                    if !s.is_empty() {
+                        urls = vec![s.to_string()];
+                    }
+                }
+            }
+        }
         if urls.is_empty() {
             if let Ok(cloud_res) = self.player.kg.user_cloud_url(hash, "", 0).await {
                 if let Some(arr) = cloud_res.body.pointer("/data/url").and_then(|v| v.as_array()) {

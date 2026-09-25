@@ -211,11 +211,19 @@ pub async fn dispatch(player: &Player, cmd: &str, args: Value) -> Value {
             ok(data)
         }
         "add_play_history" => {
+            let settings_path = config_dir().join("settings.json");
+            let save_history = read_json(&settings_path, json!({}))
+                .pointer("/privacy/saveHistory")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true);
+
             let path = cache_dir().join("history.json");
             let mut data = read_json(&path, json!({ "records": [], "total_count": 0 }));
-            let req = args.get("request").cloned().unwrap_or_else(|| args.clone());
-            add_history_record(&mut data, &req);
-            write_json(&path, &data);
+            if save_history {
+                let req = args.get("request").cloned().unwrap_or_else(|| args.clone());
+                add_history_record(&mut data, &req);
+                write_json(&path, &data);
+            }
             ok(data)
         }
         "get_play_history" => {

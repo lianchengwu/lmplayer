@@ -494,6 +494,23 @@ function restoreLastPlayingSong() {
                 }
             }
 
+            // 检查自动播放设置
+            const autoPlay = window.appSettings?.playback?.autoPlay ?? true;
+            if (autoPlay) {
+                console.log('▶️ 根据设置自动播放上次歌曲:', currentSong.songname);
+                setTimeout(async () => {
+                    try {
+                        if (window.PlayerController?.playCurrentSong) {
+                            await window.PlayerController.playCurrentSong();
+                        } else if (window.PlayerController?.playSong) {
+                            await window.PlayerController.playSong(currentSong);
+                        }
+                    } catch (err) {
+                        console.warn('⚠️ 自动播放触发失败:', err);
+                    }
+                }, 1000);
+            }
+
         } catch (error) {
             console.error('❌ 恢复歌曲信息失败:', error);
         }

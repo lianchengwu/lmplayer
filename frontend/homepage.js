@@ -3037,6 +3037,10 @@ async function addPlayHistory(song) {
     }
 
     try {
+        if (window.appSettings?.privacy?.saveHistory === false) {
+            console.log('🔇 用户设置禁止保存播放历史，跳过记录');
+            return;
+        }
         const request = {
             hash: song.hash,
             songname: song.songname || song.title || '',

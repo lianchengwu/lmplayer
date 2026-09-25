@@ -21,6 +21,10 @@ pub struct OsdConfig {
     pub font_size: i32,
     pub width: i32,
     pub height: i32,
+    #[serde(default)]
+    pub x: Option<i32>,
+    #[serde(default)]
+    pub y: Option<i32>,
     pub locked: bool,
     pub color: String,
     #[serde(default = "default_opacity")]
@@ -43,6 +47,8 @@ impl Default for OsdConfig {
             font_size: 24,
             width: 820,
             height: 76,
+            x: None,
+            y: None,
             locked: false,
             color: "#38bdf8".to_string(),
             opacity: 0.95,
@@ -79,23 +85,118 @@ fn save_config(cfg: &OsdConfig) {
     }
 }
 
+#[cfg(target_os = "linux")]
+fn reload_kwin() {
+    let ok = std::process::Command::new("qdbus6")
+        .args(["org.kde.KWin", "/KWin", "reconfigure"])
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+
+    if !ok {
+        let _ = std::process::Command::new("busctl")
+            .args(["--user", "call", "org.kde.KWin", "/KWin", "org.kde.KWin", "reconfigure"])
+            .status()
+            .or_else(|_| {
+                std::process::Command::new("qdbus")
+                    .args(["org.kde.KWin", "/KWin", "reconfigure"])
+                    .status()
+            });
+    }
+}
+
+#[cfg(target_os = "linux")]
+pub fn update_kwin_position(x: i32, y: i32) {
+    let kwin_path = dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("kwinrulesrc");
+    let content = fs::read_to_string(&kwin_path).unwrap_or_default();
+    if !content.contains("[wmplayer-osd]") {
+        return;
+    }
+    let mut new_lines = Vec::new();
+    let mut in_osd = false;
+    let mut has_position = false;
+    let mut has_positionrule = false;
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed == "[wmplayer-osd]" {
+            in_osd = true;
+            new_lines.push(line.to_string());
+            continue;
+        } else if in_osd && trimmed.starts_with('[') {
+            if !has_position {
+                new_lines.push(format!("position={x},{y}"));
+            }
+            if !has_positionrule {
+                new_lines.push("positionrule=3".to_string());
+            }
+            in_osd = false;
+            new_lines.push(line.to_string());
+            continue;
+        }
+
+        if in_osd {
+            if trimmed.starts_with("position=") {
+                new_lines.push(format!("position={x},{y}"));
+                has_position = true;
+                continue;
+            }
+            if trimmed.starts_with("positionrule=") {
+                new_lines.push("positionrule=3".to_string());
+                has_positionrule = true;
+                continue;
+            }
+        }
+        new_lines.push(line.to_string());
+    }
+    if in_osd {
+        if !has_position {
+            new_lines.push(format!("position={x},{y}"));
+        }
+        if !has_positionrule {
+            new_lines.push("positionrule=3".to_string());
+        }
+    }
+    let updated = new_lines.join("\n") + "\n";
+    let _ = fs::write(&kwin_path, updated);
+
+    reload_kwin();
+}
+
 /// Automatically configure KWin window rules so OSD window stays above all windows,
 /// skips the taskbar, skips the pager, and skips the Alt-Tab window switcher.
 #[cfg(target_os = "linux")]
-fn ensure_kwin_rules() {
+fn ensure_kwin_rules(cfg: &OsdConfig) {
     let kwin_path = dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("kwinrulesrc");
 
     let content = fs::read_to_string(&kwin_path).unwrap_or_default();
-    // If rule section already exists with position+size remember and desktop rules, skip
-    let has_osd_rule = content.contains("[wmplayer-osd]");
-    let has_exact_desktopsrule = content.lines().any(|l| l.trim() == "desktopsrule=2");
-    if has_osd_rule && has_exact_desktopsrule {
-        return;
+
+    let (pos_str, pos_rule_str) = match (cfg.x, cfg.y) {
+        (Some(x), Some(y)) => (format!("position={x},{y}\n"), "positionrule=3\n"),
+        _ => (String::new(), "positionrule=3\n"),
+    };
+
+    let has_osd = content.contains("[wmplayer-osd]");
+    let has_desktops = content.contains("desktopsrule=2");
+    if has_osd && has_desktops {
+        match (cfg.x, cfg.y) {
+            (Some(x), Some(y)) => {
+                let expected_pos = format!("position={x},{y}");
+                if content.contains(&expected_pos) {
+                    return;
+                }
+            }
+            _ => {
+                return;
+            }
+        }
     }
 
-    let rule_block = "
+    let rule_block = format!("
 [wmplayer-osd]
 Description=wmplayer OSD lyrics
 above=true
@@ -104,8 +205,7 @@ desktops=
 desktopsrule=2
 onalldesktops=true
 onalldesktopsrule=2
-positionrule=4
-sizerule=4
+{pos_str}{pos_rule_str}sizerule=4
 skippager=true
 skippagerrule=2
 skipswitcher=true
@@ -115,7 +215,7 @@ skiptaskbarrule=2
 title=wmPlayer OSD Lyrics
 titlematch=1
 types=1
-";
+");
 
     // Remove old [wmplayer-osd] section if present (upgrade path)
     let content = if let Some(start) = content.find("\n[wmplayer-osd]") {
@@ -145,7 +245,7 @@ types=1
         format!("[General]\ncount=1\nrules=wmplayer-osd\nOrder=wmplayer-osd\n{rule_block}")
     } else if content.contains("wmplayer-osd") {
         // rules= line already lists wmplayer-osd, just append new block
-        format!("{content}\n{rule_block}")
+        format!("{}\n{rule_block}", content.trim_end())
     } else if let Some(idx) = content.find("rules=") {
         let line_end = content[idx..]
             .find('\n')
@@ -159,9 +259,9 @@ types=1
         };
         let mut updated = content.clone();
         updated.replace_range(idx..line_end, &updated_line);
-        format!("{updated}\n{rule_block}")
+        format!("{}\n{rule_block}", updated.trim_end())
     } else {
-        format!("{content}\n[General]\nrules=wmplayer-osd\nOrder=wmplayer-osd\n{rule_block}")
+        format!("{}\n[General]\nrules=wmplayer-osd\nOrder=wmplayer-osd\n{rule_block}", content.trim_end())
     };
 
     if let Some(parent) = kwin_path.parent() {
@@ -169,23 +269,54 @@ types=1
     }
     let _ = fs::write(&kwin_path, new_content);
 
-    // Ask KWin to reload rules immediately
-    let ok = std::process::Command::new("busctl")
-        .args(["--user", "call", "org.kde.KWin", "/KWin", "org.kde.KWin", "reconfigure"])
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false);
+    reload_kwin();
+}
 
-    if !ok {
-        let _ = std::process::Command::new("qdbus6")
-            .args(["org.kde.KWin", "/KWin", "reconfigure"])
-            .status()
-            .or_else(|_| {
-                std::process::Command::new("qdbus")
-                    .args(["org.kde.KWin", "/KWin", "reconfigure"])
-                    .status()
+#[cfg(target_os = "linux")]
+fn ensure_kwin_script() {
+    let script_code = r#"
+function attach(w) {
+    if (w && w.caption && w.caption.indexOf("wmPlayer OSD Lyrics") >= 0) {
+        if (!w._wmplayer_attached) {
+            w._wmplayer_attached = true;
+            w.frameGeometryChanged.connect(function() {
+                callDBus("org.wmplayer.Lyric", "/org/wmplayer/Lyric", "org.wmplayer.Lyric", "SavePosition", Math.round(w.x), Math.round(w.y));
             });
+        }
     }
+}
+try {
+    workspace.windowList().forEach(attach);
+    workspace.windowAdded.connect(attach);
+} catch (e) {}
+"#;
+    let script_path = dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("wmplayer")
+        .join("kwin_osd_tracker.js");
+    if let Some(parent) = script_path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let _ = fs::write(&script_path, script_code);
+
+    let script_str = script_path.to_string_lossy().to_string();
+    std::thread::spawn(move || {
+        let _ = std::process::Command::new("qdbus6")
+            .args(["org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting.unloadScript", "wmplayer_osd_pos"])
+            .output();
+
+        if let Ok(output) = std::process::Command::new("qdbus6")
+            .args(["org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting.loadScript", &script_str, "wmplayer_osd_pos"])
+            .output()
+        {
+            let id = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !id.is_empty() {
+                let _ = std::process::Command::new("qdbus6")
+                    .args(["org.kde.KWin", &format!("/Scripting/Script{id}"), "run"])
+                    .status();
+            }
+        }
+    });
 }
 
 #[cfg(target_os = "linux")]
@@ -322,11 +453,11 @@ pub struct OsdWindow {
 #[cfg(target_os = "linux")]
 impl OsdWindow {
     pub fn new() -> Self {
-        ensure_kwin_rules();
-
         let config = Rc::new(RefCell::new(load_config()));
         let cfg = config.borrow().clone();
 
+        ensure_kwin_rules(&cfg);
+        ensure_kwin_script();
         // Sync atomic lock flag with loaded config
         crate::osd::set_osd_locked(cfg.locked);
 
@@ -759,10 +890,21 @@ impl OsdWindow {
         }
         self.render_krc_frame();
     }
+    pub fn save_position(&self, x: i32, y: i32) {
+        {
+            let mut c = self.config.borrow_mut();
+            c.x = Some(x);
+            c.y = Some(y);
+            save_config(&c);
+        }
+        update_kwin_position(x, y);
+    }
+
 
     pub fn set_visible(&self, visible: bool) {
         if visible {
-            ensure_kwin_rules();
+            ensure_kwin_rules(&self.config.borrow());
+            ensure_kwin_script();
             self.window.set_visible(true);
             self.window.present();
 
@@ -1006,6 +1148,9 @@ pub fn setup_osd_receiver(osd_win: Rc<OsdWindow>, rx: std::sync::mpsc::Receiver<
                     OsdCommand::SetColor(color) => {
                         osd_win.set_color(color);
                     }
+                    OsdCommand::SavePosition(x, y) => {
+                        osd_win.save_position(x, y);
+                    }
                 }
             }));
         }
@@ -1026,8 +1171,8 @@ impl OsdWindow {
     pub fn set_locked(&self, _l: bool) {}
     pub fn toggle_lock(&self) {}
     pub fn set_color(&self, _c: String) {}
+    pub fn save_position(&self, _x: i32, _y: i32) {}
 }
-
 #[cfg(not(target_os = "linux"))]
 pub fn setup_osd_receiver(_osd_win: Rc<OsdWindow>, _rx: std::sync::mpsc::Receiver<OsdCommand>) {}
 
@@ -1050,7 +1195,7 @@ mod tests {
     #[test]
     #[cfg(target_os = "linux")]
     fn test_ensure_kwin_rules() {
-        ensure_kwin_rules();
+        ensure_kwin_rules(&OsdConfig::default());
         let kwin_path = dirs::config_dir()
             .unwrap_or_else(|| PathBuf::from("."))
             .join("kwinrulesrc");
@@ -1061,7 +1206,7 @@ mod tests {
         assert!(content.contains("title=wmPlayer OSD Lyrics"));
 
         // Calling it a second time should be idempotent and not duplicate
-        ensure_kwin_rules();
+        ensure_kwin_rules(&OsdConfig::default());
         let content_after = fs::read_to_string(&kwin_path).unwrap_or_default();
         assert_eq!(content, content_after);
     }

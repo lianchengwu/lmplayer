@@ -60,21 +60,15 @@ window.appSettings = null;
 // 关闭窗口功能 - 根据设置决定行为
 window.closeWindow = () => {
     // 检查是否已加载设置并有关闭行为配置
-    if (window.appSettings && window.appSettings.behavior && window.appSettings.behavior.closeAction) {
-        const closeAction = window.appSettings.behavior.closeAction;
-        console.log('执行配置的关闭行为:', closeAction);
+    const closeAction = window.appSettings?.behavior?.closeAction || window.closeAction || 'ask';
+    console.log('执行配置的关闭行为:', closeAction);
 
-        if (closeAction === 'minimize') {
-            minimizeToTray();
-        } else if (closeAction === 'exit') {
-            exitApplication();
-        } else {
-            // 如果是 'ask' 或其他值，显示选择对话框
-            showCloseDialog();
-        }
+    if (closeAction === 'minimize') {
+        minimizeToTray();
+    } else if (closeAction === 'exit') {
+        exitApplication();
     } else {
-        // 如果没有加载设置，显示选择对话框
-        console.log('未找到关闭行为设置，显示选择对话框');
+        // 如果是 'ask' 或其他值，显示选择对话框
         showCloseDialog();
     }
 }
@@ -138,22 +132,28 @@ function applySettingsToFrontend(settings) {
     console.log('🎨 开始应用设置到前端...');
 
     // 应用主题设置
-    if (settings.interface && settings.interface.theme && settings.interface.theme !== 'auto') {
-        document.documentElement.setAttribute('data-theme', settings.interface.theme);
-        console.log('🎨 主题设置已应用:', settings.interface.theme);
+    if (settings.interface && settings.interface.theme) {
+        let theme = settings.interface.theme;
+        if (theme === 'auto') {
+            const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            theme = prefersDark ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', theme);
+        console.log('🎨 主题设置已应用:', theme);
     }
 
     // 应用音量设置
     if (settings.playback && settings.playback.volume !== undefined) {
         // 延迟应用音量设置，等待播放器初始化
         setTimeout(() => {
-            if (window.PlayerController && window.PlayerController.setVolume) {
-                window.PlayerController.setVolume(settings.playback.volume);
+            if (typeof window.setVolume === 'function') {
+                window.setVolume(settings.playback.volume);
                 console.log('🔊 音量设置已应用:', settings.playback.volume);
+            } else if (window.UnifiedPlayerController?.setVolume) {
+                window.UnifiedPlayerController.setVolume(settings.playback.volume);
             }
         }, 1000);
     }
-
     console.log('✅ 设置应用到前端完成');
 }
 
