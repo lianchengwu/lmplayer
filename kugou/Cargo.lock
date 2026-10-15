@@ -615,6 +615,7 @@ dependencies = [
  "md-5",
  "num-bigint",
  "num-traits",
+ "qrcode",
  "rand 0.8.8",
  "reqwest",
  "rsa",
@@ -832,6 +833,12 @@ checksum = "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9"
 dependencies = [
  "unicode-ident",
 ]
+
+[[package]]
+name = "qrcode"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d68782463e408eb1e668cf6152704bd856c78c5b6417adaee3203d8f4c1fc9ec"
 
 [[package]]
 name = "quinn"

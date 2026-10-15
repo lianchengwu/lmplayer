@@ -46,13 +46,7 @@ impl Error {
     pub(crate) fn api_fail(http_status: u16, body: Value) -> Self {
         let status = body.get("status").and_then(|v| v.as_i64());
         let error_code = body.get("error_code").and_then(|v| v.as_i64());
-        let message = body
-            .get("error")
-            .and_then(|v| v.as_str())
-            .or_else(|| body.get("msg").and_then(|v| v.as_str()))
-            .or_else(|| body.get("errmsg").and_then(|v| v.as_str()))
-            .unwrap_or("api error")
-            .to_string();
+        let message = api_text(&body).unwrap_or_else(|| "api error".into());
         Self::Api {
             http_status,
             status,
@@ -61,6 +55,36 @@ impl Error {
             body,
         }
     }
+
+    /// Short text safe to show in the login UI.
+    pub fn user_message(&self) -> String {
+        match self {
+            Self::Api { message, .. } if message != "api error" => message.clone(),
+            Self::Api {
+                error_code: Some(code),
+                ..
+            } => format!("请求失败（{code}）"),
+            Self::Api { .. } => "请求失败".into(),
+            other => other.to_string(),
+        }
+    }
+}
+
+fn api_text(body: &Value) -> Option<String> {
+    const KEYS: [&str; 5] = ["error", "msg", "errmsg", "error_msg", "message"];
+    let from = |v: &Value| {
+        KEYS.iter().find_map(|k| {
+            v.get(*k)
+                .and_then(|x| x.as_str())
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string())
+        })
+    };
+    from(body).or_else(|| match body.get("data") {
+        Some(Value::String(s)) if !s.is_empty() => Some(s.clone()),
+        Some(v) => from(v),
+        None => None,
+    })
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

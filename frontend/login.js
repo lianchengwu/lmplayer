@@ -290,36 +290,39 @@ async function generateQRCode() {
     `;
 
     try {
-        // 第一步：生成二维码Key
         console.log('生成二维码Key...');
         const keyResponse = await LoginService.GenerateQRKey();
 
-        if (!keyResponse.success) {
+        if (!keyResponse.success || !keyResponse.data) {
             throw new Error(keyResponse.message || '生成二维码Key失败');
         }
 
         currentQRKey = keyResponse.data.qrcode;
+        if (!currentQRKey) {
+            throw new Error(keyResponse.message || '未返回二维码 key');
+        }
         console.log('二维码Key生成成功:', currentQRKey);
 
-        // 第二步：根据Key生成二维码图片
-        console.log('生成二维码图片...');
-        const codeResponse = await LoginService.CreateQRCode(currentQRKey);
-
-        if (!codeResponse.success) {
-            throw new Error(codeResponse.message || '生成二维码图片失败');
+        let img = keyResponse.data.qrcode_img || '';
+        if (!img) {
+            const codeResponse = await LoginService.CreateQRCode(currentQRKey);
+            if (!codeResponse.success || !codeResponse.data || !codeResponse.data.base64) {
+                throw new Error((codeResponse && codeResponse.message) || '生成二维码图片失败');
+            }
+            img = codeResponse.data.base64;
         }
 
-        // 显示二维码
-        qrcodePlaceholder.innerHTML = `
-            <img src="${codeResponse.data.base64}"
-                 style="width: 160px; height: 160px; border-radius: 8px;"
-                 alt="登录二维码" />
-            <p class="qr-status">请使用酷狗扫描二维码登录</p>
-        `;
+        qrcodePlaceholder.replaceChildren();
+        const imgEl = document.createElement('img');
+        imgEl.src = img;
+        imgEl.alt = '登录二维码';
+        imgEl.style.cssText = 'width: 180px; height: 180px; border-radius: 8px; image-rendering: pixelated; background: #fff;';
+        const status = document.createElement('p');
+        status.className = 'qr-status';
+        status.textContent = '请使用酷狗概念版扫描二维码登录';
+        qrcodePlaceholder.append(imgEl, status);
 
         console.log('二维码生成成功');
-
-        // 第三步：开始轮询检测扫码状态
         startQRCodePolling();
 
     } catch (error) {
@@ -330,8 +333,12 @@ async function generateQRCode() {
                 <br>
                 <button onclick="generateQRCode()" style="margin-top: 8px; padding: 4px 8px; font-size: 10px;">重试</button>
             </div>
-            <p class="qr-status" style="color: #c62828;">二维码生成失败，请点击重试</p>
         `;
+        const status = document.createElement('p');
+        status.className = 'qr-status';
+        status.style.color = '#c62828';
+        status.textContent = error.message || '二维码生成失败，请点击重试';
+        qrcodePlaceholder.append(status);
     }
 }
 
@@ -368,13 +375,16 @@ async function checkQRStatus() {
 
         if (!response.success) {
             console.error('检查二维码状态失败:', response.message);
+            updateQRStatusUI(null, response.message || '检查二维码状态失败');
             return;
         }
 
-        const status = response.data.status;
+        const rawStatus = response.data && response.data.status;
+        const status = rawStatus === undefined || rawStatus === null || rawStatus === ''
+            ? NaN
+            : Number(rawStatus);
         console.log('二维码状态:', status, response.message);
 
-        // 更新UI状态提示
         updateQRStatusUI(status, response.message);
 
         // 根据状态处理
@@ -431,7 +441,7 @@ function updateQRStatusUI(status, message) {
     // 根据状态设置不同的样式和文本
     switch (status) {
         case 1: // 等待扫码
-            statusElement.textContent = '请使用手机扫描二维码登录';
+            statusElement.textContent = '请使用酷狗概念版扫描二维码';
             statusElement.style.color = '#666';
             break;
         case 2: // 已扫描，待确认

@@ -1,3 +1,9 @@
+use std::io::Write;
+
+use base64::Engine;
+use flate2::write::ZlibEncoder;
+use flate2::Compression;
+use qrcode::{Color, QrCode};
 use serde_json::json;
 
 use crate::http::{Call, Response, SignKind};
@@ -249,11 +255,12 @@ impl Client {
     }
 
     pub fn login_qr_create(&self, key: &str) -> Response {
+        let url = Self::login_qr_url(key);
         Response {
             http_status: 200,
             body: json!({
                 "code": 200,
-                "data": { "url": Self::login_qr_url(key), "base64": "" }
+                "data": { "url": url, "base64": qr_png_data_url(&url) }
             }),
             cookies: Vec::new(),
             headers: Default::default(),
@@ -262,6 +269,7 @@ impl Client {
     }
 
     pub async fn login_qr_check(&self, key: impl Into<String>) -> Result<Response> {
+        let dev = self.device.dev.clone();
         let res = self
             .execute(
                 Call::get("/v2/get_userinfo_qrcode")
@@ -270,6 +278,7 @@ impl Client {
                     .query("appid", self.appid())
                     .query("srcappid", SRCAPPID)
                     .query("qrcode", key.into())
+                    .query("dev", dev)
                     .sign(SignKind::Web),
             )
             .await?;
@@ -278,7 +287,17 @@ impl Client {
             let token = data.get("token").map(value_query).unwrap_or_default();
             let userid = data.get("userid").map(value_query).unwrap_or_default();
             if !token.is_empty() {
-                self.set_token(token, userid);
+                let mut session = self.session.lock().unwrap_or_else(|e| e.into_inner());
+                session.set_token(token, userid);
+                for key in ["vip_type", "vip_token", "t1"] {
+                    if let Some(v) = data
+                        .get(key)
+                        .map(value_query)
+                        .filter(|s| !s.is_empty() && s != "null")
+                    {
+                        session.set(key, v);
+                    }
+                }
             }
         }
         Ok(res)
@@ -311,5 +330,107 @@ impl Client {
     fn finish_login(&self, res: &mut Response, encrypt_key: &str) {
         let mut session = self.session.lock().unwrap_or_else(|e| e.into_inner());
         session.apply_login(&mut res.body, encrypt_key);
+    }
+}
+
+fn qr_png_data_url(text: &str) -> String {
+    let Ok(code) = QrCode::new(text.as_bytes()) else {
+        return String::new();
+    };
+    let quiet = 4usize;
+    let scale = 8usize;
+    let n = code.width();
+    let side = n + quiet * 2;
+    let px = side * scale;
+    let colors = code.to_colors();
+    let mut pixels = vec![255u8; px * px];
+    for y in 0..n {
+        for x in 0..n {
+            if colors[y * n + x] != Color::Dark {
+                continue;
+            }
+            let x0 = (x + quiet) * scale;
+            let y0 = (y + quiet) * scale;
+            for dy in 0..scale {
+                let row = (y0 + dy) * px + x0;
+                pixels[row..row + scale].fill(0);
+            }
+        }
+    }
+    let png = encode_png_gray(px as u32, px as u32, &pixels);
+    format!(
+        "data:image/png;base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(png)
+    )
+}
+
+fn encode_png_gray(width: u32, height: u32, pixels: &[u8]) -> Vec<u8> {
+    let mut raw = Vec::with_capacity((width as usize + 1) * height as usize);
+    for y in 0..height as usize {
+        raw.push(0);
+        let start = y * width as usize;
+        raw.extend_from_slice(&pixels[start..start + width as usize]);
+    }
+    let mut enc = ZlibEncoder::new(Vec::new(), Compression::fast());
+    enc.write_all(&raw).ok();
+    let idat = enc.finish().unwrap_or_default();
+
+    let mut ihdr = Vec::with_capacity(13);
+    ihdr.extend_from_slice(&width.to_be_bytes());
+    ihdr.extend_from_slice(&height.to_be_bytes());
+    ihdr.extend_from_slice(&[8, 0, 0, 0, 0]);
+
+    let mut out = vec![0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
+    out.extend(png_chunk(b"IHDR", &ihdr));
+    out.extend(png_chunk(b"IDAT", &idat));
+    out.extend(png_chunk(b"IEND", &[]));
+    out
+}
+
+fn png_chunk(kind: &[u8; 4], data: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(12 + data.len());
+    out.extend_from_slice(&(data.len() as u32).to_be_bytes());
+    out.extend_from_slice(kind);
+    out.extend_from_slice(data);
+    let crc = crc32(&out[4..]);
+    out.extend_from_slice(&crc.to_be_bytes());
+    out
+}
+
+fn crc32(data: &[u8]) -> u32 {
+    let mut crc = 0xFFFF_FFFFu32;
+    for &b in data {
+        crc ^= u32::from(b);
+        for _ in 0..8 {
+            let mask = (crc & 1).wrapping_neg();
+            crc = (crc >> 1) ^ (0xEDB8_8320 & mask);
+        }
+    }
+    !crc
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use base64::Engine;
+
+    #[test]
+    fn qr_create_returns_png() {
+        let client = Client::new().unwrap();
+        let res = client.login_qr_create("abc");
+        let url = res.body.pointer("/data/url").and_then(|v| v.as_str()).unwrap();
+        assert_eq!(
+            url,
+            "https://h5.kugou.com/apps/loginQRCode/html/index.html?qrcode=abc"
+        );
+        let data_url = res
+            .body
+            .pointer("/data/base64")
+            .and_then(|v| v.as_str())
+            .unwrap();
+        let b64 = data_url.strip_prefix("data:image/png;base64,").unwrap();
+        let png = base64::engine::general_purpose::STANDARD.decode(b64).unwrap();
+        assert_eq!(&png[..8], b"\x89PNG\r\n\x1a\n");
+        assert!(png.windows(4).any(|w| w == b"IEND"));
     }
 }

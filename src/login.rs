@@ -22,7 +22,7 @@ impl LoginApi<'_> {
         }
         match self.player.kg.captcha_sent(mobile).await {
             Ok(res) => ApiResponse::from_kugou("验证码发送成功", &res, res.data().clone()),
-            Err(e) => ApiResponse::fail(e.to_string()),
+            Err(e) => ApiResponse::fail(e.user_message()),
         }
     }
 
@@ -36,6 +36,9 @@ impl LoginApi<'_> {
         match self.player.kg.login_cellphone(mobile, code).await {
             Ok(res) => {
                 let token = self.player.kg.session().token().unwrap_or("").to_string();
+                if token.is_empty() {
+                    return ApiResponse::fail(kugou_err_msg(&res, "登录失败，未获取到 token"));
+                }
                 let userid = self
                     .player
                     .kg
@@ -43,41 +46,59 @@ impl LoginApi<'_> {
                     .user_id()
                     .and_then(|s| s.parse().ok())
                     .unwrap_or(0);
+                let mut user_info = res.data().clone();
+                attach_profile(self.player, &mut user_info).await;
                 let _ = self.player.save_cookie();
                 ApiResponse::ok(
                     "登录成功",
                     LoginData {
                         token,
                         userid,
-                        user_info: res.data().clone(),
+                        user_info,
                     },
                 )
             }
-            Err(e) => ApiResponse::fail(e.to_string()),
+            Err(e) => ApiResponse::fail(e.user_message()),
         }
     }
 
     pub async fn qr_key(&self) -> ApiResponse<Value> {
         match self.player.kg.login_qr_key().await {
             Ok(res) => ApiResponse::from_kugou("ok", &res, res.data().clone()),
-            Err(e) => ApiResponse::fail(e.to_string()),
+            Err(e) => ApiResponse::fail(e.user_message()),
         }
     }
 
     pub async fn qr_create(&self, key: &str) -> ApiResponse<Value> {
+        if key.is_empty() {
+            return ApiResponse::fail("二维码 key 不能为空");
+        }
         let res = self.player.kg.login_qr_create(key);
+        let b64 = res
+            .body
+            .pointer("/data/base64")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        if b64.is_empty() {
+            return ApiResponse::fail("二维码图片生成失败");
+        }
         ApiResponse::ok("ok", res.data().clone())
     }
 
     pub async fn qr_check(&self, key: &str) -> ApiResponse<Value> {
+        if key.is_empty() {
+            return ApiResponse::fail("二维码 key 不能为空");
+        }
         match self.player.kg.login_qr_check(key).await {
             Ok(res) => {
-                if self.player.kg.session().token().is_some() {
+                let mut data = res.data().clone();
+                if qr_status(&data) == Some(4) && self.player.kg.session().token().is_some() {
+                    attach_profile(self.player, &mut data).await;
                     let _ = self.player.save_cookie();
                 }
-                ApiResponse::from_kugou("ok", &res, res.data().clone())
+                ApiResponse::ok(qr_status_message(&data), data)
             }
-            Err(e) => ApiResponse::fail(e.to_string()),
+            Err(e) => ApiResponse::fail(e.user_message()),
         }
     }
 
@@ -173,6 +194,7 @@ impl LoginApi<'_> {
 
     pub fn logout(&self) -> ApiResponse<Value> {
         self.player.kg.set_token("", "0");
+        let _ = self.player.clear_cookie();
         ApiResponse::ok("已登出", Value::Null)
     }
 }
@@ -210,6 +232,46 @@ fn kugou_err_msg(res: &kugou::Response, fallback: &str) -> String {
     ["error_msg", "error", "msg", "errmsg", "message"]
         .into_iter()
         .find_map(|k| res.body.get(k).and_then(|v| v.as_str()).filter(|s| !s.is_empty()))
+        .or_else(|| res.body.get("data").and_then(|v| v.as_str()).filter(|s| !s.is_empty()))
         .unwrap_or(fallback)
         .to_string()
+}
+
+fn qr_status(data: &Value) -> Option<i64> {
+    match data.get("status") {
+        Some(Value::Number(n)) => n.as_i64(),
+        Some(Value::String(s)) => s.parse().ok(),
+        _ => None,
+    }
+}
+
+fn qr_status_message(data: &Value) -> &'static str {
+    match qr_status(data) {
+        Some(0) => "二维码已过期",
+        Some(1) => "等待扫码",
+        Some(2) => "已扫码，请在手机上确认",
+        Some(4) => "登录成功",
+        _ => "ok",
+    }
+}
+
+async fn attach_profile(player: &crate::Player, info: &mut Value) {
+    let Ok(detail) = player.kg.user_detail().await else {
+        return;
+    };
+    if !detail.kugou_ok() {
+        return;
+    }
+    let d = detail.data().clone();
+    let Some(obj) = info.as_object_mut() else {
+        return;
+    };
+    for key in ["nickname", "pic"] {
+        let missing = obj.get(key).and_then(|v| v.as_str()).unwrap_or("").is_empty();
+        if missing {
+            if let Some(v) = d.get(key).filter(|v| !matches!(v, Value::Null)) {
+                obj.insert(key.to_string(), v.clone());
+            }
+        }
+    }
 }
