@@ -475,6 +475,22 @@ export function initHomePage() {
     
     // 初始化FM播放跟踪
     initFmPlaybackTracking();
+    // 监听全局歌曲信息更新，保持主页 FM 和 AI 卡片与正在播放的歌曲同步
+    const origUpdateSongInfo = window.updateSongInfo;
+    if (typeof origUpdateSongInfo === 'function' && !origUpdateSongInfo._homeSyncExtended) {
+        window.updateSongInfo = function(song) {
+            origUpdateSongInfo(song);
+            if (isFmPlaying()) {
+                currentFmSong = song;
+                updateFmDisplay();
+            } else if (isAiPlaying()) {
+                currentAiSong = song;
+                updateAiDisplay();
+            }
+        };
+        window.updateSongInfo._homeSyncExtended = true;
+    }
+
 
     if (fmCover) {
         fmCover.addEventListener('click', toggleFM);
@@ -485,6 +501,16 @@ export function initHomePage() {
     if (fmPlayOverlay) {
         fmPlayOverlay.addEventListener('click', async (e) => {
             e.stopPropagation(); // 阻止事件冒泡
+            if (isFmPlaying()) {
+                const player = window.audioPlayer ? window.audioPlayer() : null;
+                if (player && (player.isPlaying?.() || (!player.audio?.paused && player.audio?.currentTime > 0))) {
+                    if (window.PlayerController?.togglePlayPause) {
+                        window.PlayerController.togglePlayPause();
+                        return;
+                    }
+                }
+            }
+
 
             if (currentFmSong && window.PlayerController) {
                 if (fmPlaylist.length === 0) {
@@ -534,6 +560,16 @@ export function initHomePage() {
     if (aiPlayOverlay) {
         aiPlayOverlay.addEventListener('click', async (e) => {
             e.stopPropagation(); // 阻止事件冒泡
+            if (isAiPlaying()) {
+                const player = window.audioPlayer ? window.audioPlayer() : null;
+                if (player && (player.isPlaying?.() || (!player.audio?.paused && player.audio?.currentTime > 0))) {
+                    if (window.PlayerController?.togglePlayPause) {
+                        window.PlayerController.togglePlayPause();
+                        return;
+                    }
+                }
+            }
+
 
             if (currentAiSong && window.PlayerController) {
                 if (currentAiRecommendList.length === 0) {
@@ -929,8 +965,12 @@ function updateFmPlayParams(song, isOverplay = false) {
     }
 }
 
+let fmPlaybackTrackingInitialized = false;
+
 // 监听播放器状态变化，更新FM参数
 function initFmPlaybackTracking() {
+    if (fmPlaybackTrackingInitialized) return;
+    fmPlaybackTrackingInitialized = true;
     // 延迟初始化，等待播放器加载完成
     setTimeout(() => {
         try {
@@ -1833,6 +1873,16 @@ function initPlayerBarEvents() {
 
 // ==================== 私人FM功能 ====================
 async function toggleFM() {
+    if (isFmPlaying()) {
+        const player = window.audioPlayer ? window.audioPlayer() : null;
+        if (player && (player.isPlaying?.() || (!player.audio?.paused && player.audio?.currentTime > 0))) {
+            if (window.PlayerController?.togglePlayPause) {
+                window.PlayerController.togglePlayPause();
+                return;
+            }
+        }
+    }
+
     // 确保有FM播放列表
     if (fmPlaylist.length === 0) {
         await loadRandomFmSong();
@@ -2011,6 +2061,16 @@ async function nextFmSong() {
 
 // ==================== AI推荐功能 ====================
 async function toggleAI() {
+    if (isAiPlaying()) {
+        const player = window.audioPlayer ? window.audioPlayer() : null;
+        if (player && (player.isPlaying?.() || (!player.audio?.paused && player.audio?.currentTime > 0))) {
+            if (window.PlayerController?.togglePlayPause) {
+                window.PlayerController.togglePlayPause();
+                return;
+            }
+        }
+    }
+
     // 加载AI推荐歌曲列表
     await loadRandomAiSong();
 
@@ -2020,6 +2080,7 @@ async function toggleAI() {
         const startIndex = currentIndex >= 0 ? currentIndex : 0;
 
         console.log(`🎵 设置AI推荐播放列表，共${currentAiRecommendList.length}首，从第${startIndex + 1}首开始播放:`, currentAiSong.title);
+
 
         // 使用PlayerController设置完整的AI推荐播放列表
         const success = await window.PlayerController.playPlaylist(currentAiRecommendList, startIndex, 'AI推荐', 'list');
@@ -2120,43 +2181,74 @@ async function dislikeAiSong() {
     } catch (error) {
         console.error('AI推荐不喜欢操作API调用失败:', error);
     }
-    if (isAiPlaying() && window.PlayerController?.playNext) {
-        await window.PlayerController.playNext();
-        currentAiSong = window.PlayerController.getCurrentSong() || currentAiSong;
-        updateAiDisplay();
-    } else {
-        await nextAiSong();
-    }
+    await nextAiSong();
 }
 
 async function nextAiSong() {
     console.log('🎵 切换到下一首AI推荐歌曲');
 
     try {
-        // 如果当前有AI推荐列表，从中选择下一首
-        if (currentAiRecommendList.length > 0) {
-            // 找到当前歌曲在列表中的索引
-            const currentIndex = currentAiRecommendList.findIndex(song => song.hash === currentAiSong.hash);
+        // 1. 如果当前正在播放AI推荐，直接推进播放器下一首
+        if (isAiPlaying() && window.PlayerController) {
+            const pl = window.PlaylistManager ? window.PlaylistManager.getCurrentPlaylist() : null;
+            const idx = pl?.current_index ?? pl?.CurrentIndex ?? 0;
+            const total = pl?.songs?.length || currentAiRecommendList.length;
 
-            // 选择下一首歌曲（如果是最后一首，则重新获取新的推荐列表）
-            if (currentIndex >= 0 && currentIndex < currentAiRecommendList.length - 1) {
-                // 选择列表中的下一首
-                currentAiSong = currentAiRecommendList[currentIndex + 1];
-                console.log('✅ 从AI推荐列表中选择下一首:', currentAiSong.title);
-                updateAiDisplay();
-                return;
+            // 如果接近列表末尾，提前追加更多歌曲
+            if (total > 0 && idx >= total - 1) {
+                await appendMoreAiSongs();
+            }
+
+            if (window.PlayerController.playNext) {
+                const success = await window.PlayerController.playNext();
+                if (success) {
+                    currentAiSong = window.PlayerController.getCurrentSong() || currentAiSong;
+                    updateAiDisplay();
+                    console.log('✅ 下一首AI推荐歌曲已切歌并开始播放:', currentAiSong?.title);
+                    return;
+                }
             }
         }
 
-        // 如果没有列表或已经是最后一首，重新获取新的推荐列表
-        console.log('🔄 重新获取AI推荐列表...');
-        await loadRandomAiSong(true); // 强制获取新歌曲
+        // 2. 如果未在播放AI推荐或playNext未成功切歌：从列表中选择下一首并播放
+        if (currentAiRecommendList.length === 0) {
+            await loadRandomAiSong();
+        }
 
-        if (currentAiSong) {
-            console.log('✅ 新的AI推荐歌曲已准备就绪:', currentAiSong.title);
+        let nextIndex = 0;
+        if (currentAiSong && currentAiRecommendList.length > 0) {
+            const currentIndex = currentAiRecommendList.findIndex(song => song.hash === currentAiSong.hash);
+            if (currentIndex >= 0 && currentIndex < currentAiRecommendList.length - 1) {
+                nextIndex = currentIndex + 1;
+            } else {
+                // 已到末尾，追加新歌曲
+                await appendMoreAiSongs();
+                const newIndex = currentAiRecommendList.findIndex(song => song.hash === currentAiSong.hash);
+                if (newIndex >= 0 && newIndex < currentAiRecommendList.length - 1) {
+                    nextIndex = newIndex + 1;
+                } else if (currentAiRecommendList.length === 0) {
+                    await loadRandomAiSong(true);
+                    nextIndex = 0;
+                } else {
+                    nextIndex = 0;
+                }
+            }
+        }
+
+        if (currentAiRecommendList.length > 0) {
+            currentAiSong = currentAiRecommendList[nextIndex];
             updateAiDisplay();
+
+            if (window.PlayerController) {
+                const success = await window.PlayerController.playPlaylist(currentAiRecommendList, nextIndex, 'AI推荐', 'list');
+                if (success) {
+                    console.log('✅ 下一首AI推荐歌曲已开始播放:', currentAiSong?.title);
+                } else {
+                    console.error('❌ 播放下一首AI推荐歌曲失败');
+                }
+            }
         } else {
-            console.error('❌ 无法加载下一首AI推荐歌曲');
+            console.error('❌ 无法加载AI推荐歌曲');
         }
     } catch (error) {
         console.error(`❌ AI推荐歌曲切换异常:`, error);

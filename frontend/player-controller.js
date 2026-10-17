@@ -21,6 +21,7 @@ function fallbackUpdatePlayerBar() {
 
 // 统一播放函数 - 单曲播放
 async function playSong(song) {
+    window.PlaylistManager?.cancelStartupAutoPlay?.();
     console.log('🎵 播放单曲:', song.songname);
 
     if (!song || !song.hash) {
@@ -51,6 +52,7 @@ async function playSong(song) {
 
 async function playPlaylist(songs, startIndex = 0, playlistName = '播放列表', playMode = 'repeat_all') {
     console.log('🎵 播放歌单:', { songs: songs.length, startIndex, playlistName, playMode });
+    window.PlaylistManager?.cancelStartupAutoPlay?.();
 
     if (!songs || songs.length === 0) {
         console.error('❌ 歌曲列表为空');
@@ -77,6 +79,7 @@ async function playPlaylist(songs, startIndex = 0, playlistName = '播放列表'
 
 async function updatePlaylist(songs, currentIndex, playlistName) {
     if (!window.PlaylistManager || !songs || songs.length === 0) return false;
+    window.PlaylistManager?.cancelStartupAutoPlay?.();
     const pl = window.PlaylistManager.getCurrentPlaylist() || {};
     const mode = pl.play_mode || pl.PlayMode || 'repeat_all';
     const name = playlistName || pl.name || '播放列表';
@@ -101,6 +104,7 @@ const SKIP_DEBOUNCE_MS = 250;
 
 // 播放当前歌曲
 async function playCurrentSong() {
+    window.PlaylistManager?.cancelStartupAutoPlay?.();
     clearAutoNextErrorTimer();
     const playSeq = ++currentPlaySeq;
     console.log(`🎵 [Seq #${playSeq}] 获取当前歌曲...`);
@@ -310,6 +314,7 @@ async function playCurrentSong() {
 
 // 下一首
 async function playNextSong() {
+    window.PlaylistManager?.cancelStartupAutoPlay?.();
     const now = Date.now();
     if (now - lastSkipTime < SKIP_DEBOUNCE_MS) {
         console.log('⚠️ 切歌过快，忽略多余点击');
@@ -339,6 +344,7 @@ async function playNextSong() {
 
 // 上一首
 async function playPreviousSong() {
+    window.PlaylistManager?.cancelStartupAutoPlay?.();
     const now = Date.now();
     if (now - lastSkipTime < SKIP_DEBOUNCE_MS) {
         console.log('⚠️ 切歌过快，忽略多余点击');
@@ -362,6 +368,7 @@ async function playPreviousSong() {
 
 // 播放指定索引的歌曲
 async function playByIndex(index) {
+    window.PlaylistManager?.cancelStartupAutoPlay?.();
     console.log('🎵 播放指定索引歌曲:', index);
     
     try {

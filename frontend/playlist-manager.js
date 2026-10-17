@@ -41,6 +41,8 @@ async function loadPlaylistFromCache() {
 
             // 更新UI显示
             updatePlaylistUI();
+            // 恢复上次播放的歌曲信息到播放器界面（仅应用启动初始化时执行）
+            restoreLastPlayingSong(true);
             return true;
         } else {
             console.warn('⚠️ 加载播放列表失败:', response?.message || '未知错误');
@@ -436,15 +438,26 @@ function updatePlaylistUI() {
         window.updateRightSidebarPlaylist(songs, currentPlaylist.current_index, currentPlaylist.name);
     }
 
-    // 恢复上次播放的歌曲信息到播放器界面（但不播放）
-    restoreLastPlayingSong();
 
     // 更新播放模式按钮状态
     updatePlayModeButtons();
 }
 
-// 恢复上次播放的歌曲信息到播放器界面（但不播放）
-function restoreLastPlayingSong() {
+// 启动自动播放定时器追踪
+let startupAutoPlayTimer = null;
+let hasAutoPlayedOnStartup = false;
+
+// 取消启动自动播放（用户手动切歌或开始播放时调用）
+function cancelStartupAutoPlay() {
+    if (startupAutoPlayTimer) {
+        clearTimeout(startupAutoPlayTimer);
+        startupAutoPlayTimer = null;
+    }
+    hasAutoPlayedOnStartup = true;
+}
+
+// 恢复上次播放的歌曲信息到播放器界面（仅在启动初始化时恢复显示或按设置自动播放）
+function restoreLastPlayingSong(isStartup = false) {
     // 检查是否有有效的播放列表和当前索引
     if (!currentPlaylist || !currentPlaylist.songs || currentPlaylist.songs.length === 0) {
         console.log('🎵 没有播放列表或播放列表为空，跳过歌曲信息恢复');
@@ -494,21 +507,30 @@ function restoreLastPlayingSong() {
                 }
             }
 
-            // 检查自动播放设置
-            const autoPlay = window.appSettings?.playback?.autoPlay ?? true;
-            if (autoPlay) {
-                console.log('▶️ 根据设置自动播放上次歌曲:', currentSong.songname);
-                setTimeout(async () => {
-                    try {
-                        if (window.PlayerController?.playCurrentSong) {
-                            await window.PlayerController.playCurrentSong();
-                        } else if (window.PlayerController?.playSong) {
-                            await window.PlayerController.playSong(currentSong);
+            // 检查自动播放设置：仅在启动从缓存恢复且未触发过自动播放时执行
+            if (isStartup && !hasAutoPlayedOnStartup) {
+                hasAutoPlayedOnStartup = true;
+                const autoPlay = window.appSettings?.playback?.autoPlay ?? true;
+                if (autoPlay) {
+                    console.log('▶️ 根据设置启动时自动播放上次歌曲:', currentSong.songname);
+                    startupAutoPlayTimer = setTimeout(async () => {
+                        startupAutoPlayTimer = null;
+                        try {
+                            const player = window.audioPlayer ? window.audioPlayer() : null;
+                            if (player && (player.isPlaying?.() || (!player.audio?.paused && player.audio?.currentTime > 0))) {
+                                console.log('🎵 播放器已在播放中，跳过启动自动播放');
+                                return;
+                            }
+                            if (window.PlayerController?.playCurrentSong) {
+                                await window.PlayerController.playCurrentSong();
+                            } else if (window.PlayerController?.playSong) {
+                                await window.PlayerController.playSong(currentSong);
+                            }
+                        } catch (err) {
+                            console.warn('⚠️ 自动播放触发失败:', err);
                         }
-                    } catch (err) {
-                        console.warn('⚠️ 自动播放触发失败:', err);
-                    }
-                }, 1000);
+                    }, 1000);
+                }
             }
 
         } catch (error) {
@@ -572,6 +594,7 @@ window.PlaylistManager = {
     setCurrentIndex,
     updatePlayMode,
     clearPlaylist,
+    cancelStartupAutoPlay,
     hasNext,
     peekNextSong,
     getCurrentPlaylist: () => currentPlaylist,
