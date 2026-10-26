@@ -61,6 +61,7 @@ function resetLoginForm() {
         sendCodeBtn.disabled = false;
         sendCodeBtn.textContent = '发送验证码';
     }
+    clearCodeHint();
 }
 
 // 切换登录标签页
@@ -87,6 +88,32 @@ function switchLoginTab(tabType) {
     console.log('切换到登录方式:', tabType === 'phone' ? '手机号登录' : '扫码登录');
 }
 
+// 验证码区域的行内提示，不打断登录弹窗
+function setCodeHint(message, type = 'success') {
+    const hint = document.getElementById('codeHint');
+    if (!hint) return;
+
+    hint.replaceChildren();
+    if (!message) {
+        hint.hidden = true;
+        hint.className = 'code-hint';
+        return;
+    }
+
+    const icon = document.createElement('i');
+    icon.className = type === 'error' ? 'fas fa-exclamation-circle' : 'fas fa-check-circle';
+    icon.setAttribute('aria-hidden', 'true');
+    const text = document.createElement('span');
+    text.textContent = message;
+    hint.className = `code-hint ${type === 'error' ? 'error' : 'success'}`;
+    hint.append(icon, text);
+    hint.hidden = false;
+}
+
+function clearCodeHint() {
+    setCodeHint('');
+}
+
 // 发送验证码
 async function sendVerificationCode() {
     const phoneInput = document.getElementById('phoneNumber');
@@ -98,10 +125,11 @@ async function sendVerificationCode() {
 
     // 验证手机号格式
     if (!validatePhoneNumber(phoneNumber)) {
-        alert('请输入正确的手机号');
+        setCodeHint('请输入正确的手机号', 'error');
         return;
     }
 
+    clearCodeHint();
     // 禁用按钮并显示发送中状态
     sendCodeBtn.disabled = true;
     sendCodeBtn.textContent = '发送中...';
@@ -112,18 +140,18 @@ async function sendVerificationCode() {
         const response = await LoginService.SendCaptcha(phoneNumber);
 
         if (response.success) {
-            // 发送成功，开始倒计时
-            alert('验证码已发送，请注意查收');
+            setCodeHint('验证码已发送，请查收短信');
             startCountdown(sendCodeBtn);
+            document.getElementById('verificationCode')?.focus();
         } else {
             // 发送失败，显示错误信息
-            alert(response.message || '验证码发送失败');
+            setCodeHint(response.message || '验证码发送失败', 'error');
             sendCodeBtn.disabled = false;
             sendCodeBtn.textContent = '发送验证码';
         }
     } catch (error) {
         console.error('发送验证码失败:', error);
-        alert('网络错误，请检查网络连接');
+        setCodeHint('网络错误，请检查网络连接', 'error');
         sendCodeBtn.disabled = false;
         sendCodeBtn.textContent = '发送验证码';
     }

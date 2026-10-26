@@ -1525,6 +1525,51 @@ h1 {
     box-shadow: none;
 }
 
+/* 验证码发送提示，替代系统 alert */
+.code-hint {
+    margin: 0;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.4;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-primary);
+    animation: codeHintIn 0.2s ease-out;
+}
+
+.code-hint[hidden] {
+    display: none;
+}
+
+.code-hint.success {
+    background: rgba(16, 185, 129, 0.12);
+}
+
+.code-hint.success i {
+    color: #10b981;
+}
+
+.code-hint.error {
+    background: rgba(239, 68, 68, 0.12);
+}
+
+.code-hint.error i {
+    color: #ef4444;
+}
+
+@keyframes codeHintIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 /* 登录按钮 */
 .login-btn {
     padding: 0;
