@@ -195,7 +195,7 @@ git push origin v0.9.3
 | 平台 | 架构 | 生成产物 | 说明 |
 | :--- | :--- | :--- | :--- |
 | **Linux** | x86_64 | `wmplayer-linux-amd64.tar.gz` | 原生 GTK4 + WebKitGTK 6.0 桌面应用（内嵌 WebUI 与纯 Rust 协议引擎） |
-| **Windows** | x86_64 | `wmplayer-windows-amd64.zip` | 单一可执行程序 `wmplayer.exe`，启动并自动开启网页界面 |
+| **Windows** | x86_64 | `wmplayer-windows-amd64.zip` | 无控制台的原生窗口应用，界面由 WebView2 内嵌（不打开系统浏览器；缺少运行时会弹窗提示安装） |
 | **macOS** | Universal (x86_64 / arm64) | `wmplayer-darwin-universal.zip` | 单一可执行程序 `wmplayer`，启动并自动开启网页界面 |
 
 ---

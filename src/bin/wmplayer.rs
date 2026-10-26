@@ -1,3 +1,8 @@
+#![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
+
+#[cfg(target_os = "windows")]
+mod windows_app;
+
 #[cfg(target_os = "linux")]
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -53,16 +58,16 @@ enum WinOp {
 #[cfg(target_os = "linux")]
 static WIN_TX: OnceLock<Sender<WinOp>> = OnceLock::new();
 static MAXIMIZED: AtomicBool = AtomicBool::new(false);
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "windows"))]
 static QUIT: AtomicBool = AtomicBool::new(false);
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "windows"))]
 const JS_TOGGLE: &str = "window.Events&&window.Events.Emit('systray:toggle-play-pause')";
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "windows"))]
 const JS_PREV: &str = "window.Events&&window.Events.Emit('systray:previous-song')";
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "windows"))]
 const JS_NEXT: &str = "window.Events&&window.Events.Emit('systray:next-song')";
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "windows"))]
 const JS_FAV: &str = "window.Events&&window.Events.Emit('systray:favorite-song')";
 #[cfg(target_os = "linux")]
 const JS_OSD: &str = "window.Events&&window.Events.Emit('systray:toggle-osd-lyrics')";
@@ -79,7 +84,12 @@ fn send_win(op: WinOp) {
     }
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "windows")]
+fn send_win(op: WinOp) {
+    windows_app::send_win(op);
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
 fn send_win(_op: WinOp) {}
 
 #[cfg(target_os = "linux")]
@@ -132,7 +142,6 @@ fn hardware_accel_enabled() -> bool {
         .and_then(|v| v.as_bool())
         .unwrap_or(true)
 }
-#[cfg(target_os = "linux")]
 fn start_minimized_enabled() -> bool {
     let path = dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
@@ -216,7 +225,7 @@ async fn window_q() -> Json<Value> {
 
 async fn open_url(Json(body): Json<Value>) -> Json<Value> {
     if let Some(url) = body.get("url").and_then(|v| v.as_str()) {
-        let _ = std::process::Command::new("xdg-open").arg(url).spawn();
+        wmplayer::open_with_system(url);
     }
     Json(json!({ "ok": true }))
 }
@@ -365,25 +374,14 @@ fn main() {
         start_webview(app, addr);
     }
 
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(target_os = "windows")]
+    windows_app::start(rt, listener, router, addr);
+
+    #[cfg(target_os = "macos")]
     {
         let uri = format!("http://{addr}/");
-        eprintln!("🎵 wmplayer running at {uri}");
-        eprintln!("Opening default browser...");
-
-        #[cfg(target_os = "windows")]
-        {
-            let _ = std::process::Command::new("rundll32")
-                .args(["url.dll,FileProtocolHandler", &uri])
-                .spawn();
-        }
-        #[cfg(target_os = "macos")]
-        {
-            let _ = std::process::Command::new("open")
-                .arg(&uri)
-                .spawn();
-        }
-
+        eprintln!("wmplayer http://{uri}");
+        let _ = std::process::Command::new("open").arg(&uri).spawn();
         rt.block_on(async {
             let _ = tokio::select! {
                 res = axum::serve(listener, router) => {

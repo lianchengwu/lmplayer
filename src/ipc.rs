@@ -366,7 +366,7 @@ pub async fn dispatch(player: &Player, cmd: &str, args: Value) -> Value {
             let fp = arg_str(&args, "filePath");
             let p = std::path::Path::new(&fp);
             let dir = if p.is_dir() { p } else { p.parent().unwrap_or(p) };
-            let _ = std::process::Command::new("xdg-open").arg(dir).spawn();
+            crate::open_with_system(dir);
             ok(json!("ok"))
         }
         "select_music_folder" => match crate::local_music::select_folder().await {
