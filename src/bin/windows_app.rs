@@ -80,7 +80,7 @@ pub(super) fn start(
         .with_devtools(cfg!(debug_assertions))
         .with_background_throttling(wry::BackgroundThrottlingPolicy::Disabled)
         .with_new_window_req_handler(|url, _features| {
-            crate::open_with_system(&url);
+            wmplayer::open_with_system(&url);
             wry::NewWindowResponse::Deny
         })
         .build(&window);
@@ -196,7 +196,7 @@ fn create_tray(proxy: EventLoopProxy<WinOp>) -> Option<tray_icon::TrayIcon> {
             let _ = click_proxy.send_event(WinOp::Show);
         }
     }));
-    MenuEvent::set_event_handler(Some(move |event| {
+    MenuEvent::set_event_handler(Some(move |event: MenuEvent| {
         let op = match event.id.as_ref() {
             "show" => WinOp::Show,
             "toggle" => WinOp::Js(JS_TOGGLE),
