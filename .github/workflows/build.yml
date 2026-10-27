@@ -71,6 +71,14 @@ jobs:
           name: wmplayer-linux-amd64
           path: wmplayer-linux-amd64.tar.gz
 
+      - name: Publish Linux release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: wmplayer-linux-amd64.tar.gz
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+
   build-windows:
     name: Build Windows (x86_64)
     runs-on: windows-latest
@@ -116,6 +124,14 @@ jobs:
           name: wmplayer-windows-amd64
           path: wmplayer-windows-amd64.zip
 
+      - name: Publish Windows release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: wmplayer-windows-amd64.zip
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+
   build-macos:
     name: Build macOS (Universal)
     runs-on: macos-latest
@@ -160,20 +176,11 @@ jobs:
         with:
           name: wmplayer-darwin-universal
           path: wmplayer-darwin-universal.zip
-  release:
-    name: GitHub Release
-    if: startsWith(github.ref, 'refs/tags/')
-    needs: [build-linux, build-windows, build-macos]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: release_assets
-          merge-multiple: true
 
-      - name: Publish release
+      - name: Publish macOS release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: release_assets/*
+          files: wmplayer-darwin-universal.zip
+          fail_on_unmatched_files: true
           generate_release_notes: true
