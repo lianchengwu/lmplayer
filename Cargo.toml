@@ -3,6 +3,7 @@ name = "wmplayer"
 version = "0.9.4"
 edition = "2021"
 description = "wmPlayer Rust backend — KuGou via kugou crate, Lite default"
+autobins = false
 
 [[bin]]
 name = "wmplayer"
@@ -38,7 +39,19 @@ zbus = { version = "5", default-features = false, features = ["tokio"] }
 tao = "0.37"
 wry = "0.57"
 tray-icon = { version = "0.26", default-features = false }
-
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_Graphics_Gdi",
+    "Win32_Graphics_Direct2D",
+    "Win32_Graphics_Direct2D_Common",
+    "Win32_Graphics_DirectWrite",
+    "Win32_Graphics_Dxgi_Common",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Com",
+] }
+windows-numerics = "0.3"
 [target.'cfg(target_os = "windows")'.build-dependencies]
 winresource = "0.1"
 [dev-dependencies]

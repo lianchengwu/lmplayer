@@ -51,7 +51,7 @@ pub(super) fn start(
         })
         .expect("http thread");
 
-    let tray = create_tray(proxy);
+    let tray = create_tray(proxy.clone());
     let has_tray = tray.is_some();
     let start_hidden = has_tray && super::start_minimized_enabled();
     let mut window = WindowBuilder::new()
@@ -80,7 +80,7 @@ pub(super) fn start(
         .with_devtools(cfg!(debug_assertions))
         .with_background_throttling(wry::BackgroundThrottlingPolicy::Disabled)
         .with_new_window_req_handler(|url, _features| {
-            crate::open_with_system(&url);
+            wmplayer::open_with_system(&url);
             wry::NewWindowResponse::Deny
         })
         .build(&window);
@@ -93,10 +93,35 @@ pub(super) fn start(
             std::process::exit(1);
         }
     };
+    // Setup native Direct2D/DirectWrite OSD floating lyrics window
+    let osd_win = std::rc::Rc::new(wmplayer::osd_window::OsdWindow::new());
+    let (osd_tx, osd_rx) = std::sync::mpsc::channel();
+    wmplayer::osd::register_osd_cmd_sender(osd_tx);
+    wmplayer::osd_window::setup_osd_receiver(osd_win.clone(), osd_rx);
+
+    // Setup player actions handler (for OSD/remote controls)
+    let (act_tx, act_rx) = std::sync::mpsc::channel::<wmplayer::osd::PlayerAction>();
+    wmplayer::osd::register_action_sender(act_tx);
+    let act_proxy = proxy.clone();
+    std::thread::Builder::new()
+        .name("osd-actions".into())
+        .spawn(move || {
+            while let Ok(act) = act_rx.recv() {
+                let op = match act {
+                    wmplayer::osd::PlayerAction::TogglePlayPause => WinOp::Js(JS_TOGGLE),
+                    wmplayer::osd::PlayerAction::Next => WinOp::Js(JS_NEXT),
+                    wmplayer::osd::PlayerAction::Previous => WinOp::Js(JS_PREV),
+                };
+                let _ = act_proxy.send_event(op);
+            }
+        })
+        .expect("actions thread");
+
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
         let _hold_tray = &tray;
+        let _hold_osd = &osd_win;
         match event {
             Event::UserEvent(op) => apply_op(&window, &webview, op, has_tray),
             Event::WindowEvent {
@@ -196,7 +221,7 @@ fn create_tray(proxy: EventLoopProxy<WinOp>) -> Option<tray_icon::TrayIcon> {
             let _ = click_proxy.send_event(WinOp::Show);
         }
     }));
-    MenuEvent::set_event_handler(Some(move |event| {
+    MenuEvent::set_event_handler(Some(move |event: MenuEvent| {
         let op = match event.id.as_ref() {
             "show" => WinOp::Show,
             "toggle" => WinOp::Js(JS_TOGGLE),

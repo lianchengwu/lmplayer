@@ -8,12 +8,12 @@ use gtk4::prelude::*;
 use std::cell::RefCell;
 use std::fs;
 use std::path::PathBuf;
-use std::rc::Rc;
 #[cfg(target_os = "linux")]
+use std::rc::Rc;
 use std::time::Instant;
-
 #[cfg(target_os = "linux")]
 use crate::osd::{set_osd_enabled, set_osd_locked};
+#[cfg(target_os = "linux")]
 use crate::osd::{LyricPayload, OsdCommand};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -418,21 +418,19 @@ fn generate_css(bg_opacity: f64) -> String {
 }
 
 // Token for KRC karaoke animation
-#[cfg(target_os = "linux")]
 #[derive(Debug, Clone)]
-struct KrcToken {
-    start_offset_ms: u64,
-    _duration_ms: u64,
-    text: String,
+pub struct KrcToken {
+    pub start_offset_ms: u64,
+    pub duration_ms: u64,
+    pub text: String,
 }
 
-#[cfg(target_os = "linux")]
-struct KrcLine {
-    tokens: Vec<KrcToken>,
-    start_time: Instant,
-    total_duration_ms: u64,
+#[derive(Debug, Clone)]
+pub struct KrcLine {
+    pub tokens: Vec<KrcToken>,
+    pub start_time: Instant,
+    pub total_duration_ms: u64,
 }
-
 #[cfg(target_os = "linux")]
 pub struct OsdWindow {
     window: gtk4::Window,
@@ -1068,8 +1066,7 @@ impl OsdWindow {
 
 // Parses KRC format: [line_start, line_duration]<offset, duration, 0>text...
 // Returns (tokens, total_duration, line_start_ms)
-#[cfg(target_os = "linux")]
-fn parse_krc_line(krc_raw: &str) -> (Vec<KrcToken>, u64, u64) {
+pub fn parse_krc_line(krc_raw: &str) -> (Vec<KrcToken>, u64, u64) {
     let mut tokens = Vec::new();
     let mut total_duration = 0u64;
     let mut line_start_ms = 0u64;
@@ -1111,7 +1108,7 @@ fn parse_krc_line(krc_raw: &str) -> (Vec<KrcToken>, u64, u64) {
         if !word.is_empty() {
             tokens.push(KrcToken {
                 start_offset_ms: offset,
-                _duration_ms: duration,
+                duration_ms: duration,
                 text: word.to_string(),
             });
         }
@@ -1158,10 +1155,16 @@ pub fn setup_osd_receiver(osd_win: Rc<OsdWindow>, rx: std::sync::mpsc::Receiver<
     });
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "windows")]
+#[path = "osd_window_win.rs"]
+mod osd_window_win;
+#[cfg(target_os = "windows")]
+pub use osd_window_win::*;
+
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
 pub struct OsdWindow;
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
 impl OsdWindow {
     pub fn new() -> Self {
         Self
@@ -1173,7 +1176,7 @@ impl OsdWindow {
     pub fn set_color(&self, _c: String) {}
     pub fn save_position(&self, _x: i32, _y: i32) {}
 }
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
 pub fn setup_osd_receiver(_osd_win: Rc<OsdWindow>, _rx: std::sync::mpsc::Receiver<OsdCommand>) {}
 
 #[cfg(test)]
@@ -1181,7 +1184,6 @@ mod tests {
     use super::*;
 
     #[test]
-    #[cfg(target_os = "linux")]
     fn test_parse_krc_line() {
         let line = "[171960,5040]<0,240,0>hello<240,300,0>world";
         let (tokens, duration, start) = parse_krc_line(line);

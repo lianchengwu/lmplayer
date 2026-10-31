@@ -4848,6 +4848,8 @@ dependencies = [
  "tray-icon",
  "walkdir",
  "webkit6",
+ "windows",
+ "windows-numerics",
  "winresource",
  "wry",
  "zbus",
