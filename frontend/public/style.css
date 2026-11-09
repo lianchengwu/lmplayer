@@ -1,5 +1,6 @@
 :root {
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "WenQuanYi Micro Hei", sans-serif;
+    --app-font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "WenQuanYi Micro Hei", sans-serif;
+    font-family: var(--app-font-family);
     font-size: 16px;
     line-height: 24px;
     font-weight: 400;
@@ -225,7 +226,7 @@ body {
 /* 美化标题样式 */
 .title-wm,
 .title-lm {
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: var(--app-font-family);
     font-weight: 800;
     font-size: 1.15rem;
     letter-spacing: -0.5px;
@@ -237,7 +238,7 @@ body {
 }
 
 .title-player {
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: var(--app-font-family);
     font-weight: 700;
     font-size: 1.15rem;
     letter-spacing: -0.3px;

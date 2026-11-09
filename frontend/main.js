@@ -3,6 +3,7 @@ import {Window, Events} from "@wailsio/runtime";
 import {initLoginModule, getLoginStatus} from "./login.js";
 import {initHomePage} from "./homepage.js";
 import * as SettingsService from "./bindings/wmplayer/settingsservice.js";
+import {applyFontFamily} from "./settings.js";
 
 import {initLocalMusic} from "./local.js";
 import "./playlists.js";
@@ -141,6 +142,8 @@ function applySettingsToFrontend(settings) {
         document.documentElement.setAttribute('data-theme', theme);
         console.log('🎨 主题设置已应用:', theme);
     }
+
+    applyFontFamily(settings.interface?.fontFamily);
 
     // 应用音量设置
     if (settings.playback && settings.playback.volume !== undefined) {

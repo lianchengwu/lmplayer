@@ -380,3 +380,31 @@
     font-weight: 600;
     color: var(--text-secondary);
 }
+
+.settings-font-item {
+    align-items: flex-start;
+}
+
+.settings-font-control {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+}
+
+.settings-font-select {
+    min-width: 180px;
+    max-width: 240px;
+}
+
+.settings-font-custom {
+    width: 180px;
+    min-width: 180px;
+}
+
+.settings-font-preview {
+    margin-top: 8px;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--text-primary);
+}

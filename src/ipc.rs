@@ -412,7 +412,188 @@ pub async fn dispatch(player: &Player, cmd: &str, args: Value) -> Value {
                 _ => fail("no lyrics"),
             }
         }
+        "list_system_fonts" => {
+            let fonts = match tokio::task::spawn_blocking(list_system_fonts).await {
+                Ok(fonts) => fonts,
+                Err(_) => Vec::new(),
+            };
+            ok(json!(fonts))
+        }
         other => fail(format!("unknown cmd {other}")),
+    }
+}
+
+fn command_stdout(program: &str, args: &[&str], timeout: std::time::Duration) -> Option<Vec<u8>> {
+    use std::io::Read;
+    let mut child = std::process::Command::new(program)
+        .args(args)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .ok()?;
+    let started = std::time::Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                if !status.success() {
+                    return None;
+                }
+                let mut buf = Vec::new();
+                if let Some(mut stdout) = child.stdout.take() {
+                    let _ = stdout.read_to_end(&mut buf);
+                }
+                return Some(buf);
+            }
+            Ok(None) => {
+                if started.elapsed() > timeout {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return None;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(15));
+            }
+            Err(_) => return None,
+        }
+    }
+}
+
+fn decode_command_output(bytes: &[u8]) -> String {
+    let bytes = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(bytes);
+    if bytes.len() >= 4 && bytes[1] == 0 && bytes[3] == 0 {
+        let units: Vec<u16> = bytes
+            .chunks_exact(2)
+            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .take_while(|u| *u != 0)
+            .collect();
+        return String::from_utf16_lossy(&units);
+    }
+    String::from_utf8_lossy(bytes).into_owned()
+}
+
+#[cfg_attr(all(target_os = "windows", not(test)), allow(dead_code))]
+fn is_font_style_variant(name: &str) -> bool {
+    const WORDS: &[&str] = &[
+        "thin", "hairline", "extralight", "ultralight", "light", "regular", "book", "normal",
+        "medium", "semibold", "demibold", "bold", "extrabold", "ultrabold", "black", "heavy",
+        "italic", "oblique", "condensed", "extracondensed", "semicondensed", "expanded", "narrow",
+    ];
+    const CJK: &[&str] = &["细体", "特细", "粗体", "特粗", "常规", "中黑", "中等"];
+    if CJK.iter().any(|w| name.contains(w)) {
+        return true;
+    }
+    let lower = name.to_ascii_lowercase();
+    lower
+        .split(|c: char| matches!(c, ' ' | '_' | '-'))
+        .any(|tok| WORDS.contains(&tok))
+}
+
+#[cfg_attr(all(target_os = "windows", not(test)), allow(dead_code))]
+fn preferred_font_label(names: &[&str]) -> String {
+    let has_cjk = |s: &str| s.chars().any(|c| ('\u{4E00}'..='\u{9FFF}').contains(&c));
+    names
+        .iter()
+        .copied()
+        .find(|s| has_cjk(s) && !is_font_style_variant(s))
+        .or_else(|| names.iter().copied().find(|s| !is_font_style_variant(s)))
+        .unwrap_or(names[0])
+        .to_string()
+}
+
+fn usable_font_name(name: &str) -> bool {
+    !name.is_empty() && name.len() <= 120 && !name.chars().any(|c| c.is_control())
+}
+
+#[cfg_attr(all(target_os = "windows", not(test)), allow(dead_code))]
+fn parse_fontconfig_families(text: &str) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for line in text.lines() {
+        let names: Vec<&str> = line
+            .split(',')
+            .map(str::trim)
+            .filter(|s| usable_font_name(s))
+            .collect();
+        if names.is_empty() {
+            continue;
+        }
+        let family = names[0];
+        if !seen.insert(family.to_string()) {
+            continue;
+        }
+        out.push((family.to_string(), preferred_font_label(&names)));
+        if out.len() >= 2000 {
+            break;
+        }
+    }
+    out
+}
+
+fn font_entries(pairs: Vec<(String, String)>) -> Vec<Value> {
+    pairs
+        .into_iter()
+        .map(|(family, label)| json!({ "family": family, "label": label }))
+        .collect()
+}
+
+#[cfg(target_os = "windows")]
+fn list_system_fonts() -> Vec<Value> {
+    let script = r#"[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false; Add-Type -AssemblyName System.Drawing; (New-Object System.Drawing.Text.InstalledFontCollection).Families | ForEach-Object { $_.Name }"#;
+    let Some(buf) = command_stdout(
+        "powershell.exe",
+        &["-NoProfile", "-NonInteractive", "-Command", script],
+        std::time::Duration::from_secs(8),
+    ) else {
+        return Vec::new();
+    };
+    let mut pairs = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for line in decode_command_output(&buf).lines() {
+        let name = line.trim();
+        if !usable_font_name(name) || !seen.insert(name.to_string()) {
+            continue;
+        }
+        pairs.push((name.to_string(), name.to_string()));
+        if pairs.len() >= 2000 {
+            break;
+        }
+    }
+    font_entries(pairs)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn list_system_fonts() -> Vec<Value> {
+    let Some(buf) = command_stdout(
+        "fc-list",
+        &["-f", "%{family}\n"],
+        std::time::Duration::from_secs(3),
+    ) else {
+        return Vec::new();
+    };
+    font_entries(parse_fontconfig_families(&decode_command_output(&buf)))
+}
+
+#[cfg(test)]
+mod font_tests {
+    use super::parse_fontconfig_families;
+
+    #[test]
+    fn parses_fontconfig_families() {
+        let text = "\
+Microsoft YaHei,微软雅黑,Microsoft YaHei Light,微软雅黑 Light
+Noto Sans CJK JP
+Source Han Serif CN,思源宋体 CN,Source Han Serif CN Medium,思源宋体 CN Medium
+PingFang SC,苹方_细体
+Microsoft YaHei,微软雅黑
+Noto Sans,Noto Sans ExtraCondensed Light
+
+";
+        let fonts = parse_fontconfig_families(text);
+        assert_eq!(fonts.iter().filter(|f| f.0 == "Microsoft YaHei").count(), 1);
+        assert_eq!(fonts.iter().find(|f| f.0 == "Microsoft YaHei").unwrap().1, "微软雅黑");
+        assert_eq!(fonts.iter().find(|f| f.0 == "Source Han Serif CN").unwrap().1, "思源宋体 CN");
+        assert_eq!(fonts.iter().find(|f| f.0 == "PingFang SC").unwrap().1, "PingFang SC");
+        assert_eq!(fonts.iter().find(|f| f.0 == "Noto Sans CJK JP").unwrap().1, "Noto Sans CJK JP");
+        assert_eq!(fonts.iter().find(|f| f.0 == "Noto Sans").unwrap().1, "Noto Sans");
     }
 }
 

@@ -27,7 +27,8 @@ const DEFAULT_SETTINGS = {
         showLyrics: true,
         showSpectrum: false,
         miniPlayer: false,
-        osdLyricsColor: '#38bdf8'
+        osdLyricsColor: '#38bdf8',
+        fontFamily: 'system'
     },
     // 下载设置
     download: {
@@ -82,6 +83,185 @@ function mergeSettings(base, overlay) {
     }
     return out;
 }
+const SYSTEM_FONT_STACK = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "WenQuanYi Micro Hei", sans-serif';
+
+const PREFERRED_FONTS = [
+    'Noto Sans CJK SC',
+    'Noto Sans SC',
+    'Source Han Sans SC',
+    'Source Han Sans CN',
+    '思源黑体 CN',
+    '思源黑体',
+    'Microsoft YaHei',
+    '微软雅黑',
+    'PingFang SC',
+    '苹方-简',
+    'Sarasa Gothic SC',
+    '更纱黑体 SC',
+    'LXGW WenKai',
+    '霞鹜文楷',
+    'LXGW WenKai Screen',
+    'HarmonyOS Sans SC',
+    'WenQuanYi Micro Hei',
+    '文泉驿微米黑',
+    'Noto Serif CJK SC',
+    'Source Han Serif CN',
+    '思源宋体 CN',
+    'Source Han Serif SC',
+    'Inter',
+    'Segoe UI',
+];
+
+const FONT_PRESETS = [
+    ...PREFERRED_FONTS,
+    'Noto Sans CJK TC',
+    'Source Han Sans',
+    'WenQuanYi Zen Hei',
+    'Roboto',
+    'Cantarell',
+];
+
+let availableFonts = null;
+
+function escapeAttr(value) {
+    return String(value).replace(/[&<>"']/g, (ch) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+    })[ch]);
+}
+
+function fontFamilyCss(family) {
+    const name = String(family || '').trim();
+    if (!name || name === 'system') return SYSTEM_FONT_STACK;
+    const safe = name.replace(/["\\\r\n]/g, '').slice(0, 80);
+    if (!safe) return SYSTEM_FONT_STACK;
+    return `"${safe}", ${SYSTEM_FONT_STACK}`;
+}
+
+export function applyFontFamily(family) {
+    const name = String(family || '').trim();
+    const root = document.documentElement;
+    if (!name || name === 'system') {
+        root.style.removeProperty('--app-font-family');
+        try { localStorage.removeItem('lmplayer-font'); } catch (e) {}
+        return;
+    }
+    const safe = name.replace(/["\\\r\n]/g, '').slice(0, 80);
+    if (!safe) {
+        root.style.removeProperty('--app-font-family');
+        return;
+    }
+    root.style.setProperty('--app-font-family', fontFamilyCss(safe));
+    try { localStorage.setItem('lmplayer-font', safe); } catch (e) {}
+}
+
+function normalizeFontEntries(list) {
+    const out = [];
+    const seen = new Set();
+    for (const item of list) {
+        const family = String(item?.family || item || '').trim();
+        if (!family || family.length > 120 || seen.has(family)) continue;
+        seen.add(family);
+        const label = String(item?.label || family).trim() || family;
+        out.push({ family, label });
+    }
+    return out;
+}
+
+function isFontInstalled(family) {
+    try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return true;
+        const sample = 'mmmmmmmmmmlli字体';
+        const safe = String(family).replace(/"/g, '');
+        return ['monospace', 'serif', 'sans-serif'].some((base) => {
+            ctx.font = `72px ${base}`;
+            const width = ctx.measureText(sample).width;
+            ctx.font = `72px "${safe}", ${base}`;
+            return ctx.measureText(sample).width !== width;
+        });
+    } catch (e) {
+        return true;
+    }
+}
+
+function detectPresetFonts() {
+    return FONT_PRESETS.filter(isFontInstalled).map((name) => ({ family: name, label: name }));
+}
+
+async function loadAvailableFonts() {
+    if (availableFonts) return availableFonts;
+    try {
+        const response = await SettingsService.ListSystemFonts();
+        const list = response?.data ?? response?.Data;
+        if (response?.success !== false && Array.isArray(list) && list.length) {
+            const fonts = normalizeFontEntries(list);
+            if (fonts.length) {
+                availableFonts = fonts;
+                return availableFonts;
+            }
+        }
+    } catch (e) {
+        console.warn('读取系统字体失败:', e);
+    }
+    availableFonts = detectPresetFonts();
+    return availableFonts;
+}
+
+function renderFontControl(current) {
+    const fonts = availableFonts || [];
+    const saved = String(current || 'system');
+    const matched = saved === 'system'
+        ? null
+        : fonts.find((font) => font.family === saved || font.label === saved);
+    const isCustom = saved !== 'system' && !matched;
+    const preferredKeys = new Map(PREFERRED_FONTS.map((name, index) => [name.toLowerCase(), index]));
+    const preferred = [];
+    const rest = [];
+    for (const font of fonts) {
+        const rank = preferredKeys.get(font.family.toLowerCase())
+            ?? preferredKeys.get(String(font.label || '').toLowerCase());
+        if (rank === undefined) rest.push(font);
+        else preferred.push({ font, rank });
+    }
+    preferred.sort((a, b) => a.rank - b.rank);
+    rest.sort((a, b) => a.label.localeCompare(b.label, 'zh-CN'));
+    const option = (font, selected) => {
+        const css = font.family.replace(/["'\\<>]/g, '');
+        const text = font.label && font.label !== font.family ? font.label : font.family;
+        return `<option value="${escapeAttr(font.family)}" ${selected ? 'selected' : ''} style="font-family:'${escapeAttr(css)}',sans-serif">${escapeAttr(text)}</option>`;
+    };
+    const selectedFamily = matched ? matched.family : '';
+    const preferredHtml = preferred.map(({ font }) => option(font, font.family === selectedFamily)).join('');
+    const restHtml = rest.map((font) => option(font, font.family === selectedFamily)).join('');
+    const css = fontFamilyCss(matched ? matched.family : saved);
+    return `
+        <select id="fontFamilySelect" class="settings-select settings-font-select" style="font-family:${escapeAttr(css)}" onchange="updateFontFamily(this.value)">
+            <option value="system" ${saved === 'system' ? 'selected' : ''}>系统默认</option>
+            ${preferredHtml ? `<optgroup label="推荐">${preferredHtml}</optgroup>` : ''}
+            ${restHtml ? `<optgroup label="已安装">${restHtml}</optgroup>` : ''}
+            <option value="__custom__" ${isCustom ? 'selected' : ''}>自定义…</option>
+        </select>
+        <input type="text" class="settings-input settings-font-custom" id="fontFamilyCustom"
+            placeholder="输入已安装的字体名称" autocomplete="off"
+            value="${isCustom ? escapeAttr(saved) : ''}"
+            style="display:${isCustom ? 'block' : 'none'}"
+            onchange="updateFontFamily(this.value)">
+    `;
+}
+
+function syncFontPreview(family) {
+    const css = fontFamilyCss(family);
+    const preview = document.getElementById('fontPreview');
+    if (preview) preview.style.fontFamily = css;
+    const select = document.getElementById('fontFamilySelect');
+    if (select && select.value !== '__custom__') select.style.fontFamily = css;
+}
+
 
 window.initSettingsPage = async () => {
     console.log('初始化设置页面');
@@ -91,6 +271,7 @@ window.initSettingsPage = async () => {
     } catch (error) {
         console.error('初始化设置失败:', error);
     }
+    await loadAvailableFonts();
     renderSettingsPage();
     await loadSettingsPath();
     await loadAppVersion();
@@ -201,6 +382,7 @@ function applyAllSettings() {
 
     // 应用主题设置
     applyTheme(settingsData.interface.theme);
+    applyFontFamily(settingsData.interface.fontFamily);
 
     // 应用桌面歌词颜色设置
     if (settingsData.interface.osdLyricsColor) {
@@ -371,6 +553,17 @@ function renderSettingsPage() {
                         <option value="frosted" ${settingsData.interface.theme === 'frosted' ? 'selected' : ''}>磨砂</option>
                         <option value="frosted-dark" ${settingsData.interface.theme === 'frosted-dark' ? 'selected' : ''}>磨砂黑</option>
                     </select>
+                </div>
+            </div>
+
+            <div class="settings-item settings-font-item">
+                <div class="settings-item-info">
+                    <div class="settings-item-title">界面字体</div>
+                    <div class="settings-item-description">应用于界面文字与播放歌词</div>
+                    <div class="settings-font-preview" id="fontPreview" style="font-family:${escapeAttr(fontFamilyCss(settingsData.interface.fontFamily))}">春江花月夜 · Aa 字体</div>
+                </div>
+                <div class="settings-item-control settings-font-control">
+                    ${renderFontControl(settingsData.interface.fontFamily)}
                 </div>
             </div>
 
@@ -628,6 +821,10 @@ function applySetting(path, value) {
         case 'interface.theme':
             applyTheme(value);
             break;
+        case 'interface.fontFamily':
+            applyFontFamily(value);
+            syncFontPreview(value);
+            break;
         case 'playback.volume':
             const volumeDisplay = document.querySelector('.settings-value');
             if (volumeDisplay) {
@@ -653,6 +850,27 @@ function applySetting(path, value) {
             break;
     }
 }
+window.updateFontFamily = async (value) => {
+    const custom = document.getElementById('fontFamilyCustom');
+    if (value === '__custom__') {
+        if (custom) {
+            custom.style.display = '';
+            custom.focus();
+        }
+        return;
+    }
+    const typed = String(value ?? '').trim();
+    if (!typed) {
+        if (custom) custom.style.display = 'none';
+        const select = document.getElementById('fontFamilySelect');
+        if (select) select.value = 'system';
+        await window.updateSetting('interface.fontFamily', 'system');
+        return;
+    }
+    const fromCustom = custom && document.activeElement === custom;
+    if (!fromCustom && custom) custom.style.display = 'none';
+    await window.updateSetting('interface.fontFamily', typed);
+};
 
 async function applyOsdColor(color) {
     if (!color) return;

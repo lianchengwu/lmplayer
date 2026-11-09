@@ -2,6 +2,17 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8"/>
+    <script>
+    (function () {
+        try {
+            var saved = localStorage.getItem('lmplayer-font');
+            if (!saved || saved === 'system') return;
+            var safe = String(saved).replace(/["\\\r\n]/g, '').slice(0, 80);
+            if (!safe) return;
+            document.documentElement.style.setProperty('--app-font-family', '"' + safe + '", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "WenQuanYi Micro Hei", sans-serif');
+        } catch (e) {}
+    })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="/wails.png"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <link rel="stylesheet" href="/style.css"/>
