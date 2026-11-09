@@ -1170,14 +1170,14 @@ impl OsdWindow {
         Self
     }
     pub fn set_visible(&self, _v: bool) {}
-    pub fn update_lyrics(&self, _p: LyricPayload) {}
+    pub fn update_lyrics(&self, _p: crate::osd::LyricPayload) {}
     pub fn set_locked(&self, _l: bool) {}
     pub fn toggle_lock(&self) {}
     pub fn set_color(&self, _c: String) {}
     pub fn save_position(&self, _x: i32, _y: i32) {}
 }
 #[cfg(not(any(target_os = "linux", target_os = "windows")))]
-pub fn setup_osd_receiver(_osd_win: Rc<OsdWindow>, _rx: std::sync::mpsc::Receiver<OsdCommand>) {}
+pub fn setup_osd_receiver(_osd_win: std::rc::Rc<OsdWindow>, _rx: std::sync::mpsc::Receiver<crate::osd::OsdCommand>) {}
 
 #[cfg(test)]
 mod tests {
