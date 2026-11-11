@@ -28,6 +28,8 @@ const DEFAULT_SETTINGS = {
         showSpectrum: false,
         miniPlayer: false,
         osdLyricsColor: '#38bdf8',
+        osdLyricsAlign: 'center',
+        osdLyricsFont: 'system',
         fontFamily: 'system'
     },
     // 下载设置
@@ -212,7 +214,10 @@ async function loadAvailableFonts() {
     return availableFonts;
 }
 
-function renderFontControl(current) {
+function renderFontControl(current, options = {}) {
+    const selectId = options.selectId || 'fontFamilySelect';
+    const customId = options.customId || 'fontFamilyCustom';
+    const onChange = options.onChange || 'updateFontFamily';
     const fonts = availableFonts || [];
     const saved = String(current || 'system');
     const matched = saved === 'system'
@@ -240,25 +245,25 @@ function renderFontControl(current) {
     const restHtml = rest.map((font) => option(font, font.family === selectedFamily)).join('');
     const css = fontFamilyCss(matched ? matched.family : saved);
     return `
-        <select id="fontFamilySelect" class="settings-select settings-font-select" style="font-family:${escapeAttr(css)}" onchange="updateFontFamily(this.value)">
+        <select id="${selectId}" class="settings-select settings-font-select" style="font-family:${escapeAttr(css)}" onchange="${onChange}(this.value)">
             <option value="system" ${saved === 'system' ? 'selected' : ''}>系统默认</option>
             ${preferredHtml ? `<optgroup label="推荐">${preferredHtml}</optgroup>` : ''}
             ${restHtml ? `<optgroup label="已安装">${restHtml}</optgroup>` : ''}
             <option value="__custom__" ${isCustom ? 'selected' : ''}>自定义…</option>
         </select>
-        <input type="text" class="settings-input settings-font-custom" id="fontFamilyCustom"
+        <input type="text" class="settings-input settings-font-custom" id="${customId}"
             placeholder="输入已安装的字体名称" autocomplete="off"
             value="${isCustom ? escapeAttr(saved) : ''}"
             style="display:${isCustom ? 'block' : 'none'}"
-            onchange="updateFontFamily(this.value)">
+            onchange="${onChange}(this.value)">
     `;
 }
 
-function syncFontPreview(family) {
+function syncFontPreview(family, previewId = 'fontPreview', selectId = 'fontFamilySelect') {
     const css = fontFamilyCss(family);
-    const preview = document.getElementById('fontPreview');
+    const preview = document.getElementById(previewId);
     if (preview) preview.style.fontFamily = css;
-    const select = document.getElementById('fontFamilySelect');
+    const select = document.getElementById(selectId);
     if (select && select.value !== '__custom__') select.style.fontFamily = css;
 }
 
@@ -326,10 +331,20 @@ async function loadSettings() {
             settingsData.behavior.hardwareAcceleration = true;
         }
         try {
-            const { GetOSDColor } = await import('./bindings/wmplayer/cacheservice.js');
-            const res = await GetOSDColor();
-            if (res && res.success && res.color) {
-                settingsData.interface.osdLyricsColor = res.color;
+            const { GetOSDColor, GetOSDAlign, GetOSDFont } = await import('./bindings/wmplayer/cacheservice.js');
+            const [colorRes, alignRes, fontRes] = await Promise.all([
+                GetOSDColor().catch(() => null),
+                GetOSDAlign().catch(() => null),
+                GetOSDFont().catch(() => null),
+            ]);
+            if (colorRes && colorRes.success && colorRes.color) {
+                settingsData.interface.osdLyricsColor = colorRes.color;
+            }
+            if (alignRes && alignRes.success && alignRes.align) {
+                settingsData.interface.osdLyricsAlign = alignRes.align;
+            }
+            if (fontRes && fontRes.success && fontRes.font) {
+                settingsData.interface.osdLyricsFont = fontRes.font;
             }
         } catch (e) {}
     } catch (error) {
@@ -384,10 +399,12 @@ function applyAllSettings() {
     applyTheme(settingsData.interface.theme);
     applyFontFamily(settingsData.interface.fontFamily);
 
-    // 应用桌面歌词颜色设置
+    // 应用桌面歌词颜色、对齐和字体
     if (settingsData.interface.osdLyricsColor) {
         applyOsdColor(settingsData.interface.osdLyricsColor);
     }
+    applyOsdAlign(settingsData.interface.osdLyricsAlign || 'center');
+    applyOsdFont(settingsData.interface.osdLyricsFont || 'system');
 
     // 应用音量设置
     if (settingsData.playback.volume !== undefined) {
@@ -603,6 +620,35 @@ function renderSettingsPage() {
                             <span class="osd-color-code" id="osdColorCode">${settingsData.interface.osdLyricsColor || '#38bdf8'}</span>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <div class="settings-item">
+                <div class="settings-item-info">
+                    <div class="settings-item-title">桌面歌词对齐</div>
+                    <div class="settings-item-description">悬浮歌词在窗口中的水平对齐方式</div>
+                </div>
+                <div class="settings-item-control">
+                    <div class="osd-align-controls" role="group" aria-label="桌面歌词对齐">
+                        <button type="button" class="osd-align-btn ${(settingsData.interface.osdLyricsAlign || 'center') === 'left' ? 'active' : ''}" data-align="left" onclick="updateOsdAlign('left')">左对齐</button>
+                        <button type="button" class="osd-align-btn ${(settingsData.interface.osdLyricsAlign || 'center') === 'center' ? 'active' : ''}" data-align="center" onclick="updateOsdAlign('center')">居中</button>
+                        <button type="button" class="osd-align-btn ${(settingsData.interface.osdLyricsAlign || 'center') === 'right' ? 'active' : ''}" data-align="right" onclick="updateOsdAlign('right')">右对齐</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-item settings-font-item">
+                <div class="settings-item-info">
+                    <div class="settings-item-title">桌面歌词字体</div>
+                    <div class="settings-item-description">仅作用于桌面悬浮歌词，不影响界面字体</div>
+                    <div class="settings-font-preview" id="osdFontPreview" style="font-family:${escapeAttr(fontFamilyCss(settingsData.interface.osdLyricsFont || 'system'))}">春江花月夜 · 桌面歌词</div>
+                </div>
+                <div class="settings-item-control settings-font-control">
+                    ${renderFontControl(settingsData.interface.osdLyricsFont || 'system', {
+                        selectId: 'osdFontFamilySelect',
+                        customId: 'osdFontFamilyCustom',
+                        onChange: 'updateOsdFont',
+                    })}
                 </div>
             </div>
         </div>
@@ -848,10 +894,18 @@ function applySetting(path, value) {
         case 'interface.osdLyricsColor':
             applyOsdColor(value);
             break;
+        case 'interface.osdLyricsAlign':
+            applyOsdAlign(value);
+            break;
+        case 'interface.osdLyricsFont':
+            applyOsdFont(value);
+            syncFontPreview(value, 'osdFontPreview', 'osdFontFamilySelect');
+            break;
     }
 }
-window.updateFontFamily = async (value) => {
-    const custom = document.getElementById('fontFamilyCustom');
+async function commitFontChoice(value, ids) {
+    const custom = document.getElementById(ids.customId);
+    const select = document.getElementById(ids.selectId);
     if (value === '__custom__') {
         if (custom) {
             custom.style.display = '';
@@ -862,15 +916,26 @@ window.updateFontFamily = async (value) => {
     const typed = String(value ?? '').trim();
     if (!typed) {
         if (custom) custom.style.display = 'none';
-        const select = document.getElementById('fontFamilySelect');
         if (select) select.value = 'system';
-        await window.updateSetting('interface.fontFamily', 'system');
+        await window.updateSetting(ids.settingPath, 'system');
         return;
     }
     const fromCustom = custom && document.activeElement === custom;
     if (!fromCustom && custom) custom.style.display = 'none';
-    await window.updateSetting('interface.fontFamily', typed);
-};
+    await window.updateSetting(ids.settingPath, typed);
+}
+
+window.updateFontFamily = (value) => commitFontChoice(value, {
+    customId: 'fontFamilyCustom',
+    selectId: 'fontFamilySelect',
+    settingPath: 'interface.fontFamily',
+});
+
+window.updateOsdFont = (value) => commitFontChoice(value, {
+    customId: 'osdFontFamilyCustom',
+    selectId: 'osdFontFamilySelect',
+    settingPath: 'interface.osdLyricsFont',
+});
 
 async function applyOsdColor(color) {
     if (!color) return;
@@ -893,6 +958,37 @@ window.updateOsdColor = async (color) => {
     document.querySelectorAll('.osd-color-swatch').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.color.toLowerCase() === color.toLowerCase());
     });
+};
+
+function normalizeOsdAlign(align) {
+    return align === 'left' || align === 'right' ? align : 'center';
+}
+
+async function applyOsdAlign(align) {
+    const next = normalizeOsdAlign(align);
+    document.querySelectorAll('.osd-align-btn').forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.align === next);
+    });
+    try {
+        const { SetOSDAlign } = await import('./bindings/wmplayer/cacheservice.js');
+        await SetOSDAlign(next);
+    } catch (e) {
+        console.warn('同步桌面歌词对齐失败:', e);
+    }
+}
+
+async function applyOsdFont(font) {
+    const family = String(font || 'system').trim() || 'system';
+    try {
+        const { SetOSDFont } = await import('./bindings/wmplayer/cacheservice.js');
+        await SetOSDFont(family);
+    } catch (e) {
+        console.warn('同步桌面歌词字体失败:', e);
+    }
+}
+
+window.updateOsdAlign = async (align) => {
+    await window.updateSetting('interface.osdLyricsAlign', normalizeOsdAlign(align));
 };
 
 window.selectDownloadPath = async () => {

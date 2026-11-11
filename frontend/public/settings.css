@@ -408,3 +408,24 @@
     line-height: 1.5;
     color: var(--text-primary);
 }
+
+.osd-align-controls {
+    display: flex;
+    gap: 6px;
+}
+
+.osd-align-btn {
+    padding: 6px 12px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-primary, inherit);
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.osd-align-btn.active {
+    background: var(--accent-color, #6366f1);
+    color: #fff;
+    border-color: transparent;
+}

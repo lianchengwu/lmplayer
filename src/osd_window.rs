@@ -31,6 +31,12 @@ pub struct OsdConfig {
     pub opacity: f64,
     #[serde(default = "default_bg_opacity")]
     pub bg_opacity: f64,
+    /// "left" | "center" | "right"
+    #[serde(default = "default_align")]
+    pub align: String,
+    /// Empty means the platform default (Sans / Microsoft YaHei).
+    #[serde(default = "default_font_family")]
+    pub font_family: String,
 }
 
 fn default_opacity() -> f64 {
@@ -40,6 +46,15 @@ fn default_opacity() -> f64 {
 fn default_bg_opacity() -> f64 {
     0.78
 }
+
+fn default_align() -> String {
+    "center".to_string()
+}
+
+fn default_font_family() -> String {
+    String::new()
+}
+
 
 impl Default for OsdConfig {
     fn default() -> Self {
@@ -53,6 +68,8 @@ impl Default for OsdConfig {
             color: "#38bdf8".to_string(),
             opacity: 0.95,
             bg_opacity: 0.78,
+            align: default_align(),
+            font_family: default_font_family(),
         }
     }
 }
@@ -67,7 +84,9 @@ fn config_path() -> PathBuf {
 pub fn load_config() -> OsdConfig {
     let path = config_path();
     if let Ok(content) = fs::read_to_string(&path) {
-        if let Ok(cfg) = serde_json::from_str::<OsdConfig>(&content) {
+        if let Ok(mut cfg) = serde_json::from_str::<OsdConfig>(&content) {
+            cfg.align = normalize_align(&cfg.align).to_string();
+            cfg.font_family = normalize_font_family(&cfg.font_family);
             return cfg;
         }
     }
@@ -84,6 +103,101 @@ fn save_config(cfg: &OsdConfig) {
         let _ = fs::write(path, content);
     }
 }
+
+pub fn normalize_align(raw: &str) -> &'static str {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "left" | "start" => "left",
+        "right" | "end" => "right",
+        _ => "center",
+    }
+}
+
+pub fn cycle_align(align: &str) -> &'static str {
+    match normalize_align(align) {
+        "left" => "center",
+        "center" => "right",
+        _ => "left",
+    }
+}
+
+pub fn align_button_label(align: &str) -> &'static str {
+    match normalize_align(align) {
+        "left" => "左",
+        "right" => "右",
+        _ => "中",
+    }
+}
+
+/// Empty string means the platform default. Strips characters that break Pango markup.
+pub fn normalize_font_family(raw: &str) -> String {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("system") {
+        return String::new();
+    }
+    let mut out = String::new();
+    for ch in trimmed.chars() {
+        if ch.is_control() || matches!(ch, '<' | '>' | '&' | '"' | '\'' | '\\') {
+            continue;
+        }
+        out.push(ch);
+        if out.chars().count() >= 80 {
+            break;
+        }
+    }
+    let out = out.trim().to_string();
+    if out.is_empty() || out.eq_ignore_ascii_case("system") {
+        String::new()
+    } else {
+        out
+    }
+}
+
+pub fn resolve_font_family(stored: &str) -> String {
+    let normalized = normalize_font_family(stored);
+    if !normalized.is_empty() {
+        return normalized;
+    }
+    #[cfg(target_os = "windows")]
+    {
+        "Microsoft YaHei".to_string()
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        "Sans".to_string()
+    }
+}
+
+fn markup_attr(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for ch in s.chars() {
+        match ch {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&#39;"),
+            _ => out.push(ch),
+        }
+    }
+    out
+}
+
+fn colored_line_markup(cfg: &OsdConfig, text: &str, foreground: &str) -> String {
+    let family = markup_attr(&resolve_font_family(&cfg.font_family));
+    let size = cfg.font_size.clamp(14, 56);
+    let fg = markup_attr(foreground);
+    let escaped = markup_attr(text);
+    format!(
+        "<span font_family=\"{family}\" font_weight=\"bold\" font_size=\"{size}pt\" foreground=\"{fg}\">{escaped}</span>"
+    )
+}
+
+fn font_open_tag(cfg: &OsdConfig) -> String {
+    let family = markup_attr(&resolve_font_family(&cfg.font_family));
+    let size = cfg.font_size.clamp(14, 56);
+    format!("<span font_family=\"{family}\" font_weight=\"bold\" font_size=\"{size}pt\">")
+}
+
 
 #[cfg(target_os = "linux")]
 fn reload_kwin() {
@@ -431,12 +545,84 @@ pub struct KrcLine {
     pub start_time: Instant,
     pub total_duration_ms: u64,
 }
+
+#[cfg(target_os = "linux")]
+fn apply_label_align(label: &gtk4::Label, align: &str) {
+    label.set_halign(gtk4::Align::Fill);
+    label.set_hexpand(true);
+    match normalize_align(align) {
+        "left" => {
+            label.set_xalign(0.0);
+            label.set_justify(gtk4::Justification::Left);
+            label.set_ellipsize(gtk4::pango::EllipsizeMode::End);
+        }
+        "right" => {
+            label.set_xalign(1.0);
+            label.set_justify(gtk4::Justification::Right);
+            label.set_ellipsize(gtk4::pango::EllipsizeMode::Start);
+        }
+        _ => {
+            label.set_xalign(0.5);
+            label.set_justify(gtk4::Justification::Center);
+            label.set_ellipsize(gtk4::pango::EllipsizeMode::Middle);
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn krc_markup(cfg: &OsdConfig, krc: &KrcLine, elapsed: u64) -> String {
+    let mut markup = font_open_tag(cfg);
+    for tok in &krc.tokens {
+        let escaped = markup_attr(&tok.text);
+        if elapsed >= tok.start_offset_ms {
+            markup.push_str(&format!(
+                "<span foreground=\"#ffffff\" alpha=\"45%\">{}</span>",
+                escaped
+            ));
+        } else {
+            markup.push_str(&format!(
+                "<span foreground=\"{}\">{}</span>",
+                markup_attr(&cfg.color), escaped
+            ));
+        }
+    }
+    markup.push_str("</span>");
+    markup
+}
+
+#[cfg(target_os = "linux")]
+fn repaint_lyrics(
+    label: &gtk4::Label,
+    cfg: &OsdConfig,
+    krc: &Option<KrcLine>,
+    plain: &Option<String>,
+) {
+    apply_label_align(label, &cfg.align);
+    if let Some(krc) = krc {
+        let elapsed = krc.start_time.elapsed().as_millis() as u64;
+        label.set_markup(&krc_markup(cfg, krc, elapsed));
+        return;
+    }
+    match plain {
+        None => label.set_markup(&colored_line_markup(
+            cfg,
+            "wmPlayer 桌面歌词已启动",
+            &cfg.color,
+        )),
+        Some(text) if text.is_empty() => {
+            label.set_markup(&colored_line_markup(cfg, "wmPlayer - 暂无播放", "#94a3b8"));
+        }
+        Some(text) => label.set_markup(&colored_line_markup(cfg, text, &cfg.color)),
+    }
+}
+
 #[cfg(target_os = "linux")]
 pub struct OsdWindow {
     window: gtk4::Window,
     label: gtk4::Label,
     toolbar: gtk4::Box,
     btn_lock: gtk4::Button,
+    btn_align: gtk4::Button,
     #[allow(dead_code)]
     btn_opacity: gtk4::Button,
     #[allow(dead_code)]
@@ -445,6 +631,7 @@ pub struct OsdWindow {
     css_provider: gtk4::CssProvider,
     config: Rc<RefCell<OsdConfig>>,
     current_krc: Rc<RefCell<Option<KrcLine>>>,
+    current_plain: Rc<RefCell<Option<String>>>,
     krc_source_id: Rc<RefCell<Option<glib::SourceId>>>,
 }
 
@@ -509,6 +696,10 @@ impl OsdWindow {
         window.add_controller(motion_ctrl);
 
         // Control buttons
+        let btn_align = gtk4::Button::with_label(align_button_label(&cfg.align));
+        btn_align.add_css_class("osd-mini-btn");
+        btn_align.set_tooltip_text(Some("切换文字对齐：左对齐 / 居中 / 右对齐"));
+
         let btn_font_dec = gtk4::Button::with_label("A-");
         btn_font_dec.add_css_class("osd-mini-btn");
         btn_font_dec.set_tooltip_text(Some("缩小字号"));
@@ -540,6 +731,7 @@ impl OsdWindow {
         btn_close.add_css_class("osd-close-btn");
         btn_close.set_tooltip_text(Some("关闭桌面歌词"));
 
+        toolbar.append(&btn_align);
         toolbar.append(&btn_font_dec);
         toolbar.append(&btn_font_inc);
         toolbar.append(&btn_bg);
@@ -551,15 +743,15 @@ impl OsdWindow {
         let label = gtk4::Label::new(None);
         label.set_hexpand(true);
         label.set_vexpand(true);
-        label.set_halign(gtk4::Align::Center);
         label.set_valign(gtk4::Align::Center);
         label.set_use_markup(true);
         label.set_wrap(false);
-        label.set_ellipsize(gtk4::pango::EllipsizeMode::End);
         label.add_css_class("osd-lyric-label");
-        label.set_markup(&format!(
-            "<span font_desc=\"Sans Bold {}\" foreground=\"{}\">wmPlayer 桌面歌词已启动</span>",
-            cfg.font_size, cfg.color
+        apply_label_align(&label, &cfg.align);
+        label.set_markup(&colored_line_markup(
+            &cfg,
+            "wmPlayer 桌面歌词已启动",
+            &cfg.color,
         ));
 
         root_box.append(&toolbar);
@@ -644,6 +836,9 @@ impl OsdWindow {
         // Scroll controller:
         // - Plain scroll: adjust opacity (smooth)
         // - Ctrl + scroll: zoom font size (A- / A+)
+        let current_krc: Rc<RefCell<Option<KrcLine>>> = Rc::new(RefCell::new(None));
+        let current_plain: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+
         let scroll_ctrl = gtk4::EventControllerScroll::new(
             gtk4::EventControllerScrollFlags::VERTICAL,
         );
@@ -651,6 +846,8 @@ impl OsdWindow {
         let win_scroll = window.clone();
         let lbl_scroll = label.clone();
         let btn_op_clone = btn_opacity.clone();
+        let krc_scroll = current_krc.clone();
+        let plain_scroll = current_plain.clone();
         scroll_ctrl.connect_scroll(move |controller, _, dy| {
             if cfg_scroll.borrow().locked {
                 return glib::Propagation::Proceed;
@@ -659,14 +856,22 @@ impl OsdWindow {
             let is_ctrl = state.contains(gtk4::gdk::ModifierType::CONTROL_MASK);
 
             if is_ctrl {
-                let mut c = cfg_scroll.borrow_mut();
-                if dy < 0.0 && c.font_size < 56 {
-                    c.font_size += 2;
-                } else if dy > 0.0 && c.font_size > 14 {
-                    c.font_size -= 2;
-                }
-                save_config(&c);
-                lbl_scroll.queue_draw();
+                let snapshot = {
+                    let mut c = cfg_scroll.borrow_mut();
+                    if dy < 0.0 && c.font_size < 56 {
+                        c.font_size += 2;
+                    } else if dy > 0.0 && c.font_size > 14 {
+                        c.font_size -= 2;
+                    }
+                    save_config(&c);
+                    c.clone()
+                };
+                repaint_lyrics(
+                    &lbl_scroll,
+                    &snapshot,
+                    &krc_scroll.borrow(),
+                    &plain_scroll.borrow(),
+                );
             } else {
                 let mut c = cfg_scroll.borrow_mut();
                 let delta = if dy < 0.0 { 0.05 } else { -0.05 };
@@ -682,26 +887,54 @@ impl OsdWindow {
         window.add_controller(scroll_ctrl);
 
         // Button actions
+        let cfg_align = config.clone();
+        let lbl_align = label.clone();
+        let btn_align_click = btn_align.clone();
+        let krc_align = current_krc.clone();
+        let plain_align = current_plain.clone();
+        btn_align.connect_clicked(move |_| {
+            let snapshot = {
+                let mut c = cfg_align.borrow_mut();
+                c.align = cycle_align(&c.align).to_string();
+                save_config(&c);
+                btn_align_click.set_label(align_button_label(&c.align));
+                c.clone()
+            };
+            repaint_lyrics(&lbl_align, &snapshot, &krc_align.borrow(), &plain_align.borrow());
+        });
+
         let cfg_fdec = config.clone();
         let lbl_fdec = label.clone();
+        let krc_fdec = current_krc.clone();
+        let plain_fdec = current_plain.clone();
         btn_font_dec.connect_clicked(move |_| {
-            let mut c = cfg_fdec.borrow_mut();
-            if c.font_size > 14 {
+            let snapshot = {
+                let mut c = cfg_fdec.borrow_mut();
+                if c.font_size <= 14 {
+                    return;
+                }
                 c.font_size -= 2;
                 save_config(&c);
-                lbl_fdec.queue_draw();
-            }
+                c.clone()
+            };
+            repaint_lyrics(&lbl_fdec, &snapshot, &krc_fdec.borrow(), &plain_fdec.borrow());
         });
 
         let cfg_finc = config.clone();
         let lbl_finc = label.clone();
+        let krc_finc = current_krc.clone();
+        let plain_finc = current_plain.clone();
         btn_font_inc.connect_clicked(move |_| {
-            let mut c = cfg_finc.borrow_mut();
-            if c.font_size < 56 {
+            let snapshot = {
+                let mut c = cfg_finc.borrow_mut();
+                if c.font_size >= 56 {
+                    return;
+                }
                 c.font_size += 2;
                 save_config(&c);
-                lbl_finc.queue_draw();
-            }
+                c.clone()
+            };
+            repaint_lyrics(&lbl_finc, &snapshot, &krc_finc.borrow(), &plain_finc.borrow());
         });
 
         // Background brightness / opacity presets:
@@ -819,11 +1052,13 @@ impl OsdWindow {
             label,
             toolbar,
             btn_lock,
+            btn_align,
             btn_opacity,
             btn_bg,
             css_provider,
             config,
-            current_krc: Rc::new(RefCell::new(None)),
+            current_krc,
+            current_plain,
             krc_source_id: Rc::new(RefCell::new(None)),
         }
     }
@@ -886,7 +1121,34 @@ impl OsdWindow {
             c.color = color;
             save_config(&c);
         }
-        self.render_krc_frame();
+        self.refresh_lyrics();
+    }
+
+    pub fn set_align(&self, align: String) {
+        let align = normalize_align(&align).to_string();
+        {
+            let mut c = self.config.borrow_mut();
+            c.align = align.clone();
+            save_config(&c);
+        }
+        self.btn_align.set_label(align_button_label(&align));
+        self.refresh_lyrics();
+    }
+
+    pub fn set_font(&self, font: String) {
+        {
+            let mut c = self.config.borrow_mut();
+            c.font_family = normalize_font_family(&font);
+            save_config(&c);
+        }
+        self.refresh_lyrics();
+    }
+
+    fn refresh_lyrics(&self) {
+        let cfg = self.config.borrow();
+        let krc = self.current_krc.borrow();
+        let plain = self.current_plain.borrow();
+        repaint_lyrics(&self.label, &cfg, &krc, &plain);
     }
     pub fn save_position(&self, x: i32, y: i32) {
         {
@@ -930,11 +1192,8 @@ impl OsdWindow {
 
         let raw = payload.lyric.trim();
         if raw.is_empty() {
-            let cfg = self.config.borrow();
-            self.label.set_markup(&format!(
-                "<span font_desc=\"Sans Bold {}\" foreground=\"#94a3b8\">wmPlayer - 暂无播放</span>",
-                cfg.font_size
-            ));
+            *self.current_plain.borrow_mut() = Some(String::new());
+            self.refresh_lyrics();
             return;
         }
 
@@ -951,14 +1210,10 @@ impl OsdWindow {
         } else {
             line
         }
-        .trim();
-
-        let escaped = glib::markup_escape_text(clean);
-        let cfg = self.config.borrow();
-        self.label.set_markup(&format!(
-            "<span font_desc=\"Sans Bold {}\" foreground=\"{}\">{}</span>",
-            cfg.font_size, cfg.color, escaped
-        ));
+        .trim()
+        .to_string();
+        *self.current_plain.borrow_mut() = Some(clean);
+        self.refresh_lyrics();
     }
 
     fn start_krc_display(&self, krc_raw: &str, current_audio_sec: f64) {
@@ -985,7 +1240,7 @@ impl OsdWindow {
         *self.current_krc.borrow_mut() = Some(krc_line);
 
         // Initial render frame
-        self.render_krc_frame();
+        self.refresh_lyrics();
 
         // 30ms progressive highlight animation timer
         let current_krc = self.current_krc.clone();
@@ -1001,27 +1256,8 @@ impl OsdWindow {
 
             let elapsed = krc.start_time.elapsed().as_millis() as u64;
             let cfg = config.borrow();
-
-            let mut markup = format!("<span font_desc=\"Sans Bold {}\">", cfg.font_size);
-            for tok in &krc.tokens {
-                let escaped = glib::markup_escape_text(&tok.text);
-                if elapsed >= tok.start_offset_ms {
-                    // Played
-                    markup.push_str(&format!(
-                        "<span foreground=\"#ffffff\" alpha=\"45%\">{}</span>",
-                        escaped
-                    ));
-                } else {
-                    // Pending
-                    markup.push_str(&format!(
-                        "<span foreground=\"{}\">{}</span>",
-                        cfg.color, escaped
-                    ));
-                }
-            }
-            markup.push_str("</span>");
-
-            label.set_markup(&markup);
+            apply_label_align(&label, &cfg.align);
+            label.set_markup(&krc_markup(&cfg, krc, elapsed));
 
             // Continue while within duration + grace buffer (600ms)
             if elapsed > krc.total_duration_ms + 600 {
@@ -1035,33 +1271,7 @@ impl OsdWindow {
         *self.krc_source_id.borrow_mut() = Some(source_id);
     }
 
-    fn render_krc_frame(&self) {
-        let krc_opt = self.current_krc.borrow();
-        let Some(krc) = krc_opt.as_ref() else {
-            return;
-        };
 
-        let elapsed = krc.start_time.elapsed().as_millis() as u64;
-        let cfg = self.config.borrow();
-
-        let mut markup = format!("<span font_desc=\"Sans Bold {}\">", cfg.font_size);
-        for tok in &krc.tokens {
-            let escaped = glib::markup_escape_text(&tok.text);
-            if elapsed >= tok.start_offset_ms {
-                markup.push_str(&format!(
-                    "<span foreground=\"#ffffff\" alpha=\"45%\">{}</span>",
-                    escaped
-                ));
-            } else {
-                markup.push_str(&format!(
-                    "<span foreground=\"{}\">{}</span>",
-                    cfg.color, escaped
-                ));
-            }
-        }
-        markup.push_str("</span>");
-        self.label.set_markup(&markup);
-    }
 }
 
 // Parses KRC format: [line_start, line_duration]<offset, duration, 0>text...
@@ -1145,6 +1355,12 @@ pub fn setup_osd_receiver(osd_win: Rc<OsdWindow>, rx: std::sync::mpsc::Receiver<
                     OsdCommand::SetColor(color) => {
                         osd_win.set_color(color);
                     }
+                    OsdCommand::SetAlign(align) => {
+                        osd_win.set_align(align);
+                    }
+                    OsdCommand::SetFont(font) => {
+                        osd_win.set_font(font);
+                    }
                     OsdCommand::SavePosition(x, y) => {
                         osd_win.save_position(x, y);
                     }
@@ -1193,6 +1409,36 @@ mod tests {
         assert_eq!(duration, 5040);
         assert_eq!(start, 171960);
     }
+
+    #[test]
+    fn osd_style_normalizes_and_roundtrips() {
+        assert_eq!(normalize_align("LEFT"), "left");
+        assert_eq!(normalize_align("end"), "right");
+        assert_eq!(normalize_align("nope"), "center");
+        assert_eq!(cycle_align("left"), "center");
+        assert_eq!(cycle_align("center"), "right");
+        assert_eq!(cycle_align("right"), "left");
+        assert_eq!(normalize_font_family(" system "), "");
+        assert_eq!(normalize_font_family("Noto Sans CJK SC"), "Noto Sans CJK SC");
+        assert!(!normalize_font_family("A<b>&\"'").contains('<'));
+        assert!(!normalize_font_family("A<b>&\"'").contains('&'));
+
+        let raw = r##"{"font_size":24,"width":820,"height":76,"locked":false,"color":"#fff","opacity":1.0,"bg_opacity":0.5}"##;
+        let cfg: OsdConfig = serde_json::from_str(raw).unwrap();
+        assert_eq!(cfg.align, "center");
+        assert_eq!(cfg.font_family, "");
+
+        let mut styled = OsdConfig::default();
+        styled.font_family = "Noto Sans CJK SC".to_string();
+        styled.font_size = 28;
+        styled.color = "#38bdf8".to_string();
+        let markup = colored_line_markup(&styled, "春江花月夜", "#38bdf8");
+        assert!(markup.contains("font_family=\"Noto Sans CJK SC\""));
+        assert!(markup.contains("font_size=\"28pt\""));
+        assert!(markup.contains("春江花月夜"));
+        assert!(!markup.contains("font_desc="));
+    }
+
 
     #[test]
     #[cfg(target_os = "linux")]

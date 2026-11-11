@@ -192,6 +192,39 @@ pub fn get_osd_color() -> String {
     crate::osd_window::load_config().color
 }
 
+pub fn set_osd_align(align: &str) -> String {
+    let align = crate::osd_window::normalize_align(align).to_string();
+    if let Some(tx) = OSD_CMD_TX.get() {
+        let _ = tx.send(OsdCommand::SetAlign(align.clone()));
+    }
+    align
+}
+
+pub fn get_osd_align() -> String {
+    crate::osd_window::normalize_align(&crate::osd_window::load_config().align).to_string()
+}
+
+pub fn set_osd_font(font: &str) -> String {
+    let stored = crate::osd_window::normalize_font_family(font);
+    if let Some(tx) = OSD_CMD_TX.get() {
+        let _ = tx.send(OsdCommand::SetFont(stored.clone()));
+    }
+    if stored.is_empty() {
+        "system".to_string()
+    } else {
+        stored
+    }
+}
+
+pub fn get_osd_font() -> String {
+    let font = crate::osd_window::normalize_font_family(&crate::osd_window::load_config().font_family);
+    if font.is_empty() {
+        "system".to_string()
+    } else {
+        font
+    }
+}
+
 pub fn set_osd_enabled(enabled: bool) {
     OSD_ENABLED.store(enabled, Ordering::Relaxed);
     notify_osd_visibility(enabled);
@@ -204,6 +237,8 @@ pub enum OsdCommand {
     SetLocked(bool),
     ToggleLock,
     SetColor(String),
+    SetAlign(String),
+    SetFont(String),
     SavePosition(i32, i32),
 }
 

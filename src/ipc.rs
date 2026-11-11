@@ -337,6 +337,16 @@ pub async fn dispatch(player: &Player, cmd: &str, args: Value) -> Value {
             json!({ "success": true, "color": color })
         }
         "get_osd_color" => json!({ "success": true, "color": crate::osd::get_osd_color() }),
+        "set_osd_align" => {
+            let align = crate::osd::set_osd_align(&arg_str(&args, "align"));
+            json!({ "success": true, "align": align })
+        }
+        "get_osd_align" => json!({ "success": true, "align": crate::osd::get_osd_align() }),
+        "set_osd_font" => {
+            let font = crate::osd::set_osd_font(&arg_str(&args, "font"));
+            json!({ "success": true, "font": font })
+        }
+        "get_osd_font" => json!({ "success": true, "font": crate::osd::get_osd_font() }),
         "set_playback_state" => {
             let playing = arg_bool(&args, "playing");
             crate::sleep_inhibitor::set_playback_state(playing);

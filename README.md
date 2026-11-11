@@ -8,7 +8,7 @@
 
 [![Rust Version](https://img.shields.io/badge/Rust-2021_Edition-DEA584.svg?style=flat-square&logo=rust)](https://www.rust-lang.org/)
 [![UI Shell](https://img.shields.io/badge/UI-GTK4%20%2B%20WebKitGTK%206.0-4A90E2.svg?style=flat-square&logo=gnome)](https://gtk.org/)
-[![Release](https://img.shields.io/badge/Release-v0.9.5-blue.svg?style=flat-square)](https://github.com/lianchengwu/lmplayer/releases)
+[![Release](https://img.shields.io/badge/Release-v0.9.6-blue.svg?style=flat-square)](https://github.com/lianchengwu/lmplayer/releases)
 [![GitHub Actions](https://img.shields.io/github/actions/workflow/status/lianchengwu/lmplayer/build.yml?branch=rust&style=flat-square&logo=github-actions)](https://github.com/lianchengwu/lmplayer/actions)
 [![License](https://img.shields.io/badge/License-GPL--3.0-green.svg?style=flat-square)](LICENSE)
 
@@ -68,7 +68,7 @@
 ### 🎤 独立歌词系统 (OSD & Plasma)
 - **多格式歌词解析**：支持标准 LRC 歌词与逐字高亮 KRC 歌词解码。
 - **跨进程歌词广播**：支持将实时歌词流广播给外部独立歌词进程。
-- **独立 OSD 桌面歌词**：配套支持透明度调节 (`0.01` ~ `0.90`)、字体缩放 (`12px` ~ `48px`)、卡拉 OK 逐字高亮色彩自定义与窗口锁定。
+- **独立 OSD 桌面歌词**：配套支持透明度调节 (`0.01` ~ `0.90`)、字体缩放 (`12px` ~ `48px`)、文字左/中/右对齐、桌面歌词字体选择、卡拉 OK 逐字高亮色彩自定义与窗口锁定。
 - **KDE Plasma 桌面挂件**：深度适配 Linux KDE Plasma 桌面环境。
 
 ---
@@ -186,11 +186,11 @@ target/release/wmplayer
 本项目配置了 **GitHub Actions CI 流水线** (`.github/workflows/build.yml`)：
 
 ### 自动化发布流程
-只需向仓库推送以 `v` 开头的版本标签（例如 `v0.9.5`），CI 将自动完成编译、打包并创建 GitHub Release 发布：
+只需向仓库推送以 `v` 开头的版本标签（例如 `v0.9.6`），CI 将自动完成编译、打包并创建 GitHub Release 发布：
 
 ```bash
-git tag v0.9.5
-git push origin v0.9.5
+git tag v0.9.6
+git push origin v0.9.6
 ```
 
 | 平台 | 架构 | 生成产物 | 说明 |

@@ -3,7 +3,7 @@
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::{Duration, Instant};
 
-use windows::core::{w, Interface};
+use windows::core::{w, Interface, PCWSTR};
 use windows_numerics::Vector2;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Direct2D::Common::*;
@@ -19,7 +19,10 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 use windows::Win32::UI::WindowsAndMessaging::*;
 
 use crate::osd::{set_osd_enabled, set_osd_locked, LyricPayload, OsdCommand};
-use crate::osd_window::{load_config, parse_krc_line, save_config, KrcLine, OsdConfig};
+use crate::osd_window::{
+    align_button_label, cycle_align, load_config, normalize_align, parse_krc_line,
+    resolve_font_family, save_config, KrcLine, OsdConfig,
+};
 
 const WM_OSD_CMD: u32 = WM_USER + 101;
 const WM_MOUSELEAVE: u32 = 0x02A3;
@@ -32,6 +35,7 @@ pub struct OsdWindow {
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum MiniButton {
+    Align,
     Lock,
     FontDec,
     FontInc,
@@ -43,6 +47,12 @@ fn get_button_rect(btn: MiniButton, width: i32) -> D2D_RECT_F {
     let bottom = 24.0;
     let w = width as f32;
     match btn {
+        MiniButton::Align => D2D_RECT_F {
+            left: w - 154.0,
+            top,
+            right: w - 128.0,
+            bottom,
+        },
         MiniButton::Lock => D2D_RECT_F {
             left: w - 124.0,
             top,
@@ -67,6 +77,37 @@ fn get_button_rect(btn: MiniButton, width: i32) -> D2D_RECT_F {
             right: w - 10.0,
             bottom,
         },
+    }
+}
+
+fn wide_null(s: &str) -> Vec<u16> {
+    s.encode_utf16().chain(std::iter::once(0)).collect()
+}
+
+fn lyric_text_format(
+    factory: &IDWriteFactory,
+    family: &str,
+    size: f32,
+) -> windows::core::Result<IDWriteTextFormat> {
+    let wide = wide_null(family);
+    unsafe {
+        factory.CreateTextFormat(
+            PCWSTR(wide.as_ptr()),
+            None,
+            DWRITE_FONT_WEIGHT_BOLD,
+            DWRITE_FONT_STYLE_NORMAL,
+            DWRITE_FONT_STRETCH_NORMAL,
+            size,
+            w!("zh-cn"),
+        )
+    }
+}
+
+fn text_align_for(align: &str) -> DWRITE_TEXT_ALIGNMENT {
+    match normalize_align(align) {
+        "left" => DWRITE_TEXT_ALIGNMENT_LEADING,
+        "right" => DWRITE_TEXT_ALIGNMENT_TRAILING,
+        _ => DWRITE_TEXT_ALIGNMENT_CENTER,
     }
 }
 
@@ -242,7 +283,9 @@ impl WinOsdState {
                     let _ = btn_fmt.SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
                     let _ = btn_fmt.SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
 
+                    let align_label = align_button_label(&self.config.align);
                     let buttons = [
+                        (MiniButton::Align, align_label),
                         (
                             MiniButton::Lock,
                             if self.config.locked {
@@ -313,18 +356,13 @@ impl WinOsdState {
 
             // 3. Draw Lyrics
             let font_size = self.config.font_size.clamp(14, 56) as f32;
-            let lyric_fmt = self.dwrite_factory.CreateTextFormat(
-                w!("Microsoft YaHei"),
-                None,
-                DWRITE_FONT_WEIGHT_BOLD,
-                DWRITE_FONT_STYLE_NORMAL,
-                DWRITE_FONT_STRETCH_NORMAL,
-                font_size,
-                w!("zh-cn"),
-            );
+            let family = resolve_font_family(&self.config.font_family);
+            let lyric_fmt = lyric_text_format(&self.dwrite_factory, &family, font_size).or_else(|_| {
+                lyric_text_format(&self.dwrite_factory, "Microsoft YaHei", font_size)
+            });
 
             if let Ok(fmt) = lyric_fmt {
-                let _ = fmt.SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+                let _ = fmt.SetTextAlignment(text_align_for(&self.config.align));
                 let _ = fmt.SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
 
                 let text_top = if !self.config.locked { 18.0 } else { 6.0 };
@@ -525,6 +563,7 @@ impl WinOsdState {
 
             let mut hit = None;
             for btn in [
+                MiniButton::Align,
                 MiniButton::Lock,
                 MiniButton::FontDec,
                 MiniButton::FontInc,
@@ -564,6 +603,11 @@ impl WinOsdState {
         }
 
         match self.hovered_btn {
+            Some(MiniButton::Align) => {
+                self.config.align = cycle_align(&self.config.align).to_string();
+                save_config(&self.config);
+                self.render_frame();
+            }
             Some(MiniButton::Lock) => {
                 self.toggle_lock();
             }
@@ -700,6 +744,16 @@ impl WinOsdState {
                 }
                 OsdCommand::SetColor(color) => {
                     self.config.color = color;
+                    save_config(&self.config);
+                    self.render_frame();
+                }
+                OsdCommand::SetAlign(align) => {
+                    self.config.align = normalize_align(&align).to_string();
+                    save_config(&self.config);
+                    self.render_frame();
+                }
+                OsdCommand::SetFont(font) => {
+                    self.config.font_family = crate::osd_window::normalize_font_family(&font);
                     save_config(&self.config);
                     self.render_frame();
                 }
