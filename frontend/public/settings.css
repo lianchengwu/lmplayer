@@ -1,8 +1,9 @@
 /* 设置页面样式 */
 .settings-content {
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 0 20px;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
 }
 
 /* 设置分组 */
@@ -411,11 +412,22 @@
 
 .osd-align-controls {
     display: flex;
+    align-items: center;
     gap: 6px;
+    flex-wrap: nowrap;
 }
 
-.osd-align-btn {
-    padding: 6px 12px;
+button.osd-align-btn {
+    width: auto !important;
+    height: auto !important;
+    min-width: 72px;
+    min-height: 32px;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 6px 14px !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
+    flex: 0 0 auto;
     border: 1px solid rgba(0, 0, 0, 0.12);
     border-radius: 6px;
     background: transparent;
