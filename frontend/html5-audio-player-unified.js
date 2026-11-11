@@ -54,7 +54,7 @@ class HTML5AudioPlayer {
     this.audio = null;
     this.currentSong = null;
     this._isPlaying = false;
-    this.volume = 0.5;
+    this.volume = 0.8;
     this.playUrls = [];
     this.currentUrlIndex = 0;
     this.retryCount = 0;

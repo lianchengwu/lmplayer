@@ -92,6 +92,113 @@ fn youth_card_id(category: &str) -> i64 {
     }
 }
 
+const GITHUB_LATEST_RELEASE: &str =
+    "https://api.github.com/repos/lianchengwu/lmplayer/releases/latest";
+
+fn version_parts(raw: &str) -> Vec<u64> {
+    raw.trim()
+        .trim_start_matches(['v', 'V'])
+        .split(|c: char| !c.is_ascii_digit())
+        .filter(|part| !part.is_empty())
+        .filter_map(|part| part.parse().ok())
+        .collect()
+}
+
+fn is_newer_version(latest: &str, current: &str) -> bool {
+    let latest = version_parts(latest);
+    let current = version_parts(current);
+    let len = latest.len().max(current.len());
+    for i in 0..len {
+        let next = latest.get(i).copied().unwrap_or(0);
+        let now = current.get(i).copied().unwrap_or(0);
+        if next != now {
+            return next > now;
+        }
+    }
+    false
+}
+
+fn update_result(ok_check: bool, message: &str, has_update: bool, latest: &str, notes: &str, url: &str) -> Value {
+    let current = env!("CARGO_PKG_VERSION");
+    json!({
+        "Success": ok_check,
+        "success": ok_check,
+        "HasUpdate": has_update,
+        "hasUpdate": has_update,
+        "LatestVersion": latest,
+        "latestVersion": latest,
+        "CurrentVersion": current,
+        "currentVersion": current,
+        "ReleaseNotes": notes,
+        "releaseNotes": notes,
+        "ReleaseURL": url,
+        "releaseURL": url,
+        "Message": message,
+        "message": message,
+    })
+}
+
+async fn check_github_updates() -> Value {
+    let current = env!("CARGO_PKG_VERSION");
+    let client = match reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .user_agent(concat!("wmplayer/", env!("CARGO_PKG_VERSION")))
+        .build()
+    {
+        Ok(client) => client,
+        Err(err) => return update_result(false, &format!("无法发起更新检查: {err}"), false, current, "", ""),
+    };
+
+    let response = match client
+        .get(GITHUB_LATEST_RELEASE)
+        .header("Accept", "application/vnd.github+json")
+        .send()
+        .await
+    {
+        Ok(response) => response,
+        Err(err) => return update_result(false, &format!("无法连接 GitHub: {err}"), false, current, "", ""),
+    };
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let message = if status.as_u16() == 404 {
+            "GitHub 上还没有已发布的版本".to_string()
+        } else {
+            format!("GitHub 返回 {status}")
+        };
+        return update_result(false, &message, false, current, "", "");
+    }
+
+    let body = match response.text().await {
+        Ok(body) => body,
+        Err(err) => return update_result(false, &format!("读取版本信息失败: {err}"), false, current, "", ""),
+    };
+    let release: Value = match serde_json::from_str(&body) {
+        Ok(release) => release,
+        Err(_) => return update_result(false, "GitHub 返回了无法解析的版本信息", false, current, "", ""),
+    };
+
+    let tag = release.get("tag_name").and_then(|v| v.as_str()).unwrap_or("").trim();
+    if tag.is_empty() {
+        return update_result(false, "GitHub 发布信息缺少版本号", false, current, "", "");
+    }
+    let latest = tag.trim_start_matches(['v', 'V']);
+    let mut notes = release.get("body").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    if notes.chars().count() > 4000 {
+        notes = notes.chars().take(4000).collect();
+        notes.push_str("…");
+    }
+    let url = release
+        .get("html_url")
+        .and_then(|v| v.as_str())
+        .filter(|url| url.starts_with("https://github.com/"))
+        .unwrap_or("https://github.com/lianchengwu/lmplayer/releases");
+    let has_update = is_newer_version(latest, current);
+    let message = if has_update { "发现新版本" } else { "当前已是最新版本" };
+    update_result(true, message, has_update, latest, &notes, url)
+}
+
+
 pub async fn dispatch(player: &Player, cmd: &str, args: Value) -> Value {
     let search = SearchApi { player };
     let home = HomeApi { player };
@@ -368,7 +475,7 @@ pub async fn dispatch(player: &Player, cmd: &str, args: Value) -> Value {
             ok(json!({ "success": true, "status": status }))
         }
         "get_media_key_status" => json!({ "registered": false }),
-        "check_for_updates" => json!({ "success": true, "hasUpdate": false }),
+        "check_for_updates" => check_github_updates().await,
         "get_current_version" => json!(env!("CARGO_PKG_VERSION")),
         "get_download_records" => ok(json!({ "records": [], "total_count": 0 })),
         "add_download_record" | "delete_download_record" | "clear_download_records" => ok(json!({})),
@@ -774,6 +881,16 @@ mod tests {
         assert_eq!(res3["success"], true);
         assert!(!crate::sleep_inhibitor::is_playing());
     }
+
+    #[test]
+    fn newer_release_is_detected() {
+        assert!(is_newer_version("v0.9.7", "0.9.6"));
+        assert!(is_newer_version("0.10.0", "0.9.6"));
+        assert!(!is_newer_version("v0.9.6", "0.9.6"));
+        assert!(!is_newer_version("0.9.5", "0.9.6"));
+        assert!(!is_newer_version("v0.9", "0.9.0"));
+    }
+
 
     #[tokio::test]
     async fn test_cloud_songs_ipc_dispatch() {

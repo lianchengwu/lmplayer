@@ -1097,33 +1097,62 @@ window.checkForAppUpdates = async () => {
         const res = await UpdateService.CheckForUpdates();
         btn.disabled = false;
         btn.textContent = '检查更新';
-
-        if (res.Success && res.HasUpdate) {
-            infoDiv.style.background = 'rgba(99, 102, 241, 0.1)';
-            infoDiv.style.color = 'var(--accent-color)';
-            infoDiv.style.border = '1px solid var(--accent-color)';
-            infoDiv.innerHTML = `
-                <div style="font-weight: 600; margin-bottom: 4px;">🎉 发现新版本 v${res.LatestVersion} (当前 v${res.CurrentVersion})</div>
-                ${res.ReleaseNotes ? `<div style="margin: 6px 0; max-height: 120px; overflow-y: auto; white-space: pre-wrap; opacity: 0.85;">${res.ReleaseNotes}</div>` : ''}
-                <button class="settings-button" style="margin-top: 8px;" onclick="openExternalLink('${res.ReleaseURL}')">前往下载发布页</button>
-            `;
-        } else if (res.Success) {
-            infoDiv.style.background = 'rgba(34, 197, 94, 0.1)';
-            infoDiv.style.color = '#22c55e';
-            infoDiv.style.border = '1px solid #22c55e';
-            infoDiv.innerHTML = `<i class="fas fa-check-circle"></i> 当前已是最新版本 (v${res.CurrentVersion})`;
-        } else {
-            infoDiv.style.background = 'rgba(239, 68, 68, 0.1)';
-            infoDiv.style.color = '#ef4444';
-            infoDiv.style.border = '1px solid #ef4444';
-            infoDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${res.Message || '检查更新失败'}`;
-        }
+        renderUpdateStatus(infoDiv, res);
     } catch (err) {
         btn.disabled = false;
         btn.textContent = '检查更新';
         infoDiv.style.background = 'rgba(239, 68, 68, 0.1)';
         infoDiv.style.color = '#ef4444';
         infoDiv.style.border = '1px solid #ef4444';
-        infoDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> 检查失败: ${err.message || err}`;
+        infoDiv.textContent = `检查失败: ${err.message || err}`;
     }
 };
+
+function renderUpdateStatus(infoDiv, res) {
+    const success = res?.Success ?? res?.success;
+    const hasUpdate = res?.HasUpdate ?? res?.hasUpdate;
+    const latest = res?.LatestVersion ?? res?.latestVersion ?? '';
+    const current = res?.CurrentVersion ?? res?.currentVersion ?? '';
+    const notes = res?.ReleaseNotes ?? res?.releaseNotes ?? '';
+    const url = res?.ReleaseURL ?? res?.releaseURL ?? res?.releaseUrl ?? '';
+    const message = res?.Message ?? res?.message ?? '';
+
+    infoDiv.replaceChildren();
+    if (success && hasUpdate) {
+        infoDiv.style.background = 'rgba(99, 102, 241, 0.1)';
+        infoDiv.style.color = 'var(--accent-color)';
+        infoDiv.style.border = '1px solid var(--accent-color)';
+        const title = document.createElement('div');
+        title.style.fontWeight = '600';
+        title.style.marginBottom = '4px';
+        title.textContent = `发现新版本 v${latest}（当前 v${current}）`;
+        infoDiv.appendChild(title);
+        if (notes) {
+            const notesEl = document.createElement('div');
+            notesEl.style.cssText = 'margin:6px 0;max-height:120px;overflow-y:auto;white-space:pre-wrap;opacity:0.85';
+            notesEl.textContent = notes;
+            infoDiv.appendChild(notesEl);
+        }
+        if (url) {
+            const link = document.createElement('button');
+            link.type = 'button';
+            link.className = 'settings-button';
+            link.style.marginTop = '8px';
+            link.textContent = '前往下载发布页';
+            link.addEventListener('click', () => window.openExternalLink(url));
+            infoDiv.appendChild(link);
+        }
+        return;
+    }
+    if (success) {
+        infoDiv.style.background = 'rgba(34, 197, 94, 0.1)';
+        infoDiv.style.color = '#22c55e';
+        infoDiv.style.border = '1px solid #22c55e';
+        infoDiv.textContent = `当前已是最新版本 (v${current || '未知'})`;
+        return;
+    }
+    infoDiv.style.background = 'rgba(239, 68, 68, 0.1)';
+    infoDiv.style.color = '#ef4444';
+    infoDiv.style.border = '1px solid #ef4444';
+    infoDiv.textContent = message || '检查更新失败';
+}

@@ -147,15 +147,12 @@ function applySettingsToFrontend(settings) {
 
     // 应用音量设置
     if (settings.playback && settings.playback.volume !== undefined) {
-        // 延迟应用音量设置，等待播放器初始化
-        setTimeout(() => {
-            if (typeof window.setVolume === 'function') {
-                window.setVolume(settings.playback.volume);
-                console.log('🔊 音量设置已应用:', settings.playback.volume);
-            } else if (window.UnifiedPlayerController?.setVolume) {
-                window.UnifiedPlayerController.setVolume(settings.playback.volume);
-            }
-        }, 1000);
+        const volume = settings.playback.volume;
+        const apply = () => window.setVolume(volume);
+        apply();
+        if (!window.UnifiedPlayerController?.setVolume) {
+            setTimeout(apply, 500);
+        }
     }
     console.log('✅ 设置应用到前端完成');
 }
@@ -743,20 +740,37 @@ window.formatTime = (seconds) => {
 }
 
 window.setVolume = (value) => {
-    // 接受 0-1 或 0-100 的值，统一为 0-1
-    const vol = value > 1 ? Math.max(0, Math.min(100, value)) / 100 : Math.max(0, Math.min(1, value));
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return;
+    const percent = numeric > 1
+        ? Math.max(0, Math.min(100, numeric))
+        : Math.max(0, Math.min(1, numeric)) * 100;
+    const rounded = Math.round(percent);
+
+    document.querySelectorAll('.volume-slider').forEach((slider) => {
+        slider.value = String(rounded);
+    });
+
     const volumeBtn = document.querySelector('.volume-btn i');
     if (volumeBtn) {
-        if (vol === 0) {
+        if (rounded === 0) {
             volumeBtn.className = 'fas fa-volume-mute';
-        } else if (vol < 0.5) {
+        } else if (rounded < 40) {
             volumeBtn.className = 'fas fa-volume-down';
         } else {
             volumeBtn.className = 'fas fa-volume-up';
         }
     }
-    console.log('音量设置为:', value, '规范化:', vol);
-}
+
+    if (window.UnifiedPlayerController?.setVolume) {
+        window.UnifiedPlayerController.setVolume(rounded);
+        return;
+    }
+    const player = typeof window.audioPlayer === 'function' ? window.audioPlayer() : null;
+    if (player?.setVolume) {
+        player.setVolume(rounded / 100);
+    }
+};
 
 // 左侧栏功能
 window.toggleSidebar = () => {
@@ -1048,8 +1062,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // }
 
     // 初始化播放器状态 - 现在由 HTML5 Audio API 管理
-    // window.updateProgress(0, 0); // 注释掉，避免与 HTML5 音频集成冲突
-    window.setVolume(50);
+    // 音量由已保存的设置应用，避免这里再用默认值盖掉
 
     // 左侧栏功能
     const sidebarToggle = document.getElementById('sidebarToggle');

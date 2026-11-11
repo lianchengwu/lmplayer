@@ -7,7 +7,7 @@ class UnifiedPlayerController {
     constructor() {
         // 播放器状态
         this.state = {
-            volume: 50,
+            volume: 80,
             isMuted: false,
             isPlaying: false,
             currentTime: 0,
