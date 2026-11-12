@@ -54,6 +54,30 @@ fn default_align() -> String {
 fn default_font_family() -> String {
     String::new()
 }
+/// Height of the control strip. Lyrics are laid out strictly below it when unlocked.
+pub const OSD_BUTTON_STRIP_H: f32 = 32.0;
+pub const OSD_BUTTON_TOP: f32 = 5.0;
+pub const OSD_BUTTON_BOTTOM: f32 = 27.0;
+pub const OSD_UNLOCKED_MIN_W: i32 = 520;
+pub const OSD_UNLOCKED_MIN_H: i32 = 118;
+
+pub fn osd_button_strip_height(locked: bool) -> f32 {
+    if locked {
+        0.0
+    } else {
+        OSD_BUTTON_STRIP_H
+    }
+}
+
+/// Lyric text box `(left, top, right, bottom)`. Unlocked top is below the control strip.
+pub fn osd_lyric_band(width: i32, height: i32, locked: bool) -> (f32, f32, f32, f32) {
+    let strip = osd_button_strip_height(locked);
+    let top = if locked { 6.0 } else { strip + 8.0 };
+    let bottom = (height as f32 - 6.0).max(top + 8.0);
+    let right = (width as f32 - 16.0).max(26.0);
+    (16.0, top, right, bottom)
+}
+
 
 
 impl Default for OsdConfig {
@@ -103,6 +127,24 @@ fn save_config(cfg: &OsdConfig) {
         let _ = fs::write(path, content);
     }
 }
+/// Grow a saved window so the control strip and one lyric line both fit.
+pub fn ensure_osd_room(cfg: &mut OsdConfig) {
+    let min_h = if cfg.locked { 48 } else { OSD_UNLOCKED_MIN_H };
+    let min_w = if cfg.locked { 300 } else { OSD_UNLOCKED_MIN_W };
+    let mut changed = false;
+    if cfg.height < min_h {
+        cfg.height = min_h;
+        changed = true;
+    }
+    if cfg.width < min_w {
+        cfg.width = min_w;
+        changed = true;
+    }
+    if changed {
+        save_config(cfg);
+    }
+}
+
 
 pub fn normalize_align(raw: &str) -> &'static str {
     match raw.trim().to_ascii_lowercase().as_str() {
@@ -495,15 +537,28 @@ fn generate_css(bg_opacity: f64) -> String {
         window.background.osd-window,
         .osd-window {{
             background-image: none;
-            background-color: {bg_str};
-            border-radius: 16px;
-            border: {border_str};
-            box-shadow: {shadow_str};
+            background-color: transparent;
+            border: none;
+            box-shadow: none;
         }}
         .osd-root-box {{
             background-image: none;
             background-color: transparent;
-            padding: 4px 12px 10px 12px;
+            padding: 6px;
+        }}
+        .osd-toolbar {{
+            background-color: #0f172a;
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            border-radius: 12px;
+            padding: 4px 8px;
+        }}
+        .osd-lyric-area {{
+            background-image: none;
+            background-color: {bg_str};
+            border-radius: 16px;
+            border: {border_str};
+            box-shadow: {shadow_str};
+            padding: 4px 12px;
         }}
         .osd-mini-btn {{
             background: rgba(255, 255, 255, 0.16);
@@ -530,6 +585,17 @@ fn generate_css(bg_opacity: f64) -> String {
         "
     )
 }
+
+#[cfg(target_os = "linux")]
+fn lyric_opacity_tooltip(pct: i32) -> String {
+    format!("调节歌词透明度: 当前 {pct}%（不影响操作按钮，滚轮微调）")
+}
+
+#[cfg(target_os = "linux")]
+fn lyric_bg_tooltip(pct: i32) -> String {
+    format!("调节歌词底色透明度: 当前 {pct}%（不影响操作按钮）")
+}
+
 
 // Token for KRC karaoke animation
 #[derive(Debug, Clone)]
@@ -639,6 +705,7 @@ pub struct OsdWindow {
 impl OsdWindow {
     pub fn new() -> Self {
         let config = Rc::new(RefCell::new(load_config()));
+        ensure_osd_room(&mut config.borrow_mut());
         let cfg = config.borrow().clone();
 
         ensure_kwin_rules(&cfg);
@@ -656,44 +723,29 @@ impl OsdWindow {
             .build();
 
         window.add_css_class("osd-window");
-        window.set_opacity(cfg.opacity);
+        // Window alpha would fade the control strip together with the lyrics.
+        window.set_opacity(1.0);
 
-        // Main layout container
-        let root_box = gtk4::Box::new(gtk4::Orientation::Vertical, 0);
+        let root_box = gtk4::Box::new(gtk4::Orientation::Vertical, 6);
         root_box.set_hexpand(true);
         root_box.set_vexpand(true);
         root_box.add_css_class("osd-root-box");
 
-        // Top subtle control toolbar (shown on hover when unlocked)
+        // Dedicated control strip. Not overlaid on the lyric card.
         let toolbar = gtk4::Box::new(gtk4::Orientation::Horizontal, 6);
-        toolbar.set_halign(gtk4::Align::End);
+        toolbar.set_halign(gtk4::Align::Fill);
+        toolbar.set_hexpand(true);
         toolbar.set_valign(gtk4::Align::Start);
-        toolbar.set_margin_top(4);
-        toolbar.set_margin_end(8);
         toolbar.add_css_class("osd-toolbar");
-        toolbar.set_opacity(0.35); // visible enough to be seen
+        toolbar.set_opacity(1.0);
 
         if cfg.locked {
             toolbar.set_visible(false);
         }
 
-        // Add hover effect to toolbar
-        let motion_ctrl = gtk4::EventControllerMotion::new();
-        let tb_hover = toolbar.clone();
-        let cfg_hover = config.clone();
-        motion_ctrl.connect_enter(move |_, _, _| {
-            if !cfg_hover.borrow().locked {
-                tb_hover.set_opacity(1.0);
-            }
-        });
-        let tb_leave = toolbar.clone();
-        let cfg_leave = config.clone();
-        motion_ctrl.connect_leave(move |_| {
-            if !cfg_leave.borrow().locked {
-                tb_leave.set_opacity(0.35);
-            }
-        });
-        window.add_controller(motion_ctrl);
+        let toolbar_spacer = gtk4::Box::new(gtk4::Orientation::Horizontal, 0);
+        toolbar_spacer.set_hexpand(true);
+        toolbar.append(&toolbar_spacer);
 
         // Control buttons
         let btn_align = gtk4::Button::with_label(align_button_label(&cfg.align));
@@ -711,12 +763,12 @@ impl OsdWindow {
         let bg_pct = (cfg.bg_opacity * 100.0).round() as i32;
         let btn_bg = gtk4::Button::with_label(&format!("🌓 {}%", bg_pct));
         btn_bg.add_css_class("osd-mini-btn");
-        btn_bg.set_tooltip_text(Some(&format!("调节底色亮度/透明度 (当前底色: {}%)", bg_pct)));
+        btn_bg.set_tooltip_text(Some(&lyric_bg_tooltip(bg_pct)));
 
         let pct = (cfg.opacity * 100.0).round() as i32;
         let btn_opacity = gtk4::Button::with_label(&format!("🔆 {}%", pct));
         btn_opacity.add_css_class("osd-mini-btn");
-        btn_opacity.set_tooltip_text(Some(&format!("调节窗口透明度: 当前 {}% (滚轮微调)", pct)));
+        btn_opacity.set_tooltip_text(Some(&lyric_opacity_tooltip(pct)));
 
         let btn_lock = gtk4::Button::with_label(if cfg.locked { "🔒" } else { "🔓" });
         btn_lock.add_css_class("osd-mini-btn");
@@ -739,7 +791,13 @@ impl OsdWindow {
         toolbar.append(&btn_lock);
         toolbar.append(&btn_close);
 
-        // Center Lyric Label
+        let lyric_area = gtk4::Box::new(gtk4::Orientation::Vertical, 0);
+        lyric_area.set_hexpand(true);
+        lyric_area.set_vexpand(true);
+        lyric_area.set_overflow(gtk4::Overflow::Hidden);
+        lyric_area.add_css_class("osd-lyric-area");
+        lyric_area.set_opacity(cfg.opacity.clamp(0.20, 1.0));
+
         let label = gtk4::Label::new(None);
         label.set_hexpand(true);
         label.set_vexpand(true);
@@ -753,10 +811,15 @@ impl OsdWindow {
             "wmPlayer 桌面歌词已启动",
             &cfg.color,
         ));
+        lyric_area.append(&label);
 
         root_box.append(&toolbar);
-        root_box.append(&label);
+        root_box.append(&lyric_area);
         window.set_child(Some(&root_box));
+        window.set_size_request(
+            if cfg.locked { 300 } else { OSD_UNLOCKED_MIN_W },
+            if cfg.locked { 48 } else { OSD_UNLOCKED_MIN_H },
+        );
 
         // Edge cursor motion detection
         let motion_edge = gtk4::EventControllerMotion::new();
@@ -843,7 +906,7 @@ impl OsdWindow {
             gtk4::EventControllerScrollFlags::VERTICAL,
         );
         let cfg_scroll = config.clone();
-        let win_scroll = window.clone();
+        let lyric_scroll = lyric_area.clone();
         let lbl_scroll = label.clone();
         let btn_op_clone = btn_opacity.clone();
         let krc_scroll = current_krc.clone();
@@ -876,10 +939,10 @@ impl OsdWindow {
                 let mut c = cfg_scroll.borrow_mut();
                 let delta = if dy < 0.0 { 0.05 } else { -0.05 };
                 c.opacity = (c.opacity + delta).clamp(0.20, 1.0);
-                win_scroll.set_opacity(c.opacity);
+                lyric_scroll.set_opacity(c.opacity);
                 let pct = (c.opacity * 100.0).round() as i32;
                 btn_op_clone.set_label(&format!("🔆 {}%", pct));
-                btn_op_clone.set_tooltip_text(Some(&format!("调节窗口透明度: 当前 {}% (滚轮微调)", pct)));
+                btn_op_clone.set_tooltip_text(Some(&lyric_opacity_tooltip(pct)));
                 save_config(&c);
             }
             glib::Propagation::Stop
@@ -970,13 +1033,13 @@ impl OsdWindow {
             css_provider_clone.load_from_data(&generate_css(c.bg_opacity));
             let pct = (c.bg_opacity * 100.0).round() as i32;
             btn_bg_clone.set_label(&format!("🌓 {}%", pct));
-            btn_bg_clone.set_tooltip_text(Some(&format!("调节底色亮度/透明度: 当前 {}%", pct)));
+            btn_bg_clone.set_tooltip_text(Some(&lyric_bg_tooltip(pct)));
             save_config(&c);
         });
 
-        // Window overall opacity presets: 100% -> 85% -> 70% -> 50% -> 35%
+        // Lyric opacity only. The control strip stays fully opaque.
         let cfg_op = config.clone();
-        let win_op = window.clone();
+        let lyric_op = lyric_area.clone();
         let btn_op_action = btn_opacity.clone();
         btn_opacity.connect_clicked(move |_| {
             let mut c = cfg_op.borrow_mut();
@@ -992,10 +1055,10 @@ impl OsdWindow {
                 1.0
             };
             c.opacity = next_op;
-            win_op.set_opacity(c.opacity);
+            lyric_op.set_opacity(c.opacity);
             let pct = (c.opacity * 100.0).round() as i32;
             btn_op_action.set_label(&format!("🔆 {}%", pct));
-            btn_op_action.set_tooltip_text(Some(&format!("调节窗口透明度: 当前 {}% (滚轮微调)", pct)));
+            btn_op_action.set_tooltip_text(Some(&lyric_opacity_tooltip(pct)));
             save_config(&c);
         });
 
@@ -1078,9 +1141,11 @@ impl OsdWindow {
 
         if locked {
             toolbar.set_visible(false);
+            window.set_size_request(300, 48);
         } else {
             toolbar.set_visible(true);
-            toolbar.set_opacity(0.35);
+            toolbar.set_opacity(1.0);
+            window.set_size_request(OSD_UNLOCKED_MIN_W, OSD_UNLOCKED_MIN_H);
         }
 
         Self::set_window_input_region(window, locked, window.width(), window.height());
@@ -1437,6 +1502,22 @@ mod tests {
         assert!(markup.contains("font_size=\"28pt\""));
         assert!(markup.contains("春江花月夜"));
         assert!(!markup.contains("font_desc="));
+    }
+
+    #[test]
+    fn lyric_band_does_not_overlap_buttons() {
+        assert!(OSD_BUTTON_TOP < OSD_BUTTON_BOTTOM);
+        assert!(OSD_BUTTON_BOTTOM <= OSD_BUTTON_STRIP_H);
+        assert_eq!(osd_button_strip_height(false), OSD_BUTTON_STRIP_H);
+        assert_eq!(osd_button_strip_height(true), 0.0);
+
+        let (_, top, right, bottom) = osd_lyric_band(820, OSD_UNLOCKED_MIN_H, false);
+        assert!(top >= OSD_BUTTON_STRIP_H);
+        assert!(bottom > top);
+        assert!(right > 16.0);
+
+        let (_, locked_top, _, _) = osd_lyric_band(820, 76, true);
+        assert!(locked_top < OSD_BUTTON_STRIP_H);
     }
 
 

@@ -20,8 +20,9 @@ use windows::Win32::UI::WindowsAndMessaging::*;
 
 use crate::osd::{set_osd_enabled, set_osd_locked, LyricPayload, OsdCommand};
 use crate::osd_window::{
-    align_button_label, cycle_align, load_config, normalize_align, parse_krc_line,
-    resolve_font_family, save_config, KrcLine, OsdConfig,
+    align_button_label, cycle_align, ensure_osd_room, load_config, normalize_align,
+    osd_button_strip_height, osd_lyric_band, parse_krc_line, resolve_font_family, save_config,
+    KrcLine, OsdConfig, OSD_BUTTON_BOTTOM, OSD_BUTTON_TOP,
 };
 
 const WM_OSD_CMD: u32 = WM_USER + 101;
@@ -43,8 +44,8 @@ enum MiniButton {
 }
 
 fn get_button_rect(btn: MiniButton, width: i32) -> D2D_RECT_F {
-    let top = 4.0;
-    let bottom = 24.0;
+    let top = OSD_BUTTON_TOP;
+    let bottom = OSD_BUTTON_BOTTOM;
     let w = width as f32;
     match btn {
         MiniButton::Align => D2D_RECT_F {
@@ -230,45 +231,45 @@ impl WinOsdState {
                 a: 0.0,
             }));
 
-            // 1. Draw rounded background
-            let bg_round = D2D1_ROUNDED_RECT {
-                rect: D2D_RECT_F {
-                    left: 2.0,
-                    top: 2.0,
-                    right: (width - 2) as f32,
-                    bottom: (height - 2) as f32,
-                },
-                radiusX: 14.0,
-                radiusY: 14.0,
-            };
+            let lyric_opacity = self.config.opacity.clamp(0.1, 1.0) as f32;
+            let strip = osd_button_strip_height(self.config.locked);
 
-            let bg_alpha = (self.config.bg_opacity * 0.78) as f32;
-            if let Ok(bg_brush) = dc_target.CreateSolidColorBrush(
-                &D2D1_COLOR_F {
-                    r: 0.08,
-                    g: 0.09,
-                    b: 0.12,
-                    a: bg_alpha,
-                },
-                None,
-            ) {
-                dc_target.FillRoundedRectangle(&bg_round, &bg_brush);
-            }
-
+            // Control strip is its own opaque bar. Lyric alpha must not reach it.
             if !self.config.locked {
+                let bar = D2D1_ROUNDED_RECT {
+                    rect: D2D_RECT_F {
+                        left: 2.0,
+                        top: 2.0,
+                        right: (width - 2) as f32,
+                        bottom: strip,
+                    },
+                    radiusX: 10.0,
+                    radiusY: 10.0,
+                };
+                if let Ok(bar_brush) = dc_target.CreateSolidColorBrush(
+                    &D2D1_COLOR_F {
+                        r: 0.06,
+                        g: 0.09,
+                        b: 0.15,
+                        a: 1.0,
+                    },
+                    None,
+                ) {
+                    dc_target.FillRoundedRectangle(&bar, &bar_brush);
+                }
                 if let Ok(border_brush) = dc_target.CreateSolidColorBrush(
                     &D2D1_COLOR_F {
                         r: 0.40,
                         g: 0.50,
                         b: 0.65,
-                        a: 0.35,
+                        a: 0.45,
                     },
                     None,
                 ) {
-                    dc_target.DrawRoundedRectangle(&bg_round, &border_brush, 1.2, None);
+                    dc_target.DrawRoundedRectangle(&bar, &border_brush, 1.2, None);
                 }
 
-                // 2. Draw hover toolbar buttons
+                // Buttons stay inside the opaque strip, above the lyric clip.
                 let btn_font_fmt = self.dwrite_factory.CreateTextFormat(
                     w!("Segoe UI"),
                     None,
@@ -354,7 +355,52 @@ impl WinOsdState {
                 }
             }
 
-            // 3. Draw Lyrics
+            let lyric_top = if strip > 0.0 { strip + 4.0 } else { 2.0 };
+            let lyric_round = D2D1_ROUNDED_RECT {
+                rect: D2D_RECT_F {
+                    left: 2.0,
+                    top: lyric_top,
+                    right: (width - 2) as f32,
+                    bottom: (height - 2) as f32,
+                },
+                radiusX: 14.0,
+                radiusY: 14.0,
+            };
+            let bg_alpha = self.config.bg_opacity as f32 * 0.78 * lyric_opacity;
+            if let Ok(bg_brush) = dc_target.CreateSolidColorBrush(
+                &D2D1_COLOR_F {
+                    r: 0.08,
+                    g: 0.09,
+                    b: 0.12,
+                    a: bg_alpha,
+                },
+                None,
+            ) {
+                dc_target.FillRoundedRectangle(&lyric_round, &bg_brush);
+            }
+            if bg_alpha > 0.02 {
+                if let Ok(border_brush) = dc_target.CreateSolidColorBrush(
+                    &D2D1_COLOR_F {
+                        r: 0.40,
+                        g: 0.50,
+                        b: 0.65,
+                        a: 0.35 * lyric_opacity,
+                    },
+                    None,
+                ) {
+                    dc_target.DrawRoundedRectangle(&lyric_round, &border_brush, 1.2, None);
+                }
+            }
+
+            let clip = D2D_RECT_F {
+                left: 0.0,
+                top: strip,
+                right: width as f32,
+                bottom: height as f32,
+            };
+            dc_target.PushAxisAlignedClip(&clip, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+
+            // 3. Draw Lyrics below the control strip
             let font_size = self.config.font_size.clamp(14, 56) as f32;
             let family = resolve_font_family(&self.config.font_family);
             let lyric_fmt = lyric_text_format(&self.dwrite_factory, &family, font_size).or_else(|_| {
@@ -365,12 +411,13 @@ impl WinOsdState {
                 let _ = fmt.SetTextAlignment(text_align_for(&self.config.align));
                 let _ = fmt.SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
 
-                let text_top = if !self.config.locked { 18.0 } else { 6.0 };
+                let (text_left, text_top, text_right, text_bottom) =
+                    osd_lyric_band(width, height, self.config.locked);
                 let text_rect = D2D_RECT_F {
-                    left: 16.0,
+                    left: text_left,
                     top: text_top,
-                    right: (width - 16) as f32,
-                    bottom: (height - 6) as f32,
+                    right: text_right,
+                    bottom: text_bottom,
                 };
                 let max_w = (text_rect.right - text_rect.left).max(10.0);
                 let max_h = (text_rect.bottom - text_rect.top).max(10.0);
@@ -379,7 +426,7 @@ impl WinOsdState {
                     r: 0.0,
                     g: 0.0,
                     b: 0.0,
-                    a: 0.85,
+                    a: 0.85 * lyric_opacity,
                 };
                 let shadow_brush = dc_target.CreateSolidColorBrush(&shadow_color, None).ok();
 
@@ -408,12 +455,12 @@ impl WinOsdState {
                             }
                         }
 
-                        let sung_color = parse_hex_color(&self.config.color, 1.0);
+                        let sung_color = parse_hex_color(&self.config.color, lyric_opacity);
                         let unsung_color = D2D1_COLOR_F {
                             r: 1.0,
                             g: 1.0,
                             b: 1.0,
-                            a: 0.50,
+                            a: 0.50 * lyric_opacity,
                         };
 
                         let sung_brush =
@@ -468,7 +515,7 @@ impl WinOsdState {
                     if let Ok(layout) =
                         self.dwrite_factory.CreateTextLayout(&utf16, &fmt, max_w, max_h)
                     {
-                        let active_color = parse_hex_color(&self.config.color, 1.0);
+                        let active_color = parse_hex_color(&self.config.color, lyric_opacity);
                         let active_brush =
                             dc_target.CreateSolidColorBrush(&active_color, None).ok();
 
@@ -498,6 +545,8 @@ impl WinOsdState {
                     }
                 }
             }
+            dc_target.PopAxisAlignedClip();
+
 
             let _ = dc_target.EndDraw(None, None);
 
@@ -517,7 +566,7 @@ impl WinOsdState {
             let blend = BLENDFUNCTION {
                 BlendOp: AC_SRC_OVER as u8,
                 BlendFlags: 0,
-                SourceConstantAlpha: (self.config.opacity.clamp(0.1, 1.0) * 255.0) as u8,
+                SourceConstantAlpha: 255,
                 AlphaFormat: AC_SRC_ALPHA as u8,
             };
 
@@ -896,7 +945,8 @@ fn run_osd_thread(init_tx: Sender<(isize, Sender<OsdCommand>)>) {
         };
         RegisterClassExW(&wc);
 
-        let config = load_config();
+        let mut config = load_config();
+        ensure_osd_room(&mut config);
         let screen_w = GetSystemMetrics(SM_CXSCREEN);
         let screen_h = GetSystemMetrics(SM_CYSCREEN);
 
