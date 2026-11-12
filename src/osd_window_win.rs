@@ -234,42 +234,8 @@ impl WinOsdState {
             let lyric_opacity = self.config.opacity.clamp(0.1, 1.0) as f32;
             let strip = osd_button_strip_height(self.config.locked);
 
-            // Control strip is its own opaque bar. Lyric alpha must not reach it.
+            // Opaque chips only. No full-width bar. Lyric alpha stays below the strip.
             if !self.config.locked {
-                let bar = D2D1_ROUNDED_RECT {
-                    rect: D2D_RECT_F {
-                        left: 2.0,
-                        top: 2.0,
-                        right: (width - 2) as f32,
-                        bottom: strip,
-                    },
-                    radiusX: 10.0,
-                    radiusY: 10.0,
-                };
-                if let Ok(bar_brush) = dc_target.CreateSolidColorBrush(
-                    &D2D1_COLOR_F {
-                        r: 0.06,
-                        g: 0.09,
-                        b: 0.15,
-                        a: 1.0,
-                    },
-                    None,
-                ) {
-                    dc_target.FillRoundedRectangle(&bar, &bar_brush);
-                }
-                if let Ok(border_brush) = dc_target.CreateSolidColorBrush(
-                    &D2D1_COLOR_F {
-                        r: 0.40,
-                        g: 0.50,
-                        b: 0.65,
-                        a: 0.45,
-                    },
-                    None,
-                ) {
-                    dc_target.DrawRoundedRectangle(&bar, &border_brush, 1.2, None);
-                }
-
-                // Buttons stay inside the opaque strip, above the lyric clip.
                 let btn_font_fmt = self.dwrite_factory.CreateTextFormat(
                     w!("Segoe UI"),
                     None,
@@ -303,42 +269,44 @@ impl WinOsdState {
                     for (btn, label) in buttons {
                         let r = get_button_rect(btn, width);
                         let is_hover = self.hovered_btn == Some(btn);
-
                         let btn_round = D2D1_ROUNDED_RECT {
                             rect: r,
                             radiusX: 5.0,
                             radiusY: 5.0,
                         };
-
-                        if is_hover {
-                            if let Ok(h_brush) = dc_target.CreateSolidColorBrush(
-                                &D2D1_COLOR_F {
-                                    r: 1.0,
-                                    g: 1.0,
-                                    b: 1.0,
-                                    a: 0.22,
-                                },
-                                None,
-                            ) {
-                                dc_target.FillRoundedRectangle(&btn_round, &h_brush);
-                            }
-                        }
-
-                        let text_color = if btn == MiniButton::Close && is_hover {
+                        let chip = if btn == MiniButton::Close && is_hover {
                             D2D1_COLOR_F {
-                                r: 0.95,
-                                g: 0.35,
-                                b: 0.35,
-                                a: 0.95,
+                                r: 0.86,
+                                g: 0.18,
+                                b: 0.18,
+                                a: 1.0,
+                            }
+                        } else if is_hover {
+                            D2D1_COLOR_F {
+                                r: 0.15,
+                                g: 0.20,
+                                b: 0.28,
+                                a: 1.0,
                             }
                         } else {
                             D2D1_COLOR_F {
-                                r: 0.88,
-                                g: 0.92,
-                                b: 0.96,
-                                a: 0.85,
+                                r: 0.06,
+                                g: 0.09,
+                                b: 0.16,
+                                a: 1.0,
                             }
                         };
+                        if let Ok(chip_brush) = dc_target.CreateSolidColorBrush(&chip, None) {
+                            dc_target.FillRoundedRectangle(&btn_round, &chip_brush);
+                        }
+
+                        let text_color = D2D1_COLOR_F {
+                            r: 1.0,
+                            g: 1.0,
+                            b: 1.0,
+                            a: 1.0,
+                        };
+
 
                         if let Ok(tb_brush) = dc_target.CreateSolidColorBrush(&text_color, None) {
                             let label_utf16: Vec<u16> = label.encode_utf16().collect();

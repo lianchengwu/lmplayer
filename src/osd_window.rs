@@ -547,10 +547,9 @@ fn generate_css(bg_opacity: f64) -> String {
             padding: 6px;
         }}
         .osd-toolbar {{
-            background-color: #0f172a;
-            border: 1px solid rgba(255, 255, 255, 0.22);
-            border-radius: 12px;
-            padding: 4px 8px;
+            background-color: transparent;
+            border: none;
+            padding: 0;
         }}
         .osd-lyric-area {{
             background-image: none;
@@ -561,9 +560,9 @@ fn generate_css(bg_opacity: f64) -> String {
             padding: 4px 12px;
         }}
         .osd-mini-btn {{
-            background: rgba(255, 255, 255, 0.16);
-            color: rgba(255, 255, 255, 0.95);
-            border: 1px solid rgba(255, 255, 255, 0.22);
+            background: #0f172a;
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.35);
             border-radius: 12px;
             padding: 2px 8px;
             font-size: 11px;
@@ -572,7 +571,7 @@ fn generate_css(bg_opacity: f64) -> String {
             min-width: 24px;
         }}
         .osd-mini-btn:hover {{
-            background: rgba(255, 255, 255, 0.38);
+            background: #1e293b;
             color: #ffffff;
         }}
         .osd-close-btn:hover {{
@@ -731,10 +730,10 @@ impl OsdWindow {
         root_box.set_vexpand(true);
         root_box.add_css_class("osd-root-box");
 
-        // Dedicated control strip. Not overlaid on the lyric card.
+        // Buttons sit in their own row, right-aligned. No full-width bar.
         let toolbar = gtk4::Box::new(gtk4::Orientation::Horizontal, 6);
-        toolbar.set_halign(gtk4::Align::Fill);
-        toolbar.set_hexpand(true);
+        toolbar.set_halign(gtk4::Align::End);
+        toolbar.set_hexpand(false);
         toolbar.set_valign(gtk4::Align::Start);
         toolbar.add_css_class("osd-toolbar");
         toolbar.set_opacity(1.0);
@@ -742,10 +741,6 @@ impl OsdWindow {
         if cfg.locked {
             toolbar.set_visible(false);
         }
-
-        let toolbar_spacer = gtk4::Box::new(gtk4::Orientation::Horizontal, 0);
-        toolbar_spacer.set_hexpand(true);
-        toolbar.append(&toolbar_spacer);
 
         // Control buttons
         let btn_align = gtk4::Button::with_label(align_button_label(&cfg.align));
@@ -832,7 +827,7 @@ impl OsdWindow {
             }
             let w = win_motion.width() as f64;
             let h = win_motion.height() as f64;
-            if let Some(edge) = detect_edge(x, y, w, h, 10.0) {
+            if let Some(edge) = detect_edge(x, y, w, h, 4.0) {
                 win_motion.set_cursor_from_name(Some(cursor_for_edge(edge)));
             } else {
                 win_motion.set_cursor_from_name(Some("default"));
@@ -846,20 +841,23 @@ impl OsdWindow {
         let win_resize = window.clone();
         gesture_resize.connect_drag_begin(move |gesture, x, y| {
             if cfg_resize.borrow().locked {
+                gesture.set_state(gtk4::EventSequenceState::Denied);
                 return;
             }
             let w = win_resize.width() as f64;
             let h = win_resize.height() as f64;
-            if let Some(edge) = detect_edge(x, y, w, h, 10.0) {
-                if let Some(widget) = gesture.widget() {
-                    if let Some(native) = widget.native() {
-                        if let Some(surface) = native.surface() {
-                            if let Ok(toplevel) = surface.downcast::<gtk4::gdk::Toplevel>() {
-                                if let Some(display) = gtk4::gdk::Display::default() {
-                                    if let Some(seat) = display.default_seat() {
-                                        if let Some(pointer) = seat.pointer() {
-                                            toplevel.begin_resize(edge, Some(&pointer), 1, x, y, 0);
-                                        }
+            let Some(edge) = detect_edge(x, y, w, h, 4.0) else {
+                gesture.set_state(gtk4::EventSequenceState::Denied);
+                return;
+            };
+            if let Some(widget) = gesture.widget() {
+                if let Some(native) = widget.native() {
+                    if let Some(surface) = native.surface() {
+                        if let Ok(toplevel) = surface.downcast::<gtk4::gdk::Toplevel>() {
+                            if let Some(display) = gtk4::gdk::Display::default() {
+                                if let Some(seat) = display.default_seat() {
+                                    if let Some(pointer) = seat.pointer() {
+                                        toplevel.begin_resize(edge, Some(&pointer), 1, x, y, 0);
                                     }
                                 }
                             }
@@ -1098,12 +1096,14 @@ impl OsdWindow {
             c.width = win_sz.width();
             c.height = win_sz.height();
             save_config(&c);
+            Self::set_window_input_region(&win_sz, c.locked, c.width, c.height);
         });
 
-        // Apply input region on realize / map
+        // Map, not realize: realize often reports 0×0, and a 200×40 fallback
+        // misses the right-side buttons so lock clicks pass through.
         let win_realize = window.clone();
         let cfg_realize = config.clone();
-        window.connect_realize(move |_| {
+        window.connect_map(move |_| {
             let locked = cfg_realize.borrow().locked;
             let w = win_realize.width();
             let h = win_realize.height();
@@ -1152,18 +1152,22 @@ impl OsdWindow {
     }
 
     fn set_window_input_region(window: &gtk4::Window, locked: bool, width: i32, height: i32) {
-        if let Some(surface) = gtk4::prelude::NativeExt::surface(window) {
-            if locked {
-                // Empty input region = 100% mouse click-through
-                let empty = gtk4::cairo::Region::create();
-                surface.set_input_region(&empty);
-            } else {
-                // Full rectangle = fully interactive
-                let rect = gtk4::cairo::RectangleInt::new(0, 0, width.max(200), height.max(40));
-                let full = gtk4::cairo::Region::create_rectangle(&rect);
-                surface.set_input_region(&full);
-            }
+        let Some(surface) = gtk4::prelude::NativeExt::surface(window) else {
+            return;
+        };
+        if locked {
+            let empty = gtk4::cairo::Region::create();
+            surface.set_input_region(&empty);
+            return;
         }
+        let w = width.max(window.width());
+        let h = height.max(window.height());
+        if w < 80 || h < 24 {
+            return;
+        }
+        let rect = gtk4::cairo::RectangleInt::new(0, 0, w, h);
+        let full = gtk4::cairo::Region::create_rectangle(&rect);
+        surface.set_input_region(&full);
     }
 
     pub fn set_locked(&self, locked: bool) {
