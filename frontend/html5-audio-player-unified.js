@@ -713,6 +713,8 @@ class HTML5AudioPlayer {
         return await this.tryPlayUrl(this.lastPlaybackPosition || 0);
       } else {
         console.error("❌ 所有播放地址都失败了");
+        this._isPlaying = false;
+        syncSleepInhibitor(false);
 
         // 等待30秒后自动播放下一首
         console.log("🎵 所有播放地址都失败，30秒后自动播放下一首");

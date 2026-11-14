@@ -131,6 +131,7 @@ pub(super) fn start(
                 if has_tray && !super::QUIT.load(std::sync::atomic::Ordering::Relaxed) {
                     window.set_visible(false);
                 } else {
+                    wmplayer::sleep_inhibitor::set_playback_state(false);
                     std::process::exit(0);
                 }
             }
@@ -172,7 +173,10 @@ fn apply_op(window: &tao::window::Window, webview: &wry::WebView, op: WinOp, has
             window.set_visible(true);
             window.set_focus();
         }
-        WinOp::Close => std::process::exit(0),
+        WinOp::Close => {
+            wmplayer::sleep_inhibitor::set_playback_state(false);
+            std::process::exit(0);
+        }
         WinOp::Drag { .. } => {
             let _ = window.drag_window();
         }

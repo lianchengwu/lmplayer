@@ -406,9 +406,6 @@ pub async fn dispatch(player: &Player, cmd: &str, args: Value) -> Value {
                 .and_then(|v| v.as_f64())
                 .unwrap_or(0.0);
             crate::osd::update_lyrics(&text, &song, &artist, current_time);
-            if current_time > 0.0 {
-                crate::sleep_inhibitor::set_playback_state(true);
-            }
             ok(json!("ok"))
         }
         "set_osd_enabled" => {

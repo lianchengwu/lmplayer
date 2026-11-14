@@ -111,6 +111,7 @@ fn apply_win_op(app: &gtk4::Application, win: &gtk4::ApplicationWindow, webview:
         }
         WinOp::Close => {
             QUIT.store(true, Ordering::Relaxed);
+            wmplayer::sleep_inhibitor::set_playback_state(false);
             win.close();
             app.quit();
             std::process::exit(0);
@@ -327,6 +328,7 @@ fn main() {
         .enable_all()
         .build()
         .expect("tokio");
+    wmplayer::sleep_inhibitor::init_with_runtime(rt.handle());
     let listener = rt
         .block_on(tokio::net::TcpListener::bind("127.0.0.1:0"))
         .expect("bind");
@@ -421,6 +423,7 @@ fn start_webview(app: gtk4::Application, addr: SocketAddr) {
         });
         win.connect_close_request(|win| {
             if QUIT.load(Ordering::Relaxed) {
+                wmplayer::sleep_inhibitor::set_playback_state(false);
                 if let Some(app) = win.application() {
                     app.quit();
                 }
